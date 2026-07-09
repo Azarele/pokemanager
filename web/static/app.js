@@ -2040,7 +2040,7 @@ async function removeWatch(id) {
     await api.del(`/watchlist/${id}`);
     toast('Watch entry removed', 'success');
     renderWatchlist();
-  } catch (e) { toast('Error: ' + extractError(e.message), 'error'); }
+  } catch (e) { toast('Error: ' + (e.message || e.detail || 'Failed to delete'), 'error'); }
 }
 
 async function confirmWatch() {

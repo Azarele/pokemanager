@@ -33,6 +33,8 @@ async def add_watch(req: AddWatchRequest, user: dict = Depends(get_current_user)
 async def remove_watch(watch_id: int, user: dict = Depends(get_current_user)):
     try:
         await db.remove_watch(user["id"], watch_id)
-        return {"message": "Watch entry removed"}
+        return {"success": True, "message": "Watch entry removed"}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to remove watch entry")
