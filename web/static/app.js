@@ -187,6 +187,49 @@ function closeDrawer() {
   document.getElementById('drawer-overlay').classList.remove('visible');
 }
 
+function initMobileNav() {
+  if (document.getElementById('mobile-topbar')) return;
+
+  const topbar = document.createElement('div');
+  topbar.id = 'mobile-topbar';
+  topbar.className = 'mobile-topbar';
+  topbar.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <img src="/static/logo.png" style="width:28px;height:28px;border-radius:6px">
+      <span style="font-weight:700;font-size:16px">PokeManager</span>
+    </div>
+    <button onclick="toggleMobileMenu()" style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;padding:4px 8px;line-height:1">☰</button>
+  `;
+  document.body.insertBefore(topbar, document.body.firstChild);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'mobile-menu-overlay';
+  overlay.className = 'mobile-menu-overlay';
+  overlay.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <span style="font-weight:700;font-size:18px">PokeManager</span>
+      <button onclick="toggleMobileMenu()" style="background:none;border:none;color:var(--text);font-size:28px;cursor:pointer">✕</button>
+    </div>
+    <nav style="display:flex;flex-direction:column;gap:4px">
+      <a onclick="navigate('/');toggleMobileMenu()" class="mobile-nav-link">📦 Inventory</a>
+      <a onclick="navigate('/analytics');toggleMobileMenu()" class="mobile-nav-link">📊 Analytics</a>
+      <a onclick="navigate('/listings');toggleMobileMenu()" class="mobile-nav-link">🏷️ Listings</a>
+      <a onclick="navigate('/watchlist');toggleMobileMenu()" class="mobile-nav-link">👁️ Watchlist</a>
+      <a onclick="navigate('/sales');toggleMobileMenu()" class="mobile-nav-link">💰 Sales</a>
+      <a onclick="navigate('/calculator');toggleMobileMenu()" class="mobile-nav-link">🧮 Calculator</a>
+      <a onclick="navigate('/upgrade');toggleMobileMenu()" class="mobile-nav-link">⭐ Upgrade</a>
+      <a onclick="navigate('/settings');toggleMobileMenu()" class="mobile-nav-link">⚙️ Settings</a>
+    </nav>
+    <div style="margin-top:auto;padding-top:20px;border-top:1px solid var(--border)">
+      <a onclick="confirmLogout();toggleMobileMenu()" class="mobile-nav-link" style="color:var(--accent2)">🚪 Sign Out</a>
+    </div>
+  `;
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) toggleMobileMenu();
+  });
+  document.body.appendChild(overlay);
+}
+
 function toggleMobileMenu() {
   const overlay = document.getElementById('mobile-menu-overlay');
   if (overlay) overlay.classList.toggle('open');
@@ -232,15 +275,6 @@ document.addEventListener('keydown', e => {
   if (modal && !modal.classList.contains('hidden') && getComputedStyle(modal).display !== 'none') {
     closeModal();
     return;
-  }
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-  const mobileMenu = document.getElementById('mobile-menu-overlay');
-  if (mobileMenu) {
-    mobileMenu.addEventListener('click', (e) => {
-      if (e.target === mobileMenu) toggleMobileMenu();
-    });
   }
 });
 
@@ -3812,6 +3846,7 @@ window.addEventListener('popstate', routeCurrentPath);
   startGlobalEventStream();
   updateStatus();
   await updateNavUser();
+  initMobileNav();
 
   // Add admin link if user is admin
   if (S.user?.role === 'admin') {

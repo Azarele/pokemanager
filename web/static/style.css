@@ -1810,6 +1810,24 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
   color: var(--accent);
 }
 
+.mobile-nav-link {
+  display: block;
+  padding: 14px 16px;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.mobile-nav-link:hover,
+.mobile-nav-link:active {
+  background: var(--surface2);
+}
+
 /* ── Mobile General Fixes ──────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   /* Font size minimum for accessibility */
