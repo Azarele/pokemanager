@@ -1,4 +1,5 @@
 import os
+import warnings
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -79,7 +80,7 @@ EBAY_REDIRECT_URI: str = os.getenv(
 )
 
 if not BOT_TOKEN:
-    raise EnvironmentError("DISCORD_TOKEN is not set. Copy .env.example to .env and fill it in.")
+    warnings.warn("DISCORD_TOKEN is not set — Discord bot features will be unavailable.")
 
 if not all([EBAY_APP_ID, EBAY_CERT_ID, EBAY_REFRESH_TOKEN]):
     print("[config] Warning: eBay API credentials incomplete — /list will fail. Run generate_ebay_token.py.")
