@@ -161,13 +161,13 @@ async def google_oauth():
     """Generate Google OAuth URL via Supabase."""
     import os
     supabase_url = os.getenv("SUPABASE_URL", "")
-    app_url = os.getenv("APP_URL", "http://localhost:8000")
+    site_url = os.getenv("SITE_URL", "http://localhost:8000")
 
     if not supabase_url:
         return JSONResponse({"url": None, "error": "Supabase not configured"}, status_code=500)
 
     # Supabase OAuth flow
-    redirect_to = f"{app_url}/api/auth/callback"
+    redirect_to = f"{site_url}/api/auth/callback"
     oauth_url = f"{supabase_url}/auth/v1/authorize?provider=google&redirect_to={redirect_to}"
 
     return JSONResponse({"url": oauth_url})
