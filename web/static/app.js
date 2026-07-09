@@ -2011,13 +2011,13 @@ function buildWatchlistPage(entries) {
   const rows = entries.length ? entries.map(e => {
     const triggered = e.alert_sent || (e.current_price_gbp && e.target_price_gbp && e.current_price_gbp <= e.target_price_gbp);
     return `<tr class="${triggered ? 'watch-triggered' : ''}">
-      <td>${e.watch_id}</td>
+      <td>${e.id}</td>
       <td>${esc(e.card_name)}</td>
       <td style="font-family:var(--mono)">${fmt(e.target_price_gbp)}</td>
       <td style="font-family:var(--mono);${triggered ? 'color:var(--success);font-weight:600' : ''}">${fmt(e.current_price_gbp)}</td>
       <td>${e.alert_sent ? '<span class="badge badge-success">🔔 Triggered</span>' : '<span class="badge badge-muted">Watching</span>'}</td>
       <td>${e.added_date || '—'}</td>
-      <td><button class="btn btn-icon btn-danger" onclick="removeWatch(${e.watch_id})">🗑️</button></td>
+      <td><button class="btn btn-icon btn-danger" onclick="removeWatch(${e.id})">🗑️</button></td>
     </tr>`;}).join('')
     : '';
 
@@ -2034,6 +2034,10 @@ function buildWatchlistPage(entries) {
 }
 
 async function removeWatch(id) {
+  if (!id || id === 'undefined') {
+    toast('Error: could not find watch ID', 'error');
+    return;
+  }
   const ok = await confirmDialog('Remove Watch', 'Remove this watch entry?');
   if (!ok) return;
   try {
