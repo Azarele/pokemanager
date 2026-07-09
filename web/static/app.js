@@ -189,6 +189,7 @@ function closeDrawer() {
 
 function initMobileNav() {
   if (document.getElementById('mobile-topbar')) return;
+  if (window.innerWidth > 768) return;
 
   const topbar = document.createElement('div');
   topbar.id = 'mobile-topbar';
