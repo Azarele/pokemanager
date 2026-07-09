@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>PokeManager</title>
   <link rel="stylesheet" href="/static/style.css" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
@@ -36,6 +36,30 @@
       <span id="nav-user" class="nav-user"></span>
     </div>
   </nav>
+
+  <!-- Mobile Topbar -->
+  <div class="mobile-topbar">
+    <div class="mobile-topbar-logo">
+      <img src="/static/logo.png" alt="PokeManager">
+      <span>PokeManager</span>
+    </div>
+    <button class="mobile-hamburger" onclick="toggleMobileMenu()">☰</button>
+  </div>
+
+  <!-- Mobile Menu Overlay -->
+  <div class="mobile-menu-overlay" id="mobile-menu-overlay">
+    <button class="mobile-menu-close" onclick="toggleMobileMenu()">✕</button>
+    <nav class="mobile-menu-links">
+      <a href="/" onclick="navigate('/'); toggleMobileMenu()" class="mobile-menu-link">Inventory</a>
+      <a href="/analytics" onclick="navigate('/analytics'); toggleMobileMenu()" class="mobile-menu-link">Analytics</a>
+      <a href="/listings" onclick="navigate('/listings'); toggleMobileMenu()" class="mobile-menu-link">Listings</a>
+      <a href="/watchlist" onclick="navigate('/watchlist'); toggleMobileMenu()" class="mobile-menu-link">Watchlist</a>
+      <a href="/sales" onclick="navigate('/sales'); toggleMobileMenu()" class="mobile-menu-link">Sales</a>
+      <a href="/calculator" onclick="navigate('/calculator'); toggleMobileMenu()" class="mobile-menu-link">Calculator</a>
+      <a href="/upgrade" onclick="navigate('/upgrade'); toggleMobileMenu()" class="mobile-menu-link">⭐ Upgrade</a>
+      <a href="/settings" onclick="navigate('/settings'); toggleMobileMenu()" class="mobile-menu-link">⚙️ Settings</a>
+    </nav>
+  </div>
 
   <main id="app" class="main"></main>
 

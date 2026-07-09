@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from web import db_inventory as db
 from web.auth import get_current_user
+from web.notifications import send_discord_notification
 
 router = APIRouter()
 
@@ -141,15 +142,22 @@ async def global_events(user: dict = Depends(get_current_user)):
                     newest     = today_sales[-1]
                     sell_price = float(newest.get("sell_price") or 0)
                     profit     = sell_price - float(newest.get("purchase_price") or 0)
+                    card_name  = newest.get("card_name", "Unknown")
                     event_data = json.dumps({
                         "type":        "new_sale",
-                        "card_name":   newest.get("card_name", "Unknown"),
+                        "card_name":   card_name,
                         "sell_price":  sell_price,
                         "profit":      round(profit, 2),
                         "item_id":     newest.get("item_id"),
                         "today_count": current_count,
                     })
                     yield f"event: sale\ndata: {event_data}\n\n"
+                    await send_discord_notification(
+                        user_id,
+                        "💰 Item Sold",
+                        f"**{card_name}** sold for **£{sell_price:.2f}**\nProfit: £{profit:.2f}",
+                        5763719,
+                    )
 
                 last_sold_count = current_count
                 yield f"event: heartbeat\ndata: {json.dumps({'count': current_count, 'ts': today})}\n\n"

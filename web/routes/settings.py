@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from web.auth import get_current_user
 from web.database import get_db
+from web.notifications import send_discord_notification
 
 router = APIRouter()
 
@@ -139,3 +140,15 @@ async def migrate_from_excel(user: dict = Depends(get_current_user)):
 
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+@router.post("/test-discord")
+async def test_discord_webhook(user: dict = Depends(get_current_user)):
+    """Send a test Discord notification to verify webhook is working."""
+    await send_discord_notification(
+        user["id"],
+        "✅ PokeManager Connected",
+        "Discord notifications are working! You'll receive alerts for sales, price changes, and account updates.",
+        5763719,
+    )
+    return {"success": True, "message": "Test notification sent"}

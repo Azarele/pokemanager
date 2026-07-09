@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from web.auth import get_current_user
 from web.database import get_db
+from web.notifications import send_discord_notification
 
 router = APIRouter()
 
@@ -135,6 +136,13 @@ async def stripe_webhook(request: Request):
                 "subscription_status":    "active",
             }).eq("id", user_id).execute()
             print(f"[billing] ✅ Upgraded {user_id} to {plan}")
+            plan_display = {"gym_leader": "Gym Leader", "champion": "Champion"}.get(plan, plan)
+            await send_discord_notification(
+                user_id,
+                "⭐ Plan Upgraded",
+                f"You're now on **{plan_display}**! Enjoy your new features.",
+                5763719,
+            )
 
     elif event_type == "customer.subscription.updated":
         customer_id = data.get("customer")

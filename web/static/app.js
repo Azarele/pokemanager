@@ -187,6 +187,11 @@ function closeDrawer() {
   document.getElementById('drawer-overlay').classList.remove('visible');
 }
 
+function toggleMobileMenu() {
+  const overlay = document.getElementById('mobile-menu-overlay');
+  if (overlay) overlay.classList.toggle('open');
+}
+
 /* ── Loading / empty state helpers ──────────────────────────────────────── */
 function showPageLoader(message = 'Loading…') {
   return `<div class="page-loader"><div class="spinner"></div><p class="text-muted">${message}</p></div>`;
@@ -215,6 +220,8 @@ function destroyAllCharts() {
 /* ── Global Escape key handler ───────────────────────────────────────────── */
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  const mobileMenu = document.getElementById('mobile-menu-overlay');
+  if (mobileMenu?.classList.contains('open')) { toggleMobileMenu(); return; }
   const popover = document.getElementById('card-popover');
   if (popover) { popover.remove(); return; }
   const camModal = document.getElementById('camera-modal');
@@ -225,6 +232,15 @@ document.addEventListener('keydown', e => {
   if (modal && !modal.classList.contains('hidden') && getComputedStyle(modal).display !== 'none') {
     closeModal();
     return;
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const mobileMenu = document.getElementById('mobile-menu-overlay');
+  if (mobileMenu) {
+    mobileMenu.addEventListener('click', (e) => {
+      if (e.target === mobileMenu) toggleMobileMenu();
+    });
   }
 });
 
@@ -256,6 +272,9 @@ function routeCurrentPath() {
 function highlightNav(path) {
   document.querySelectorAll('.nav-link').forEach(a => {
     a.classList.toggle('active', a.dataset.route === path);
+  });
+  document.querySelectorAll('.mobile-menu-link').forEach(a => {
+    a.classList.toggle('active', a.href === window.location.pathname || a.getAttribute('href') === path);
   });
 }
 
@@ -3164,11 +3183,18 @@ async function renderSettings() {
           }
         })()}
         <div class="form-section">
-          <label class="form-label">Discord Webhook URL (sale alerts)</label>
+          <label class="form-label">Discord Webhook URL</label>
+          <p class="text-muted" style="font-size:12px;margin-bottom:8px">
+            Paste a Discord webhook URL to get notified of important events.
+            <a href="https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks" target="_blank" style="color:var(--accent)">Create one ↗</a>
+          </p>
           <input id="s-discord" class="form-input" type="password"
-                 placeholder="${settings?.has_discord ? '••••••• (set)' : 'Optional'}">
+                 placeholder="${settings?.has_discord ? '••••••• (set)' : 'Optional — leave blank to disable'}">
         </div>
-        <button class="btn btn-accent btn-sm" onclick="saveIntegrationSettings()">Save</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-accent btn-sm" onclick="saveIntegrationSettings()">Save</button>
+          ${settings?.has_discord ? `<button class="btn btn-ghost btn-sm" onclick="testDiscordWebhook()">Test</button>` : ''}
+        </div>
       </div>
 
     </div>
@@ -3234,6 +3260,19 @@ async function saveIntegrationSettings() {
     else toast('Failed: ' + resp.error, 'error');
   } catch (e) {
     toast('Failed: ' + extractError(e.message), 'error');
+  }
+}
+
+async function testDiscordWebhook() {
+  try {
+    const resp = await api.post('/settings/test-discord', {});
+    if (resp.success) {
+      toast('✅ Test notification sent to Discord', 'success');
+    } else {
+      toast('Failed: ' + resp.error, 'error');
+    }
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
   }
 }
 
