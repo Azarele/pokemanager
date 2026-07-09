@@ -2284,9 +2284,9 @@ async function renderSales() {
       <h3>90-Day Profit Trend</h3>
       <div id="trend-chart-section" style="min-height:140px">${showPageLoader('Loading trend…')}</div>
     </div>
-    <div class="sales-chart-card" style="margin-top:16px;padding:0;overflow:hidden">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-top:16px;margin-bottom:20px;overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
-        <h3 style="margin:0">Browse by Date</h3>
+        <span style="font-size:0.95rem;font-weight:600">Browse by Date</span>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="changeSalesDate(-1)">← Prev</button>
           <input type="date" id="sales-date-picker" class="form-input"
@@ -2326,7 +2326,6 @@ async function loadSalesData() {
     if (monthProfEl)  animateCount(monthProfEl, 0, monthData.profit, 800, '£');
 
     renderWeekChart(weekData.days);
-    renderTodaySalesList(todayData.sales);
   } catch (e) {
     toast('Failed to load sales data', 'error');
   }
@@ -2461,14 +2460,14 @@ async function loadSalesByDate(date) {
         '<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px">' +
             '<thead>' +
                 '<tr style="background:var(--surface);border-bottom:1px solid var(--border)">' +
-                    '<th style="text-align:left;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:30%">Card</th>' +
-                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%">Bought</th>' +
-                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%">Sold</th>' +
-                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%">eBay Fee</th>' +
-                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%">Postage</th>' +
-                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%">Net</th>' +
-                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%">Profit</th>' +
-                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%">ROI</th>' +
+                    '<th style="text-align:left;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:30%;position:static">Card</th>' +
+                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%;position:static">Bought</th>' +
+                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%;position:static">Sold</th>' +
+                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%;position:static">eBay Fee</th>' +
+                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%;position:static">Postage</th>' +
+                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%;position:static">Net</th>' +
+                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%;position:static">Profit</th>' +
+                    '<th style="text-align:right;padding:7px 12px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;width:10%;position:static">ROI</th>' +
                 '</tr>' +
             '</thead>' +
             '<tbody>' + rows + '</tbody>' +
@@ -2486,7 +2485,7 @@ async function loadSalesByDate(date) {
             '</tfoot>' +
         '</table>';
 
-    container.innerHTML = '<div style="overflow-x:auto;width:100%;box-sizing:border-box">' + html + '</div>';
+    container.innerHTML = '<div style="overflow-x:auto;width:100%;box-sizing:border-box;position:relative">' + html + '</div>';
     observeThumbs(container);
 }
 
