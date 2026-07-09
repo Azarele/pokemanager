@@ -28,8 +28,6 @@ def _row_to_item(row: dict) -> dict:
         "quantity":          int(row.get("quantity") or 1),
         "ebay_listing_id":   row.get("ebay_listing_id", ""),
         "ebay_listed":       row.get("ebay_listed", "No"),
-        "vinted_listed":     row.get("vinted_listed", "No"),
-        "vinted_listing_url": row.get("vinted_listing_url", ""),
         "image_urls":        [u for u in (row.get("image_urls") or "").split("|") if u],
         "date_added":        str(row.get("date_added") or ""),
         "date_sold":         str(row.get("date_sold") or ""),
@@ -91,8 +89,7 @@ _EDITABLE_FIELDS = {
     "quick_price": "quick_price", "potential_profit": "potential_profit",
     "sell_price": "sell_price", "profit": "profit",
     "status": "status", "ebay_listing_id": "ebay_listing_id",
-    "ebay_listed": "ebay_listed", "vinted_listed": "vinted_listed",
-    "vinted_listing_url": "vinted_listing_url",
+    "ebay_listed": "ebay_listed",
     "date_sold": "date_sold", "price_verified": "price_verified",
     "source": "source", "image_urls": "image_urls",
 }

@@ -29,13 +29,12 @@ const CHART_THEME = {
 
 /* ── Tier / Plan Features ──────────────────────────────────────────────────── */
 const PLAN_FEATURES = {
-  unlimited_items:   ['gym_leader', 'champion'],
-  ebay_listing:      ['gym_leader', 'champion'],
-  ai_descriptions:   ['gym_leader', 'champion'],
-  price_history:     ['gym_leader', 'champion'],
-  export_accounting: ['gym_leader', 'champion'],
-  auto_relist:       ['gym_leader', 'champion'],
-  vinted_listing:    ['champion'],
+  unlimited_items:      ['gym_leader', 'champion'],
+  ebay_listing:         ['gym_leader', 'champion'],
+  ai_descriptions:      ['gym_leader', 'champion'],
+  ai_descriptions_managed: ['champion'],
+  price_history:        ['gym_leader', 'champion'],
+  export_accounting:    ['gym_leader', 'champion'],
 };
 
 function canAccess(feature) {
@@ -427,7 +426,6 @@ const FILTERS = [
   { key: 'sold',       label: 'Sold' },
   { key: 'ebay',       label: 'eBay Listed' },
   { key: 'not_listed', label: 'Not Listed' },
-  { key: 'vinted',     label: 'Vinted' },
   { key: 'underwater', label: '⚠️ Underwater' },
   { key: 'low_eff',    label: '⚡ Low Eff.' },
 ];
@@ -439,7 +437,6 @@ function applyFiltersAndSort() {
     case 'sold':       items = items.filter(i => i.status === 'Sold'); break;
     case 'ebay':       items = items.filter(i => i.ebay_listed === 'Yes'); break;
     case 'not_listed': items = items.filter(i => i.status === 'Inventory' && i.ebay_listed !== 'Yes'); break;
-    case 'vinted':     items = items.filter(i => i.vinted_listed === 'Yes'); break;
     case 'underwater': items = items.filter(i => i.status === 'Inventory' && (i.live_price || 0) < (i.purchase_price || 0)); break;
     case 'low_eff':    items = items.filter(i => i.status === 'Inventory' && i.purchase_price > 0
                                && ((i.potential_profit ?? 0) / i.purchase_price) < 0.1); break;
@@ -472,7 +469,6 @@ function countFor(k) {
     case 'sold':       return inv.filter(i => i.status === 'Sold').length;
     case 'ebay':       return inv.filter(i => i.ebay_listed === 'Yes').length;
     case 'not_listed': return inv.filter(i => i.status === 'Inventory' && i.ebay_listed !== 'Yes').length;
-    case 'vinted':     return inv.filter(i => i.vinted_listed === 'Yes').length;
     case 'underwater': return inv.filter(i => i.status === 'Inventory' && (i.live_price || 0) < (i.purchase_price || 0)).length;
     case 'low_eff':    return inv.filter(i => i.status === 'Inventory' && i.purchase_price > 0
                               && ((i.potential_profit ?? 0) / i.purchase_price) < 0.1).length;
@@ -516,14 +512,12 @@ function renderInventoryCard(item) {
 
   const badges = [
     isListed  ? `<span class="badge badge-ebay">eBay</span>`   : '',
-    item.vinted_listed === 'Yes' ? `<span class="badge badge-vinted">Vinted</span>` : '',
     isUW      ? `<span class="badge badge-danger">⚠️</span>`   : '',
     isLE && !isUW ? `<span class="badge badge-warn">⚡</span>` : '',
     isSold    ? `<span class="badge badge-sold">Sold</span>`   : '',
   ].filter(Boolean).join('');
 
   const canList   = canAccess('ebay_listing');
-  const canVinted = canAccess('vinted_listing');
 
   const actions = isSold
     ? `<button class="btn btn-icon" onclick="openPriceCheck(${item.item_id})" title="Price check">💰</button>`
@@ -538,8 +532,7 @@ function renderInventoryCard(item) {
             <button class="btn btn-sm btn-success" onclick="openSellModal(${item.item_id})">Sell</button>`
          : `<button class="btn btn-sm btn-ghost" onclick="showUpgradePrompt('ebay_listing')" title="Upgrade to list on eBay">🔒 List</button>
             <button class="btn btn-sm btn-success" onclick="openSellModal(${item.item_id})">Sell</button>`
-       }
-       ${canVinted && item.vinted_listed !== 'Yes' ? `<button class="btn btn-sm btn-vinted" onclick="listOnVinted(${item.item_id})">Vinted</button>` : ''}`;
+       }`;
 
   return `
     <div class="inv-card${isUW ? ' is-underwater' : ''}${S.selection?.has(item.item_id) ? ' is-selected' : ''}" data-id="${item.item_id}">
@@ -1680,8 +1673,6 @@ function buildListingsPage() {
   const listed   = S.inventory.filter(i => i.status === 'Inventory' && i.ebay_listed === 'Yes');
   const unlisted = S.inventory.filter(i => i.status === 'Inventory' && i.ebay_listed !== 'Yes')
                               .sort((a, b) => (b.potential_profit ?? 0) - (a.potential_profit ?? 0));
-  const notOnVinted = S.inventory.filter(i => i.status === 'Inventory' && i.vinted_listed !== 'Yes')
-                                  .sort((a, b) => (b.potential_profit ?? 0) - (a.potential_profit ?? 0));
 
   const listedHtml = listed.length
     ? listed.map(i => `
@@ -1718,21 +1709,6 @@ function buildListingsPage() {
       </div>`).join('')
     : emptyState('✅', 'All items listed', 'Every card in your inventory has an active eBay listing.');
 
-  const vintedHtml = notOnVinted.length
-    ? notOnVinted.map(i => `
-      <div class="unlisted-card" data-id="${i.item_id}">
-        <div class="unlisted-thumb card-thumb" data-item-id="${i.item_id}"><div class="thumb-spinner"></div></div>
-        <div class="unlisted-info">
-          <div class="unlisted-name">${esc(i.card_name || '')}</div>
-          <div class="unlisted-prices">
-            <span class="price-tag">Market ${fmt(i.live_price)}</span>
-            <span class="price-tag text-vinted">Quick ${fmt(i.quick_price)}</span>
-          </div>
-        </div>
-        <button class="btn btn-sm btn-vinted" onclick="openVintedDrawer(${i.item_id})">List on Vinted</button>
-      </div>`).join('')
-    : emptyState('✅', 'All items listed', 'Every card in your inventory has an active Vinted listing.');
-
   document.getElementById('app').innerHTML = `
     <div class="page-header"><h1 class="page-title">Listings</h1></div>
     <div class="listings-grid">
@@ -1743,10 +1719,6 @@ function buildListingsPage() {
       <div class="listings-panel">
         <div class="panel-header"><span class="panel-title">Not Listed — by Potential Profit (${unlisted.length})</span></div>
         ${unlistedHtml}
-      </div>
-      <div class="listings-panel">
-        <div class="panel-header"><span class="panel-title text-vinted">Not on Vinted (${notOnVinted.length})</span></div>
-        ${vintedHtml}
       </div>
     </div>
     <div class="reprice-panel">
@@ -1940,123 +1912,6 @@ async function submitListing(itemId) {
   }
 }
 
-/* ── Vinted listing drawer ────────────────────────────────────────────────
-   Same drawer element and photo picker as eBay's — see _wirePhotoDropZone. */
-async function openVintedDrawer(itemId) {
-  const item = S.inventory.find(i => i.item_id === itemId)
-             || await api.get(`/inventory/${itemId}`).catch(() => null);
-  if (!item) { toast('Item not found', 'error'); return; }
-
-  const liveP = parseFloat(item.live_price  || 0);
-  const price = (parseFloat(item.quick_price) || liveP * 0.93 || 0).toFixed(2);
-
-  const drawer = document.getElementById('listing-drawer');
-  drawer.innerHTML = `
-    <div class="drawer-header">
-      <h2 class="text-vinted">List on Vinted</h2>
-      <button class="btn-icon" onclick="closeDrawer()">✕</button>
-    </div>
-    <div class="drawer-body">
-      <div class="drawer-card-preview">
-        <div class="card-thumb" data-item-id="${itemId}"><div class="thumb-spinner"></div></div>
-        <div>
-          <h3>${esc(item.card_name || '')}</h3>
-          <p class="text-muted" style="font-size:0.82rem">${esc(item.condition || '')}${item.region ? ' · ' + esc(item.region) : ''}</p>
-        </div>
-      </div>
-
-      <div class="form-section">
-        <label>Listing Title (max 60 chars)</label>
-        <input id="vinted-title" type="text" class="form-input" maxlength="60"
-               value="${esc(item.card_name || '')} Pokemon Card">
-        <span class="char-count"><span id="vinted-title-len">0</span>/60</span>
-      </div>
-
-      <div class="form-section">
-        <label>Price (£)</label>
-        <input id="vinted-price" type="number" class="form-input" step="0.01" value="${price}">
-        <p class="text-muted" style="font-size:12px;margin-top:4px">Suggested: ${fmt(price)} (quick-sell price)</p>
-      </div>
-
-      <div class="form-section">
-        <label>Condition</label>
-        <select id="vinted-condition" class="form-input">
-          <option value="Near mint or better" ${item.condition === 'Near mint or better' ? 'selected' : ''}>Near Mint+</option>
-          <option value="Lightly played" ${item.condition === 'Lightly played' ? 'selected' : ''}>Lightly Played</option>
-          <option value="Moderately played" ${item.condition === 'Moderately played' ? 'selected' : ''}>Mod Played</option>
-          <option value="Heavily played" ${item.condition === 'Heavily played' ? 'selected' : ''}>Heavily Played</option>
-        </select>
-      </div>
-
-      <div class="form-section">
-        <label>Photos (drop or click to upload)</label>
-        <div class="photo-drop-zone" id="photo-drop">📷 Drop photos here or click to select</div>
-        <input type="file" id="photo-input" accept="image/*" multiple style="display:none">
-        <div class="photo-preview-grid" id="photo-preview"></div>
-        <p class="text-muted" style="font-size:12px;margin-top:6px">Vinted requires at least 1 photo</p>
-      </div>
-
-      <div class="form-section">
-        <label>Description</label>
-        <textarea id="vinted-desc" class="form-input" rows="4"
-                  placeholder="Pokemon card in great condition. Fast dispatch.">${esc(item.card_name || '')} Pokemon TCG card in ${esc((item.condition || 'near mint').toLowerCase())} condition. Dispatched within 1-2 days.</textarea>
-      </div>
-
-      <div class="drawer-actions">
-        <button class="btn btn-ghost" onclick="closeDrawer()">Cancel</button>
-        <button class="btn btn-sm btn-vinted" id="vinted-submit-btn" onclick="submitVintedListing(${itemId})">List on Vinted →</button>
-      </div>
-    </div>`;
-
-  drawer.classList.add('open');
-  document.getElementById('drawer-overlay').classList.add('visible');
-
-  const titleInput = document.getElementById('vinted-title');
-  const updateLen  = () => { document.getElementById('vinted-title-len').textContent = titleInput.value.length; };
-  titleInput.addEventListener('input', updateLen);
-  updateLen();
-
-  _wirePhotoDropZone();
-  observeThumbs(drawer);
-}
-
-async function submitVintedListing(itemId) {
-  const btn       = document.getElementById('vinted-submit-btn');
-  const title     = document.getElementById('vinted-title')?.value.trim();
-  const price     = parseFloat(document.getElementById('vinted-price')?.value);
-  const condition = document.getElementById('vinted-condition')?.value;
-  const desc      = document.getElementById('vinted-desc')?.value.trim();
-
-  if (_selectedPhotos.length === 0) { toast('Add at least one photo', 'error'); return; }
-  if (!price || price <= 0) { toast('Enter a valid price', 'error'); return; }
-
-  btn.disabled = true; btn.textContent = '⏳ Listing on Vinted…';
-  const fd = new FormData();
-  fd.append('item_id',     itemId);
-  fd.append('title',       title);
-  fd.append('price',       price);
-  fd.append('condition',   condition);
-  fd.append('description', desc);
-  _selectedPhotos.slice(0, 5).forEach((f, i) => fd.append(`image${i + 1}`, f));
-
-  try {
-    const res = await api.postForm('/listings/list-vinted-form', fd);
-    if (res.success) {
-      toast(`✅ Listed on Vinted! ${res.listing_url || ''}`, 'success', 8000);
-      closeDrawer();
-      const item = S.inventory.find(i => i.item_id === itemId);
-      if (item) item.vinted_listed = 'Yes';
-      buildListingsPage();
-    } else {
-      toast(`❌ Vinted: ${res.error}`, 'error', 8000);
-      btn.disabled = false; btn.textContent = 'List on Vinted →';
-    }
-  } catch (e) {
-    toast(`❌ ${extractError(e.message)}`, 'error');
-    btn.disabled = false; btn.textContent = 'List on Vinted →';
-  }
-}
-
 async function doUnlist(itemId, name) {
   const ok = await confirmDialog('End eBay Listing',
     `End listing for "${name}"? It will be removed from eBay and marked as unlisted.`);
@@ -2072,31 +1927,6 @@ async function doUnlist(itemId, name) {
       buildListingsPage();
     } else { toast('Failed to end listing', 'error'); }
   } catch (e) { toast('Error: ' + extractError(e.message), 'error'); }
-}
-
-async function listOnVinted(itemId) {
-  const item = S.inventory.find(i => i.item_id === itemId);
-  if (!item) return;
-
-  const ok = await confirmDialog(
-    'List on Vinted',
-    `List "${item.card_name}" on Vinted at ${fmt(item.quick_price || item.live_price || 0)}?`
-  );
-  if (!ok) return;
-
-  toast('⏳ Listing on Vinted — this takes 20-30 seconds…', 'info', 35000);
-  try {
-    const res = await api.post('/listings/list-vinted', { item_id: itemId });
-    if (res.success) {
-      toast('✅ Listed on Vinted!', 'success');
-      item.vinted_listed = 'Yes';
-      refreshInventoryGrid();
-    } else {
-      toast(`❌ Vinted: ${res.error}`, 'error', 8000);
-    }
-  } catch (e) {
-    toast(`❌ ${extractError(e.message)}`, 'error');
-  }
 }
 
 /* ── Reprice-all ─────────────────────────────────────────────────────────── */
@@ -2496,7 +2326,7 @@ function renderCalculator() {
       <div class="page-header">
         <h1 class="page-title">Buying Calculator</h1>
       </div>
-      <p class="text-muted" style="margin-bottom:16px">Paste an eBay or Vinted listing URL to see if it's worth buying.</p>
+      <p class="text-muted" style="margin-bottom:16px">Paste an eBay listing URL to see if it's worth buying.</p>
       <div class="calc-input-card">
         <div class="calc-url-row">
           <input type="url" id="calc-url" class="form-input calc-url-input"
@@ -3218,10 +3048,9 @@ async function renderSettings() {
             ['Buying calculator', true],
             ['Unlimited items', canAccess('unlimited_items')],
             ['eBay listing', canAccess('ebay_listing')],
-            ['AI descriptions', canAccess('ai_descriptions')],
+            ['AI descriptions (your API key)', canAccess('ai_descriptions')],
+            ['AI descriptions (we provide API key)', canAccess('ai_descriptions_managed')],
             ['Accounting exports', canAccess('export_accounting')],
-            ['Auto-relist expired listings', canAccess('auto_relist')],
-            ['Vinted listing', canAccess('vinted_listing')],
             ['Priority support', canAccess('priority_support')],
           ].map(([label, has]) => `
             <div style="display:flex;align-items:center;gap:10px">
@@ -3416,7 +3245,6 @@ async function renderUpgrade() {
             <li>✅ Analytics dashboard</li>
             <li>✅ Buying calculator</li>
             <li>❌ eBay listing</li>
-            <li>❌ Vinted listing</li>
             <li>❌ Accounting exports</li>
             <li>❌ AI descriptions</li>
           </ul>
@@ -3440,8 +3268,6 @@ async function renderUpgrade() {
             <li>✅ AI descriptions (your Gemini key)</li>
             <li>✅ Price history & sparklines</li>
             <li>✅ HMRC / Xero / QuickBooks export</li>
-            <li>✅ Auto-relist expired listings</li>
-            <li>❌ Vinted listing</li>
           </ul>
           ${plan === 'gym_leader'
             ? `<div class="plan-current-badge">Current plan</div>
@@ -3460,7 +3286,7 @@ async function renderUpgrade() {
           <div class="plan-desc">The complete solution</div>
           <ul class="plan-features">
             <li>✅ Everything in Gym Leader</li>
-            <li>✅ Vinted listing</li>
+            <li>✅ AI descriptions — no API key needed (we cover it)</li>
             <li>✅ Priority support</li>
             <li>✅ Early access to new features</li>
           </ul>

@@ -185,8 +185,6 @@ tbody td { padding: 8px 12px; vertical-align: middle; max-width: 220px; }
 .btn-ghost:hover { color: var(--text); background: var(--surface2); }
 .btn-outline { background: transparent; color: var(--accent); border-color: var(--accent); }
 .btn-outline:hover { background: rgba(108,99,255,0.12); }
-.btn-vinted  { background: #40d090; color: #062017; border-color: #40d090; }
-.btn-vinted:hover { filter: brightness(0.9); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ── Bulk toolbar ──────────────────────────────────────────────────────── */
@@ -227,7 +225,6 @@ tbody td { padding: 8px 12px; vertical-align: middle; max-width: 220px; }
 .listings-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 .panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
 .panel-title { font-size: 0.95rem; font-weight: 600; }
-.text-vinted { color: #40d090; }
 .reprice-panel {
   margin-top: 20px; background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-lg); padding: 20px;
@@ -665,7 +662,6 @@ select { position: relative; z-index: 10; }
 
 /* badges */
 .badge-ebay   { background: rgba(0,128,255,0.18); color: #66aaff; }
-.badge-vinted { background: rgba(0,190,120,0.18); color: #40d090; }
 .badge-sold   { background: rgba(136,136,153,0.18); color: var(--text-muted); }
 
 /* card actions */

@@ -137,16 +137,3 @@ def sync_ebay_delisted(item_id: int) -> None:
 def sync_ebay_sold(item_id: int, sell_price: float, profit: float) -> None:
     """Called when eBay auto-sale detection fires."""
     sync_sell_item(item_id, sell_price, profit)
-
-
-def sync_vinted_listed(item_id: int, listing_url: str) -> None:
-    try:
-        db = _db()
-        if not db:
-            return
-        db.table("inventory_items").update({
-            "vinted_listed":     "Yes",
-            "vinted_listing_url": listing_url,
-        }).eq("user_id", _USER_ID).eq("item_id", item_id).execute()
-    except Exception as e:
-        print(f"[bot_sync] sync_vinted_listed failed: {e}")

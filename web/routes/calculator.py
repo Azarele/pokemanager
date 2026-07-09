@@ -64,8 +64,6 @@ async def analyse_listing(req: AnalyseRequest, user: dict = Depends(get_current_
 
     if "ebay.co.uk" in url or "ebay.com" in url:
         result["platform"] = "ebay"
-    elif "vinted.co.uk" in url or "vinted.com" in url:
-        result["platform"] = "vinted"
     else:
         result["platform"] = "other"
 
@@ -85,14 +83,6 @@ async def analyse_listing(req: AnalyseRequest, user: dict = Depends(get_current_
             if price_el:
                 raw = price_el.get("content") or price_el.get_text(strip=True)
                 m = re.search(r"[\d]+\.?\d*", raw.replace(",", ""))
-                if m:
-                    result["asking_price"] = float(m.group())
-        elif result["platform"] == "vinted":
-            title_el = soup.select_one("h1, [data-testid='item-title']")
-            result["listing_title"] = title_el.get_text(strip=True) if title_el else None
-            price_el = soup.select_one("[data-testid='item-price']")
-            if price_el:
-                m = re.search(r"[\d.]+", price_el.get_text())
                 if m:
                     result["asking_price"] = float(m.group())
 

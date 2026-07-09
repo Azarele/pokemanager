@@ -3,14 +3,13 @@ Tier checking helpers. Import and use in any route that needs gating.
 """
 
 FEATURES = {
-    "unlimited_items":   ["gym_leader", "champion"],
-    "ebay_listing":      ["gym_leader", "champion"],
-    "ai_descriptions":   ["gym_leader", "champion"],
-    "price_history":     ["gym_leader", "champion"],
-    "export_accounting": ["gym_leader", "champion"],
-    "auto_relist":       ["gym_leader", "champion"],
-    "vinted_listing":    ["champion"],
-    "priority_support":  ["champion"],
+    "unlimited_items":      ["gym_leader", "champion"],
+    "ebay_listing":         ["gym_leader", "champion"],
+    "ai_descriptions":      ["gym_leader", "champion"],
+    "ai_descriptions_managed": ["champion"],
+    "price_history":        ["gym_leader", "champion"],
+    "export_accounting":    ["gym_leader", "champion"],
+    "priority_support":     ["champion"],
 }
 
 FREE_ITEM_LIMIT = 50

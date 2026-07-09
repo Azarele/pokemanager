@@ -118,7 +118,6 @@ async def migrate_from_excel(user: dict = Depends(get_current_user)):
                     "status":         str(v("Status") or "Inventory"),
                     "ebay_listing_id": str(v("eBay_Listing_ID") or ""),
                     "ebay_listed":    str(v("eBay_Listed") or "No"),
-                    "vinted_listed":  str(v("Vinted_Listed") or "No"),
                     "date_added":     str(v("Date_Added") or "")[:10] or None,
                     "date_sold":      str(v("Date_Sold") or "")[:10] or None,
                     "price_verified": bool(v("Price_Verified")),
