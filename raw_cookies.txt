@@ -1,0 +1,80 @@
+[
+    {
+        "domain": ".vinted.co.uk",
+        "expirationDate": 1783053876.28642,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "__cf_bm",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "I0houFWYoQwrFZBYBKNCyMd5oJvGPXXB1DB0OthFIug-1783052076.4148755-1.0.1.1-D4_okJ3_Yj5F1.CXutmXBDNjIiC3T2cb6FeOLVfwQyO726voaXQcUEJEL4s7t83G33akdfiBAPeCrBAD6F3HGQRqZYHeEh2Jw8RmREOrEaiGS0qhWstFM6e8RdVJ2jzQ7sBUD.Eb6PFTQGnyUj1lFA"
+    },
+    {
+        "domain": ".www.vinted.co.uk",
+        "expirationDate": 1783656892.032458,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "_vinted_fr_session",
+        "path": "/",
+        "sameSite": "lax",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "QXprYmN1WGhjOE1ReXgvY0F1MkhOL1pJN2VZTE9CTG9sYUF1OXlLVkt2THkxZERWVDFieUZnMlNud1hTS3lURUZEeElMWXYwU3dIRDNwZEhRTkx2d3JFQjBrOHFrT1JtUUhVTUY3QklONHgyYzRjckxYUi8vaGFMbitaR2gzN1lxa1ljK2ltbzdSWGNWb2NqaVEvTzl0VzYwMFM5VHVlM0crUWtxckVsWGdleW9tWklHejYwODM2cnNlcEhiRmZUQXg1UVVYbDNTNVZWL1hOUnNNekxMY0VBQ1FCQk1nQW5hcnhEL1BuRUlKSTlQUWdMazRpbTVTdnBCbmhxeEpqbUhBS0swRHZiSStVb280OVVUWnZBT0VqN214TytnUjJDdEZqRGJuR1JjVWFkRGkwV0RRUGFNM1hmOG02eVVQL0wtLWNxdWpKUEtTZ0VWaHlIQ1BnUnREWkE9PQ%3D%3D--31af2401da6138218edc17be0f9631bfcedc9c98"
+    },
+    {
+        "domain": ".www.vinted.co.uk",
+        "expirationDate": 1783656889.735809,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "refresh_token_web",
+        "path": "/",
+        "sameSite": "lax",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "eyJraWQiOiJFNTdZZHJ1SHBsQWp1MmNObzFEb3JIM2oyN0J1NS1zX09QNVB3UGlobjVNIiwiYWxnIjoiUFMyNTYifQ.eyJhY2NvdW50X2lkIjo5MzA5MzE3OSwiYXBwX2lkIjo0LCJhdWQiOiJmci5jb3JlLmFwaSIsImNsaWVudF9pZCI6IndlYiIsImV4cCI6MTc4MzY1Njg4OSwiaWF0IjoxNzgzMDUyMDg5LCJpc3MiOiJ2aW50ZWQtaWFtLXNlcnZpY2UiLCJsb2dpbl90eXBlIjozLCJwdXJwb3NlIjoicmVmcmVzaCIsInNjb3BlIjoidXNlciIsInNpZCI6IjA4Mjc1MzJkLTE3ODMwNTIwODkiLCJzdWIiOiIxMzUxMjg5MDQiLCJjYyI6IlVLIiwiYW5pZCI6ImM4M2JmOWYyLTVhYzEtNGRkOC05NzYyLTEzMzkwMmRjNjM5NyIsImFjdCI6eyJzdWIiOiIxMzUxMjg5MDQifX0.CftJeFr_gzjoqsCVMSOaClAd7O79o4X_BN_PUfEpxH-nezGcpMHHWRfWhv_kBVUBiBGOHcNr5vH0hAQYfvMjR2mGnTsolerSEorOh2hm6qyWHfq5IOHYHPXjZ5pLwLcObJytOcPc7k0A932A-dGzyi58LUI_WXLQ0fLMKvmfpYb_kuTnDmfrTPGzhBjrobNDi0LTBtfrVNqX-XiWWTWpvJgrtHvC_hHR4MG3J9hVJQvPUXjSKV3giEXvhqbRDDuq5aHqHXI2V2LofBw4BR3oRLyPLLTLuVcwgH6DpcQPJZFBmCGvPZ-rwM2Nbzckzb_yQ7ahTaDe2lIIPLYWJoiOcA"
+    },
+    {
+        "domain": ".vinted.co.uk",
+        "expirationDate": 1783656889.735929,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "access_token_web",
+        "path": "/",
+        "sameSite": "lax",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "eyJraWQiOiJFNTdZZHJ1SHBsQWp1MmNObzFEb3JIM2oyN0J1NS1zX09QNVB3UGlobjVNIiwiYWxnIjoiUFMyNTYifQ.eyJhY2NvdW50X2lkIjo5MzA5MzE3OSwiYXBwX2lkIjo0LCJhdWQiOiJmci5jb3JlLmFwaSIsImNsaWVudF9pZCI6IndlYiIsImV4cCI6MTc4MzA1OTI4OSwiaWF0IjoxNzgzMDUyMDg5LCJpc3MiOiJ2aW50ZWQtaWFtLXNlcnZpY2UiLCJsb2dpbl90eXBlIjozLCJwdXJwb3NlIjoiYWNjZXNzIiwic2NvcGUiOiJ1c2VyIiwic2lkIjoiMDgyNzUzMmQtMTc4MzA1MjA4OSIsInN1YiI6IjEzNTEyODkwNCIsImNjIjoiVUsiLCJhbmlkIjoiYzgzYmY5ZjItNWFjMS00ZGQ4LTk3NjItMTMzOTAyZGM2Mzk3IiwiYWN0Ijp7InN1YiI6IjEzNTEyODkwNCJ9fQ.q40j0Cp18IifqfCe6B5eiosVsKnIIVFO-Lc4QCl9E9YzHb2rPgm1tF5TLMmjS961S_zHT73cWvVe-D8yyCroFOQelR5NH9ghSAuSxl1O1_GzCQ4UTx3VWxfMKg-L_xtynGvj6babT5nfqizYBT-DsMfbe2QgmC3KYdEBxybpHc_pS7cyCHNAg3H3sMQs3mueaLIB9Z_c0kNB2vXS50Spf3JHnviQ359ziNjHa92keIC8zx-XxLbquqblrWXOfCA25c-KpL0g65Z21Fed022VwrmxIn69pV5MYOAnhPXtsDbVnPWlw1V5SeYXhKBD9WEpf4PHgKVeD2r_YuQG5PbU0A"
+    },
+    {
+        "domain": ".vinted.co.uk",
+        "expirationDate": 1814588092.055866,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "datadome",
+        "path": "/",
+        "sameSite": "lax",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "Ye~1nqSRecAOqnVTZrKyxV59JeqT3xvwheCi3n2XvjjfBcn8~AJVuRRvBTdINp0Iw3fKRdwpdsHS3P2H~L7pjuBzMY7jjFkv_JrPNIs9QbYqHgpLHFAtdE51VA5_kHfo"
+    },
+    {
+        "domain": ".vinted.co.uk",
+        "expirationDate": 1801440269,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "fs_uid",
+        "path": "/",
+        "sameSite": "strict",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "#o-2PZB-eu1#23902be0-f0c2-4b31-8a34-8258a9179581:7bdd01a9-04a1-4061-b4b9-f44d8536f247:1769904267479::1#/1801440269"
+    }
+]

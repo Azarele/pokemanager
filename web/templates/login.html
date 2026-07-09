@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PokeManager — Sign In</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0f0f13;
+      --surface:    #1a1a24;
+      --border:     #2e2e3e;
+      --accent:     #6c63ff;
+      --text:       #e8e8f0;
+      --text-muted: #888899;
+      --success:    #4caf7d;
+      --danger:     #ff6b6b;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .auth-container { width: 100%; max-width: 400px; }
+
+    .auth-logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .auth-logo h1 {
+      font-size: 28px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px;
+    }
+    .auth-logo p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+    }
+
+    .auth-tabs {
+      display: flex; gap: 4px;
+      background: var(--bg); border-radius: 10px; padding: 4px;
+      margin-bottom: 24px;
+    }
+    .auth-tab {
+      flex: 1; padding: 8px; border: none; border-radius: 8px;
+      background: transparent; color: var(--text-muted);
+      font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+    }
+    .auth-tab.active {
+      background: var(--surface); color: var(--text);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .form-group { margin-bottom: 16px; }
+
+    label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+
+    input {
+      width: 100%; padding: 11px 14px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 14px;
+      transition: border-color 0.2s; outline: none;
+    }
+    input:focus { border-color: var(--accent); }
+
+    .btn-primary {
+      width: 100%; padding: 12px; background: var(--accent);
+      border: none; border-radius: 8px; color: white;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      margin-top: 8px; transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-primary:hover  { opacity: 0.9; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-google {
+      width: 100%;
+      padding: 11px 14px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      color: #333;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      transition: background 0.2s, box-shadow 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-google:hover {
+      background: #f8f8f8;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      color: #888899;
+      font-size: 12px;
+    }
+
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #2e2e3e;
+    }
+
+    .auth-error {
+      background: rgba(255,107,107,0.1); border: 1px solid var(--danger);
+      border-radius: 8px; padding: 10px 14px; font-size: 13px;
+      color: var(--danger); margin-bottom: 16px; display: none;
+    }
+    .auth-success {
+      background: rgba(76,175,125,0.1); border: 1px solid var(--success);
+      border-radius: 8px; padding: 10px 14px; font-size: 13px;
+      color: var(--success); margin-bottom: 16px; display: none;
+    }
+
+    .features-list {
+      margin-top: 24px; padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .feature {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; color: var(--text-muted); margin-bottom: 10px;
+    }
+    .feature:last-child { margin-bottom: 0; }
+    .feature-icon { font-size: 16px; }
+
+    /* ── Footer ─────────────────────────────────────────────────────────────── */
+    .app-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      margin: 0;
+      border-top: 1px solid var(--border);
+      padding: 24px 20px;
+      background: var(--bg);
+      z-index: 10;
+    }
+
+    .footer-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .footer-logo {
+      margin-bottom: 4px;
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      font-size: 13px;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-links a:hover {
+      color: var(--accent);
+    }
+
+    .footer-dot {
+      color: var(--border);
+      user-select: none;
+    }
+
+    .footer-copy {
+      font-size: 11px;
+      color: var(--text-muted);
+      opacity: 0.6;
+      letter-spacing: 0.02em;
+    }
+
+    /* Adjust body padding to account for fixed footer */
+    body {
+      padding-bottom: 120px;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-logo">
+      <img src="/static/logo.png" alt="PokeManager" style="width:100px;height:auto;margin-bottom:16px;display:block;margin-left:auto;margin-right:auto">
+      <p style="color:#888899;font-size:14px;margin:0;text-align:center">
+        Sign in to manage your Pokémon TCG inventory
+      </p>
+    </div>
+
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchTab('login')">Sign In</button>
+        <button class="auth-tab" onclick="switchTab('register')">Create Account</button>
+      </div>
+
+      <button type="button" class="btn-google" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+          <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+          <path d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+          <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.96L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <div class="auth-divider">
+        <span>or</span>
+      </div>
+
+      <div id="auth-error"   class="auth-error"></div>
+      <div id="auth-success" class="auth-success"></div>
+
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn-primary" id="login-btn">Sign In</button>
+      </form>
+
+      <form id="register-form" style="display:none" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label>Display Name</label>
+          <input type="text" id="reg-name" placeholder="Your name" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="reg-email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="reg-password" placeholder="Min 8 characters" required minlength="8" autocomplete="new-password">
+        </div>
+        <div class="form-group" id="waiver-group" style="display:none">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px;color:#888899;line-height:1.5">
+            <input type="checkbox" id="reg-waiver"
+                   style="margin-top:2px;flex-shrink:0;width:14px;height:14px;accent-color:#6c63ff">
+            <span>I agree to PokeManager's
+              <a href="/terms" target="_blank" style="color:#6c63ff">Terms of Service</a>
+              and
+              <a href="/privacy" target="_blank" style="color:#6c63ff">Privacy Policy</a>.
+              If I subscribe to a paid plan, I understand the service begins immediately
+              and I waive my 14-day cooling-off right.
+            </span>
+          </label>
+        </div>
+        <button type="submit" class="btn-primary" id="reg-btn" style="margin-top:16px">Create Account</button>
+      </form>
+
+      <div class="features-list">
+        <div class="feature"><span class="feature-icon">📦</span> Full inventory management</div>
+        <div class="feature"><span class="feature-icon">💰</span> Buying calculator &amp; ROI analysis</div>
+        <div class="feature"><span class="feature-icon">📊</span> Sales analytics &amp; profit tracking</div>
+        <div class="feature"><span class="feature-icon">🔔</span> eBay auto-sale detection</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer" style="position:fixed;bottom:0;left:0;right:0;margin:0;border-top:1px solid #2e2e3e">
+    <div class="footer-inner">
+      <div class="footer-logo">
+        <img src="/static/logo.png" alt="PokeManager" style="height:24px;opacity:0.6">
+      </div>
+      <div class="footer-links">
+        <a href="/terms" target="_blank">Terms</a>
+        <span class="footer-dot">·</span>
+        <a href="/privacy" target="_blank">Privacy</a>
+        <span class="footer-dot">·</span>
+        <a href="/cookies" target="_blank">Cookies</a>
+        <span class="footer-dot">·</span>
+        <a href="mailto:pokemanager@thesneakaz.xyz">Support</a>
+      </div>
+      <div class="footer-copy">
+        © 2026 PokeManager · Not affiliated with Nintendo or The Pokémon Company
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function switchTab(tab) {
+      document.querySelectorAll('.auth-tab').forEach((t, i) =>
+        t.classList.toggle('active', (i === 0) === (tab === 'login')));
+      document.getElementById('login-form').style.display    = tab === 'login'    ? '' : 'none';
+      document.getElementById('register-form').style.display = tab === 'register' ? '' : 'none';
+      document.getElementById('waiver-group').style.display  = tab === 'register' ? 'block' : 'none';
+      hideMessages();
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('auth-error');
+      el.textContent = msg;
+      el.style.display = 'block';
+      document.getElementById('auth-success').style.display = 'none';
+    }
+
+    function showSuccess(msg) {
+      const el = document.getElementById('auth-success');
+      el.textContent = msg;
+      el.style.display = 'block';
+      document.getElementById('auth-error').style.display = 'none';
+    }
+
+    function hideMessages() {
+      document.getElementById('auth-error').style.display   = 'none';
+      document.getElementById('auth-success').style.display = 'none';
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('login-btn');
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      hideMessages();
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email:    document.getElementById('login-email').value,
+            password: document.getElementById('login-password').value,
+          }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          showSuccess('Signed in! Redirecting…');
+          setTimeout(() => window.location.href = '/', 800);
+        } else {
+          showError(data.detail || 'Login failed');
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+        }
+      } catch {
+        showError('Network error — please try again');
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const waiver = document.getElementById('reg-waiver')?.checked;
+      if (!waiver) {
+        showError('Please accept the Terms of Service to continue');
+        return;
+      }
+      const btn = document.getElementById('reg-btn');
+      btn.disabled = true;
+      btn.textContent = 'Creating account…';
+      hideMessages();
+      try {
+        const resp = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email:                 document.getElementById('reg-email').value,
+            password:              document.getElementById('reg-password').value,
+            display_name:          document.getElementById('reg-name').value,
+            waived_cooling_off:    true,
+          }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          showSuccess('Account created! Redirecting…');
+          setTimeout(() => window.location.href = '/', 800);
+        } else {
+          showError(data.detail || 'Registration failed');
+          btn.disabled = false;
+          btn.textContent = 'Create Account';
+        }
+      } catch {
+        showError('Network error — please try again');
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+      }
+    }
+
+    async function signInWithGoogle() {
+      const btn = event.target.closest('.btn-google');
+      btn.disabled = true;
+      btn.textContent = 'Redirecting to Google…';
+      hideMessages();
+      try {
+        const resp = await fetch('/api/auth/google', { method: 'POST' });
+        const data = await resp.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          showError('Google sign-in unavailable — try email instead');
+          btn.disabled = false;
+          btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.96L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg><span>Continue with Google</span>';
+        }
+      } catch {
+        showError('Google sign-in failed — try email instead');
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.96L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg><span>Continue with Google</span>';
+      }
+    }
+
+    // Handle OAuth error from callback
+    const urlError = new URLSearchParams(location.search).get('error');
+    if (urlError) {
+      showError(`Sign-in failed (${urlError}) — please try again`);
+    }
+
+    // Redirect to dashboard if already authenticated
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(data => { if (data.authenticated) window.location.href = '/'; })
+      .catch(() => {});
+  </script>
+</body>
+</html>

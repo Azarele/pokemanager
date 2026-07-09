@@ -1,0 +1,58 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env_dir/
+
+# ── Distribution / packaging ──────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Type checkers ─────────────────────────────────────────────────────────────
+.mypy_cache/
+.pyright/
+
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Project-specific ──────────────────────────────────────────────────────────
+
+# Secrets — never commit these
+.env
+
+# Playwright login cookies (contain live session tokens)
+browser_state/
+
+# Temporary listing images downloaded during !list
+temp_images/
+
+# Playwright debug screenshots
+debug/
+
+# Excel temporary lock file (created while inventory.xlsx is open in Excel)
+~$inventory.xlsx
+
+# Logs
+*.log
+
+logs/
+
+# Automatic inventory backups
+backups/

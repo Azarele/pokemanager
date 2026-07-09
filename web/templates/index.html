@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PokeManager</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png">
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#6c63ff" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PokeManager" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-logo">
+      <img src="/static/logo.png" alt="PokeManager" class="nav-logo-img">
+    </div>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="/" data-route="/" class="nav-link active">Inventory</a></li>
+      <li><a href="/analytics" data-route="/analytics" class="nav-link">Analytics</a></li>
+      <li><a href="/listings" data-route="/listings" class="nav-link">Listings</a></li>
+      <li><a href="/watchlist"   data-route="/watchlist"   class="nav-link">Watchlist</a></li>
+      <li><a href="/sales"      data-route="/sales"      class="nav-link">Sales</a></li>
+      <li><a href="/calculator" data-route="/calculator" class="nav-link">Calculator</a></li>
+      <li><a href="/upgrade"    data-route="/upgrade"    class="nav-link">⭐ Upgrade</a></li>
+      <li><a href="/settings"   data-route="/settings"   class="nav-link">⚙️ Settings</a></li>
+    </ul>
+    <div class="nav-status" id="nav-status">
+      <span class="status-dot"></span>
+      <span id="status-text">—</span>
+      <span id="nav-user" class="nav-user"></span>
+    </div>
+  </nav>
+
+  <main id="app" class="main"></main>
+
+  <!-- Sell Modal -->
+  <div id="modal-sell" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Mark as Sold</h2>
+        <button class="modal-close" onclick="closeModal('modal-sell')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="sell-card-name" class="modal-subtitle"></p>
+        <label class="form-label">
+          Sell Price (£)
+          <input id="sell-price-input" type="number" step="0.01" min="0" class="form-input" placeholder="0.00" />
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-sell')">Cancel</button>
+        <button class="btn btn-success" onclick="confirmSell()">Confirm Sale</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Item Modal -->
+  <div id="modal-add" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Add Item</h2>
+        <button class="modal-close" onclick="closeModal('modal-add')">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">
+          Card Name
+          <input id="add-name" type="text" class="form-input" placeholder="e.g. Charizard Holo (Pokemon Base Set)" />
+        </label>
+        <label class="form-label">
+          PriceCharting URL
+          <input id="add-url" type="url" class="form-input" placeholder="https://www.pricecharting.com/game/..." />
+        </label>
+        <div class="form-row">
+          <label class="form-label">
+            Purchase Price (£)
+            <input id="add-price" type="number" step="0.01" min="0" class="form-input" placeholder="0.00" />
+          </label>
+          <label class="form-label">
+            Market Price (£)
+            <input id="add-live" type="number" step="0.01" min="0" class="form-input" placeholder="optional" />
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="form-label">
+            Condition
+            <select id="add-condition" class="form-input">
+              <option value="Near mint or better">Near Mint or Better</option>
+              <option value="Lightly played">Lightly Played</option>
+              <option value="Moderately played">Moderately Played</option>
+              <option value="Heavily played">Heavily Played</option>
+              <option value="PSA 10">PSA 10</option>
+              <option value="PSA 9">PSA 9</option>
+              <option value="PSA 8">PSA 8</option>
+              <option value="BGS 9.5">BGS 9.5</option>
+              <option value="CGC 9">CGC 9</option>
+            </select>
+          </label>
+          <label class="form-label">
+            Region
+            <select id="add-region" class="form-input">
+              <option value="">Unknown</option>
+              <option value="EN">English (EN)</option>
+              <option value="JP">Japanese (JP)</option>
+              <option value="KR">Korean (KR)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-add')">Cancel</button>
+        <button class="btn btn-accent" onclick="confirmAdd()">Add Item</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Item Modal -->
+  <div id="modal-edit" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Edit Item</h2>
+        <button class="modal-close" onclick="closeModal('modal-edit')">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">
+          Card Name
+          <input id="edit-name" type="text" class="form-input" placeholder="e.g. Charizard Holo" />
+        </label>
+        <label class="form-label">
+          Purchase Price (£)
+          <input id="edit-price" type="number" step="0.01" min="0" class="form-input" placeholder="0.00" />
+        </label>
+        <div class="form-row">
+          <label class="form-label">
+            Condition
+            <select id="edit-condition" class="form-input">
+              <option value="Near mint or better">Near Mint or Better</option>
+              <option value="Lightly played">Lightly Played</option>
+              <option value="Moderately played">Moderately Played</option>
+              <option value="Heavily played">Heavily Played</option>
+              <option value="PSA 10">PSA 10</option>
+              <option value="PSA 9">PSA 9</option>
+              <option value="PSA 8">PSA 8</option>
+              <option value="BGS 9.5">BGS 9.5</option>
+              <option value="CGC 9">CGC 9</option>
+            </select>
+          </label>
+          <label class="form-label">
+            Region
+            <select id="edit-region" class="form-input">
+              <option value="">Unknown</option>
+              <option value="EN">English (EN)</option>
+              <option value="JP">Japanese (JP)</option>
+              <option value="KR">Korean (KR)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-edit')">Cancel</button>
+        <button class="btn btn-accent" onclick="confirmEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div id="modal-delete" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>Remove Item</h2>
+        <button class="modal-close" onclick="closeModal('modal-delete')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="delete-card-name" class="modal-subtitle"></p>
+        <p class="text-muted">This will permanently remove the item from inventory. Sold items cannot be removed.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-delete')">Cancel</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Watch Modal -->
+  <div id="modal-watch" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Add Watch</h2>
+        <button class="modal-close" onclick="closeModal('modal-watch')">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">
+          Card Name
+          <input id="watch-name" type="text" class="form-input" placeholder="e.g. Pikachu Illustrator" />
+        </label>
+        <label class="form-label">
+          PriceCharting URL
+          <input id="watch-url" type="url" class="form-input" placeholder="https://www.pricecharting.com/..." />
+        </label>
+        <div class="form-row">
+          <label class="form-label">
+            Target Price (£)
+            <input id="watch-target" type="number" step="0.01" min="0" class="form-input" placeholder="0.00" />
+          </label>
+          <label class="form-label">
+            Current Price (£)
+            <input id="watch-current" type="number" step="0.01" min="0" class="form-input" placeholder="optional" />
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-watch')">Cancel</button>
+        <button class="btn btn-accent" onclick="confirmWatch()">Add Watch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Listing drawer (slides in from right) -->
+  <div id="drawer-overlay" class="drawer-overlay" onclick="closeDrawer()"></div>
+  <aside id="listing-drawer" class="drawer"></aside>
+
+  <!-- Camera modal (Feature 12) -->
+  <div id="camera-modal" class="camera-modal">
+    <div class="camera-modal-inner">
+      <div class="camera-header">
+        <span>Take a Photo</span>
+        <button class="btn-icon" onclick="closeCamera()">✕</button>
+      </div>
+      <div class="camera-frame">
+        <video id="camera-video" autoplay playsinline muted></video>
+        <div class="card-outline"></div>
+      </div>
+      <canvas id="camera-canvas" style="display:none"></canvas>
+      <div class="camera-actions">
+        <button class="btn btn-ghost" onclick="closeCamera()">Cancel</button>
+        <button class="btn btn-accent camera-shutter" onclick="capturePhoto()">📸 Capture</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-inner">
+      <div class="footer-logo">
+        <img src="/static/logo.png" alt="PokeManager" style="height:24px;opacity:0.6">
+      </div>
+      <div class="footer-links">
+        <a href="/terms" target="_blank">Terms</a>
+        <span class="footer-dot">·</span>
+        <a href="/privacy" target="_blank">Privacy</a>
+        <span class="footer-dot">·</span>
+        <a href="/cookies" target="_blank">Cookies</a>
+        <span class="footer-dot">·</span>
+        <a href="mailto:pokemanager@thesneakaz.xyz">Support</a>
+        <span class="footer-dot">·</span>
+        <a href="#" onclick="navigate('/upgrade');return false">Upgrade</a>
+      </div>
+      <div class="footer-copy">
+        © 2026 PokeManager · Not affiliated with Nintendo or The Pokémon Company
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js')
+        .catch(err => console.warn('[PWA] SW registration failed:', err));
+    }
+  </script>
+</body>
+</html>
