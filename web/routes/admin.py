@@ -81,6 +81,7 @@ async def list_users(
 ):
     db = get_db()
 
+    # Fetch from user_profiles; email should always be set from auth
     query = db.table("user_profiles").select(
         "id, email, display_name, plan, role, created_at, subscription_status, subscription_period_end, stripe_customer_id"
     )
@@ -91,11 +92,14 @@ async def list_users(
     result = query.order("created_at", desc=True).execute()
     users = result.data or []
 
-    # Add item counts
+    # Add item counts and verify email is present
     for u in users:
         items = db.table("inventory_items").select("id", count="exact")\
             .eq("user_id", u["id"]).execute()
         u["item_count"] = items.count or 0
+        # Fallback: if email is somehow missing (shouldn't happen), use display_name
+        if not u.get("email"):
+            u["email"] = u.get("display_name", "Unknown") + "@unknown"
 
     return {"users": users, "total": len(users)}
 
