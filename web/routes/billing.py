@@ -23,7 +23,7 @@ PLANS = {
         "name":        "Champion",
         "price_id":    os.getenv("STRIPE_PRICE_CHAMPION", ""),
         "amount_gbp":  14.99,
-        "description": "Everything in Gym Leader plus Vinted listing & priority support",
+        "description": "Everything in Gym Leader plus managed AI descriptions & priority support",
     },
 }
 

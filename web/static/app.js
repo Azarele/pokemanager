@@ -3118,11 +3118,47 @@ async function renderSettings() {
       <!-- Integrations -->
       <div class="settings-card" data-section="integrations">
         <h3 class="settings-section-title">Integrations</h3>
-        <div class="form-section">
-          <label class="form-label">Gemini API Key (AI listing descriptions)</label>
-          <input id="s-gemini" class="form-input" type="password"
-                 placeholder="${settings?.has_gemini ? '••••••• (set)' : 'Optional'}">
-        </div>
+        ${(() => {
+          const plan = settings?.plan || 'free';
+          if (plan === 'champion') {
+            return `
+              <div class="form-section">
+                <label class="form-label">AI Descriptions</label>
+                <div style="background:rgba(76,175,125,0.08);border:1px solid rgba(76,175,125,0.2);border-radius:8px;padding:12px;margin-bottom:12px">
+                  <div style="display:flex;align-items:center;gap:8px;color:var(--success)">
+                    <span>✅</span>
+                    <span>AI descriptions powered by PokeManager — no setup needed</span>
+                  </div>
+                </div>
+                <p class="text-muted" style="font-size:12px;margin-bottom:12px">Or bring your own Gemini API key to use instead:</p>
+                <input id="s-gemini" class="form-input" type="password"
+                       placeholder="${settings?.has_gemini ? '••••••• (optional override)' : 'Leave blank to use PokeManager key'}">
+              </div>
+            `;
+          } else if (plan === 'gym_leader') {
+            return `
+              <div class="form-section">
+                <label class="form-label">Gemini API Key (AI listing descriptions)</label>
+                <p class="text-muted" style="font-size:12px;margin-bottom:8px">Get a free key at <a href="https://ai.google.dev" target="_blank" style="color:var(--accent)">ai.google.dev ↗</a></p>
+                <input id="s-gemini" class="form-input" type="password"
+                       placeholder="${settings?.has_gemini ? '••••••• (set)' : 'Paste your Gemini API key'}">
+              </div>
+            `;
+          } else {
+            return `
+              <div class="form-section">
+                <label class="form-label">AI Descriptions</label>
+                <div style="background:rgba(200,200,200,0.1);border:1px solid var(--border);border-radius:8px;padding:12px">
+                  <div style="display:flex;align-items:center;gap:8px;color:var(--text-muted)">
+                    <span>🔒</span>
+                    <span>Available on Gym Leader and Champion plans</span>
+                  </div>
+                  <button class="btn btn-accent btn-xs" style="margin-top:8px" onclick="navigate('/upgrade')">Upgrade →</button>
+                </div>
+              </div>
+            `;
+          }
+        })()}
         <div class="form-section">
           <label class="form-label">Discord Webhook URL (sale alerts)</label>
           <input id="s-discord" class="form-input" type="password"

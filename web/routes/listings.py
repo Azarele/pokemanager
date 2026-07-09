@@ -267,6 +267,16 @@ class DescRequest(BaseModel):
 
 @router.post("/generate-description")
 async def generate_description(req: DescRequest, user: dict = Depends(get_current_user)):
+    from web import tier
+    import os
+
+    # Check tier access
+    if not tier.can(user, "ai_descriptions"):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Gym Leader or Champion to use AI descriptions"
+        )
+
     try:
         item = await db.get_item(user["id"], req.item_id)
     except ValueError as e:
@@ -274,6 +284,33 @@ async def generate_description(req: DescRequest, user: dict = Depends(get_curren
 
     condition = req.condition or item.get("condition") or "Near mint or better"
     live      = float(item.get("live_price") or 0) or None
+
+    # Determine which API key to use
+    plan = user.get("plan", "free")
+    user_gemini_key = user.get("gemini_api_key")
+
+    if plan == "champion":
+        # Champion uses our managed key
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=500,
+                detail="AI description service is temporarily unavailable"
+            )
+    elif plan == "gym_leader":
+        # Gym Leader can use their own key or our key if they haven't set theirs
+        api_key = user_gemini_key or os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=400,
+                detail="Add your Gemini API key in Settings to use AI descriptions"
+            )
+    else:
+        # Trainer has no access
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Gym Leader or Champion to use AI descriptions"
+        )
 
     try:
         import ai_helper  # lazy — requires google-genai package

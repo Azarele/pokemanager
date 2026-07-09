@@ -39,7 +39,7 @@ def _ensure_profile(db, user_id: str, email: str, display_name: str = "") -> Non
     if not existing.data:
         db.table("user_profiles").insert({
             "id": user_id,
-            "email": email,
+            "email": email,  # retained for promotional purposes per Privacy Policy
             "display_name": display_name or email.split("@")[0],
         }).execute()
 
