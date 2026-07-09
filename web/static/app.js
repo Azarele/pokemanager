@@ -3611,13 +3611,13 @@ async function loadAdminUsers() {
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
           <tr style="border-bottom:1px solid var(--border);color:var(--text-muted)">
-            <th style="text-align:left;padding:10px 12px">User</th>
-            <th style="text-align:left;padding:10px 12px">Plan</th>
-            <th style="text-align:left;padding:10px 12px">Role</th>
-            <th style="text-align:left;padding:10px 12px">Items</th>
-            <th style="text-align:left;padding:10px 12px">Status</th>
-            <th style="text-align:left;padding:10px 12px">Joined</th>
-            <th style="text-align:left;padding:10px 12px">Actions</th>
+            <th style="position:static;text-align:left;padding:10px 12px">User</th>
+            <th style="position:static;text-align:left;padding:10px 12px">Plan</th>
+            <th style="position:static;text-align:left;padding:10px 12px">Role</th>
+            <th style="position:static;text-align:left;padding:10px 12px">Items</th>
+            <th style="position:static;text-align:left;padding:10px 12px">Status</th>
+            <th style="position:static;text-align:left;padding:10px 12px">Joined</th>
+            <th style="position:static;text-align:left;padding:10px 12px">Actions</th>
           </tr>
         </thead>
         <tbody>
