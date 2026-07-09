@@ -2028,7 +2028,7 @@ function buildWatchlistPage(entries) {
     </div>
     ${entries.length ? `<div class="table-wrap">
       <table><thead><tr>
-        <th>ID</th><th>Card</th><th>Target</th><th>Current</th><th>Alert</th><th>Added</th><th></th>
+        <th style="position:static">ID</th><th style="position:static">Card</th><th style="position:static">Target</th><th style="position:static">Current</th><th style="position:static">Alert</th><th style="position:static">Added</th><th style="position:static"></th>
       </tr></thead><tbody>${rows}</tbody></table>
     </div>` : emptyState('👁️', 'No watched cards', 'Add a card to track its price against your target.')}`;
 }
