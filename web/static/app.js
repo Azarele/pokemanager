@@ -3380,6 +3380,8 @@ async function renderUpgrade() {
             <li>✅ Everything in Trainer</li>
             <li>✅ eBay listing (your API keys)</li>
             <li>✅ AI descriptions (your Gemini key)</li>
+            <li>✅ 📷 Scan & Add (your Gemini key)</li>
+            <li>✅ 📷 Scan & Sell (your Gemini key)</li>
             <li>✅ Price history & sparklines</li>
             <li>✅ HMRC / Xero / QuickBooks export</li>
           </ul>
@@ -3401,6 +3403,8 @@ async function renderUpgrade() {
           <ul class="plan-features">
             <li>✅ Everything in Gym Leader</li>
             <li>✅ AI descriptions — no API key needed (we cover it)</li>
+            <li>✅ 📷 Scan & Add — no API key needed</li>
+            <li>✅ 📷 Scan & Sell — no API key needed</li>
             <li>✅ Priority support</li>
             <li>✅ Early access to new features</li>
           </ul>
@@ -3830,15 +3834,35 @@ let _selectedInventoryId = null;
 let _currentMatches = [];
 
 function initScanFAB() {
-  if (window.innerWidth > 768) return;
   const fab = document.createElement('div');
   fab.id = 'scan-fab';
-  fab.style.cssText = 'position:fixed;bottom:24px;right:20px;z-index:150;display:block';
+  fab.style.cssText = 'position:fixed;bottom:24px;right:20px;z-index:150;display:none';
   fab.innerHTML = `<button onclick="openScanMenu()" style="width:56px;height:56px;border-radius:50%;background:var(--accent);border:none;color:white;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.4);transition:all 0.2s ease" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">📷</button>`;
   document.body.appendChild(fab);
+  if (window.innerWidth <= 768) fab.style.display = 'block';
 }
 
 function openScanMenu() {
+  if (S.plan === 'free') {
+    showModal(`
+      <h2 style="margin-bottom:16px;text-align:center">📷 Scan & Identify</h2>
+      <p style="color:var(--text-muted);margin-bottom:16px;text-align:center">This is a Gym Leader+ feature. Upgrade to scan cards with your camera.</p>
+      <button class="btn btn-accent" onclick="navigate('/upgrade');closeModal()" style="width:100%;margin-bottom:8px">Upgrade to Gym Leader →</button>
+      <button class="btn btn-ghost" onclick="closeModal()" style="width:100%">Cancel</button>
+    `);
+    return;
+  }
+  if (S.plan === 'gym_leader') {
+    if (!S.user?.gemini_api_key) {
+      showModal(`
+        <h2 style="margin-bottom:16px;text-align:center">🔑 Gemini API Key Required</h2>
+        <p style="color:var(--text-muted);margin-bottom:16px">Add your Gemini API key in Settings to use this feature.</p>
+        <button class="btn btn-accent" onclick="navigate('/settings');closeModal()" style="width:100%;margin-bottom:8px">Open Settings →</button>
+        <button class="btn btn-ghost" onclick="closeModal()" style="width:100%">Cancel</button>
+      `);
+      return;
+    }
+  }
   showModal(`
     <h2 style="margin-bottom:20px;text-align:center">📱 Scan Card</h2>
     <div style="display:flex;flex-direction:column;gap:12px">
