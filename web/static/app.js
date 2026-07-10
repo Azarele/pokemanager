@@ -575,18 +575,18 @@ function renderInventoryCard(item) {
   const canList = canAccess('ebay_listing');
 
   const actions = isSold
-    ? `<button class="inv-card-btn" onclick="openPriceCheck(${item.item_id})" title="Price check"><span class="btn-icon-emoji">💰</span><span class="btn-label">Check</span></button>`
-    : `<button class="inv-card-btn" onclick="openPriceCheck(${item.item_id})" title="Price check"><span class="btn-icon-emoji">💰</span><span class="btn-label">Check</span></button>
-       <button class="inv-card-btn refresh-price-btn" onclick="refreshSinglePrice(${item.item_id})" title="Refresh price"><span class="btn-icon-emoji">🔄</span><span class="btn-label">Refresh</span></button>
-       <button class="inv-card-btn" onclick="openEditModal(${item.item_id})" title="Edit"><span class="btn-icon-emoji">✏️</span><span class="btn-label">Edit</span></button>
-       <button class="inv-card-btn inv-card-btn-danger" onclick="confirmRemove(${item.item_id})" title="Remove"><span class="btn-icon-emoji">🗑️</span><span class="btn-label">Delete</span></button>
+    ? `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:70px">💰 Check</button>`
+    : `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:70px">💰 Check</button>
+       <button onclick="refreshSinglePrice(${item.item_id})" class="btn btn-ghost btn-sm refresh-price-btn" style="flex:1;min-width:70px">🔄 Refresh</button>
+       <button onclick="openEditModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:70px">✏️ Edit</button>
+       <button onclick="confirmRemove(${item.item_id})" class="btn btn-danger btn-sm" style="flex:1;min-width:70px">🗑️ Delete</button>
        ${isListed
-         ? `<button class="inv-card-btn inv-card-btn-success" onclick="openSoldAndDelistModal(${item.item_id})"><span class="btn-icon-emoji">💰</span><span class="btn-label">Sold</span></button>`
+         ? `<button onclick="openSoldAndDelistModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:70px">💰 Sold</button>`
          : canList
-         ? `<button class="inv-card-btn inv-card-btn-accent" onclick="openListingDrawer(${item.item_id})"><span class="btn-icon-emoji">📋</span><span class="btn-label">List</span></button>
-            <button class="inv-card-btn inv-card-btn-success" onclick="openSellModal(${item.item_id})"><span class="btn-icon-emoji">💰</span><span class="btn-label">Sell</span></button>`
-         : `<button class="inv-card-btn" onclick="showUpgradePrompt('ebay_listing')" title="Upgrade to list on eBay"><span class="btn-icon-emoji">🔒</span><span class="btn-label">List</span></button>
-            <button class="inv-card-btn inv-card-btn-success" onclick="openSellModal(${item.item_id})"><span class="btn-icon-emoji">💰</span><span class="btn-label">Sell</span></button>`
+         ? `<button onclick="openListingDrawer(${item.item_id})" class="btn btn-accent btn-sm" style="flex:1;min-width:70px">📋 List</button>
+            <button onclick="openSellModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:70px">💰 Sell</button>`
+         : `<button onclick="showUpgradePrompt('ebay_listing')" class="btn btn-ghost btn-sm" style="flex:1;min-width:70px">🔒 List</button>
+            <button onclick="openSellModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:70px">💰 Sell</button>`
        }`;
 
   return `
@@ -621,7 +621,7 @@ function renderInventoryCard(item) {
         </div>
       </div>
 
-      <div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);flex-wrap:wrap">${actions}</div>
+      <div style="display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--border);flex-wrap:wrap">${actions}</div>
     </div>`;
 }
 
@@ -768,7 +768,7 @@ async function renderInventory() {
       <button class="btn btn-sm btn-danger" onclick="bulkRemove()">🗑️ Remove</button>
       <button class="btn btn-sm btn-ghost" onclick="clearSelection()">✕ Clear</button>
     </div>
-    <div id="inventory-grid" class="inventory-grid">${skeletonCards(12)}</div>
+    <div id="inventory-grid" class="inventory-grid" style="margin-top:12px">${skeletonCards(12)}</div>
     <p id="row-count" class="text-muted" style="font-size:0.82rem;margin-top:12px">Loading…</p>`;
 
   document.getElementById('search-input').addEventListener('input', e => {
@@ -1741,6 +1741,7 @@ function buildListingsPage() {
         <div class="listed-thumb card-thumb" data-item-id="${i.item_id}"><div class="thumb-spinner"></div></div>
         <div class="listed-info">
           <div class="listed-name">${esc(i.card_name || '')}</div>
+          <div style="font-size:11px;color:var(--text-muted)">#${i.item_id}</div>
           <div class="listed-meta">
             <span class="price-tag">Listed: ${fmt(i.sell_price)}</span>
             <span class="price-tag" style="color:var(--accent)">Quick: ${fmt(i.quick_price)}</span>
@@ -1761,6 +1762,7 @@ function buildListingsPage() {
         <div class="unlisted-thumb card-thumb" data-item-id="${i.item_id}"><div class="thumb-spinner"></div></div>
         <div class="unlisted-info">
           <div class="unlisted-name">${esc(i.card_name || '')}</div>
+          <div style="font-size:11px;color:var(--text-muted)">#${i.item_id}</div>
           <div class="unlisted-prices">
             <span class="price-tag">Market ${fmt(i.live_price)}</span>
             <span class="price-tag" style="color:var(--accent)">Quick ${fmt(i.quick_price)}</span>
@@ -2089,7 +2091,7 @@ function buildWatchlistPage(entries) {
   const rows = entries.length ? entries.map(e => {
     const triggered = e.alert_sent || (e.current_price_gbp && e.target_price_gbp && e.current_price_gbp <= e.target_price_gbp);
     return `<tr class="${triggered ? 'watch-triggered' : ''}">
-      <td>${e.id}</td>
+      <td style="font-size:11px;color:var(--text-muted)">#${e.id}</td>
       <td>${esc(e.card_name)}</td>
       <td style="font-family:var(--mono)">${fmt(e.target_price_gbp)}</td>
       <td style="font-family:var(--mono);${triggered ? 'color:var(--success);font-weight:600' : ''}">${fmt(e.current_price_gbp)}</td>
