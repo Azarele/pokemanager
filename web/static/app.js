@@ -575,56 +575,59 @@ function renderInventoryCard(item) {
   const canList = canAccess('ebay_listing');
 
   const actions = isSold
-    ? `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:70px">💰 Check</button>`
-    : `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:70px">💰 Check</button>
-       <button onclick="refreshSinglePrice(${item.item_id})" class="btn btn-ghost btn-sm refresh-price-btn" style="flex:1;min-width:70px">🔄 Refresh</button>
-       <button onclick="openEditModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:70px">✏️ Edit</button>
-       <button onclick="confirmRemove(${item.item_id})" class="btn btn-danger btn-sm" style="flex:1;min-width:70px">🗑️ Delete</button>
+    ? `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px">💰 Check</button>`
+    : `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px">💰 Check</button>
+       <button onclick="refreshSinglePrice(${item.item_id})" class="btn btn-ghost btn-sm refresh-price-btn" style="flex:1;min-width:60px">🔄 Refresh</button>
+       <button onclick="openEditModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px">✏️ Edit</button>
+       <button onclick="confirmRemove(${item.item_id})" class="btn btn-danger btn-sm" style="flex:1;min-width:60px">🗑️ Delete</button>
        ${isListed
-         ? `<button onclick="openSoldAndDelistModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:70px">💰 Sold</button>`
+         ? `<button onclick="openSoldAndDelistModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:60px">💰 Sold</button>`
          : canList
-         ? `<button onclick="openListingDrawer(${item.item_id})" class="btn btn-accent btn-sm" style="flex:1;min-width:70px">📋 List</button>
-            <button onclick="openSellModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:70px">💰 Sell</button>`
-         : `<button onclick="showUpgradePrompt('ebay_listing')" class="btn btn-ghost btn-sm" style="flex:1;min-width:70px">🔒 List</button>
-            <button onclick="openSellModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:70px">💰 Sell</button>`
+         ? `<button onclick="openListingDrawer(${item.item_id})" class="btn btn-accent btn-sm" style="flex:1;min-width:60px">📋 List</button>
+            <button onclick="openSellModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:60px">💰 Sell</button>`
+         : `<button onclick="showUpgradePrompt('ebay_listing')" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px">🔒 List</button>
+            <button onclick="openSellModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:60px">💰 Sell</button>`
        }`;
 
   return `
-    <div class="inv-card${isUW ? ' is-underwater' : ''}${S.selection?.has(item.item_id) ? ' is-selected' : ''}" data-id="${item.item_id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;margin-bottom:12px">
-      <input type="checkbox" class="bulk-cb inv-card-checkbox" data-id="${item.item_id}"
-             ${S.selection?.has(item.item_id) ? 'checked' : ''}
-             onchange="toggleSelectItem(${item.item_id})"
-             style="position:absolute;top:8px;left:8px;z-index:10;width:20px;height:20px">
+    <div class="inv-card${isUW ? ' is-underwater' : ''}${S.selection?.has(item.item_id) ? ' is-selected' : ''}" data-id="${item.item_id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;margin-bottom:12px;position:relative">
+      <div style="position:absolute;top:8px;right:8px;z-index:10">
+        <input type="checkbox" class="bulk-cb inv-card-checkbox" data-id="${item.item_id}"
+               ${S.selection?.has(item.item_id) ? 'checked' : ''}
+               onchange="toggleSelectItem(${item.item_id})"
+               style="width:20px;height:20px">
+      </div>
 
-      <div style="display:flex;gap:0;flex:1;min-height:110px">
-        <div class="card-thumb" data-item-id="${item.item_id}" style="width:80px;min-width:80px;background:var(--surface2)"><div class="thumb-spinner"></div></div>
+      <div style="display:flex;gap:0">
+        <div class="card-thumb" data-item-id="${item.item_id}" style="width:90px;min-width:90px;background:var(--surface2);height:140px"><div class="thumb-spinner"></div></div>
 
-        <div style="flex:1;padding:12px;min-width:0;display:flex;flex-direction:column;gap:8px">
+        <div style="flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span class="inv-card-id" style="color:var(--text-muted);font-size:11px">#${item.item_id}</span>
-            <div class="inv-card-name" style="flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item.card_name || '')}">${esc(item.card_name || '—')}</div>
+            <span style="color:var(--text-muted)">·</span>
+            <div class="inv-card-name" style="flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px" title="${esc(item.card_name || '')}">${esc(item.card_name || '—')}</div>
             <div class="inv-card-badges" style="display:flex;gap:4px">${badges}</div>
           </div>
 
-          <div class="inv-card-cond" style="font-size:12px;color:var(--text-muted)">${esc(item.condition || '—')} · ${esc(item.region || 'EN')}</div>
+          <div class="inv-card-cond" style="font-size:11px;color:var(--text-muted)">${esc(item.condition || '—')} · ${esc(item.region || 'EN')}</div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
-            <div><span style="color:var(--text-muted)">Bought</span><br><strong>${fmt(buyP)}</strong></div>
-            <div><span style="color:var(--text-muted)">Market</span><br><strong>${fmt(item.live_price)}</strong></div>
-            <div><span style="color:var(--text-muted)">Profit</span><br><strong class="${pClass}">${profit >= 0 ? '+' : ''}${fmt(profit)}</strong></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px">
+            <div><span style="color:var(--text-muted)">Bought</span><br><strong style="font-size:12px">${fmt(buyP)}</strong></div>
+            <div><span style="color:var(--text-muted)">Market</span><br><strong style="font-size:12px">${fmt(item.live_price)}</strong></div>
+            <div><span style="color:var(--text-muted)">Profit</span><br><strong style="font-size:12px;${pClass}">${profit >= 0 ? '+' : ''}${fmt(profit)}</strong></div>
           </div>
 
-          <div style="display:flex;align-items:center;gap:8px;font-size:12px">
-            <span><span style="color:var(--text-muted)">Quick</span> <strong style="color:var(--accent)">${fmt(item.quick_price)}</strong></span>
+          <div style="font-size:11px">
+            <span style="color:var(--text-muted)">Quick</span> <strong style="color:var(--accent);font-size:12px">${fmt(item.quick_price)}</strong>
           </div>
-        </div>
-
-        <div style="width:120px;min-width:120px;padding:8px;display:flex;align-items:center;justify-content:center">
-          <canvas class="sparkline-canvas" width="110" height="70"></canvas>
         </div>
       </div>
 
-      <div style="display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--border);flex-wrap:wrap">${actions}</div>
+      <div style="width:100%;height:65px;background:var(--surface2)">
+        <canvas class="sparkline-canvas" style="width:100%;height:65px;display:block"></canvas>
+      </div>
+
+      <div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border);flex-wrap:wrap">${actions}</div>
     </div>`;
 }
 
