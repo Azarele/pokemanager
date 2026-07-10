@@ -361,7 +361,7 @@ function applyThumb(thumb, url, itemId) {
     img.alt = 'card';
     img.loading = 'lazy';
     img.src = url;
-    img.style.cssText = 'width:100%;height:auto;max-height:100%;object-fit:contain;display:block;border-radius:4px';
+    img.style.cssText = 'width:100%;height:auto;max-height:100%;object-fit:contain;display:block';
     img.onerror = () => { thumb.innerHTML = '<span class="thumb-error">?</span>'; };
     img.onclick = (e) => {
       e.stopPropagation();
@@ -607,8 +607,8 @@ function renderInventoryCard(item) {
       </div>
 
       <div style="position:relative;padding-left:116px;min-height:150px">
-        <div style="position:absolute;left:0;top:0;bottom:0;width:110px;background:var(--surface2);padding:6px;box-sizing:border-box">
-          <div class="card-thumb" data-item-id="${item.item_id}" style="width:98px;height:100%;display:flex;align-items:center;justify-content:center"><div class="thumb-spinner"></div></div>
+        <div style="position:absolute;left:0;top:0;bottom:0;width:110px;padding:0">
+          <div class="card-thumb" data-item-id="${item.item_id}" style="width:110px;height:100%;display:flex;align-items:center;justify-content:center"><div class="thumb-spinner"></div></div>
         </div>
 
         <div style="padding:10px 12px;padding-right:36px;min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:6px;box-sizing:border-box">
