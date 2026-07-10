@@ -361,7 +361,7 @@ function applyThumb(thumb, url, itemId) {
     img.alt = 'card';
     img.loading = 'lazy';
     img.src = url;
-    img.style.cssText = 'width:100%;height:auto;object-fit:contain;display:block;border-radius:4px';
+    img.style.cssText = 'width:100%;height:auto;object-fit:contain;display:block;border-radius:4px;margin-bottom:15px';
     img.onerror = () => { thumb.innerHTML = '<span class="thumb-error">?</span>'; };
     img.onclick = (e) => {
       e.stopPropagation();
@@ -607,7 +607,7 @@ function renderInventoryCard(item) {
       </div>
 
       <div style="display:flex;position:relative">
-        <div class="card-thumb" data-item-id="${item.item_id}" style="width:110px;min-width:110px;background:var(--surface2);padding:6px;box-sizing:border-box;display:flex;align-items:flex-start;margin-bottom:15px"><div class="thumb-spinner"></div></div>
+        <div class="card-thumb" data-item-id="${item.item_id}" style="width:110px;min-width:110px;background:var(--surface2);padding:6px 6px 0 6px;box-sizing:border-box;display:flex;align-items:flex-start;align-self:stretch"><div class="thumb-spinner"></div></div>
 
         <div style="flex:1;padding:10px 12px;padding-right:36px;min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:6px;box-sizing:border-box">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;overflow:hidden;max-width:100%">
