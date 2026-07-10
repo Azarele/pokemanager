@@ -372,7 +372,8 @@ function applyThumb(thumb, url, itemId) {
     thumb.appendChild(img);
     thumb.classList.add('loaded');
   } else {
-    thumb.innerHTML = '<span class="thumb-none">—</span>';
+    thumb.innerHTML = '<div style="width:100%;height:100%;min-height:130px;background:var(--surface2);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:20px">🃏</div>';
+    thumb.classList.add('loaded');
   }
 }
 
