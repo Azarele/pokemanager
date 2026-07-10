@@ -77,7 +77,6 @@ def _write_cache(cache_key: str, url: Optional[str]) -> None:
 
 
 _load_cache()
-_ensure_cache_upgraded()
 
 # Ordered by specificity — most likely first, broad fallbacks last.
 _IMG_CSS_SELECTORS = [
@@ -184,6 +183,8 @@ def _ensure_cache_upgraded() -> None:
         _save_cache()
         print(f"[image_cache] Upgraded {updated} entries to higher resolution URLs")
 
+
+_ensure_cache_upgraded()
 
 # ── Field allowlists for PATCH endpoints ─────────────────────────────────
 # Deliberately restricted — never let a request body pick an arbitrary DB

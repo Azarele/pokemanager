@@ -7,13 +7,6 @@ python-dotenv==1.0.1
 aiohttp==3.9.5
 aiofiles==23.2.1
 
-# Playwright (required for scraping + listing automation)
-# After pip install, also run: playwright install chromium
-playwright==1.44.0
-
-# Stealth patches — hides automation fingerprints from anti-bot systems
-playwright-stealth==1.0.6
-
 # AI listing assistant (new google-genai SDK — replaces deprecated google-generativeai)
 google-genai>=0.8.0
 
