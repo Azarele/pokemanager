@@ -574,11 +574,11 @@ function renderInventoryCard(item) {
   const canList   = canAccess('ebay_listing');
 
   const actions = isSold
-    ? `<button class="btn btn-icon" onclick="openPriceCheck(${item.item_id})" title="Price check">💰</button>`
-    : `<button class="btn btn-icon" onclick="openPriceCheck(${item.item_id})" title="Price check">💰</button>
-       <button class="btn btn-icon refresh-price-btn" onclick="refreshSinglePrice(${item.item_id})" title="Refresh price from PriceCharting">🔄</button>
-       <button class="btn btn-icon" onclick="openEditModal(${item.item_id})" title="Edit">✏️</button>
-       <button class="btn btn-icon btn-danger" onclick="confirmRemove(${item.item_id})" title="Remove">🗑️</button>
+    ? `<button class="btn btn-icon btn-mobile-label" onclick="openPriceCheck(${item.item_id})" title="Price check"><span class="btn-icon-emoji">💰</span><span class="btn-label">Check</span></button>`
+    : `<button class="btn btn-icon btn-mobile-label" onclick="openPriceCheck(${item.item_id})" title="Price check"><span class="btn-icon-emoji">💰</span><span class="btn-label">Check</span></button>
+       <button class="btn btn-icon btn-mobile-label refresh-price-btn" onclick="refreshSinglePrice(${item.item_id})" title="Refresh price"><span class="btn-icon-emoji">🔄</span><span class="btn-label">Refresh</span></button>
+       <button class="btn btn-icon btn-mobile-label" onclick="openEditModal(${item.item_id})" title="Edit"><span class="btn-icon-emoji">✏️</span><span class="btn-label">Edit</span></button>
+       <button class="btn btn-icon btn-mobile-label btn-danger" onclick="confirmRemove(${item.item_id})" title="Remove"><span class="btn-icon-emoji">🗑️</span><span class="btn-label">Delete</span></button>
        ${isListed
          ? `<button class="btn btn-sm btn-success" onclick="openSoldAndDelistModal(${item.item_id})">💰 Sold</button>`
          : canList
@@ -1590,7 +1590,7 @@ async function renderAnalytics() {
               <button class="filter-tab" onclick="changeVelGroup('price',this)">Price</button>
             </div>
           </div>
-          <div class="chart-wrap"><canvas id="velocity-chart"></canvas></div>
+          <div class="chart-scroll-wrapper"><div class="chart-wrap"><canvas id="velocity-chart"></canvas></div></div>
         </div>
         <div id="best-time-section"></div>
         <div class="chart-card">
@@ -1606,7 +1606,7 @@ async function renderAnalytics() {
       <div style="display:flex;flex-direction:column;gap:16px">
         <div class="chart-card">
           <div class="chart-header"><span class="chart-title">Efficiency — Profit vs Days to Sell</span></div>
-          <div class="chart-wrap-tall"><canvas id="efficiency-chart"></canvas></div>
+          <div class="chart-scroll-wrapper"><div class="chart-wrap-tall"><canvas id="efficiency-chart"></canvas></div></div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:0.78rem;color:var(--text-muted)">
             <span style="color:var(--success)">● Fast &amp; profitable</span>
             <span style="color:var(--accent)">● Slow &amp; profitable</span>
@@ -2837,7 +2837,7 @@ async function renderBestTimePanel() {
           <span class="chart-title">Best Days to Sell</span>
           <span class="text-muted" style="font-size:0.8rem">${esc(data.recommendation || '')}</span>
         </div>
-        <div class="chart-wrap"><canvas id="best-time-chart"></canvas></div>
+        <div class="chart-scroll-wrapper"><div class="chart-wrap"><canvas id="best-time-chart"></canvas></div></div>
       </div>`;
 
     const canvas = document.getElementById('best-time-chart');
@@ -3607,7 +3607,7 @@ async function renderAdmin() {
           ? `<p class="text-muted" style="padding:20px">Stripe not configured yet — add STRIPE_SECRET_KEY to .env</p>`
           : revenue?.error
           ? `<p class="text-muted" style="padding:20px">⚠️ ${revenue.error}</p>`
-          : `<div class="chart-wrap"><canvas id="revenue-chart" height="160"></canvas></div>`
+          : `<div class="chart-scroll-wrapper"><div class="chart-wrap"><canvas id="revenue-chart" height="160"></canvas></div></div>`
         }
       </div>
     </div>
@@ -3886,43 +3886,60 @@ function openScanMenu() {
 function startScanFlow(mode) {
   _scanMode = mode;
   _scannedCardData = null;
-  closeModal();
-  showCameraCapture();
+  showScanCapture(mode);
 }
 
-function showCameraCapture() {
-  showModal(`
-    <h2 style="margin-bottom:16px">${_scanMode === 'add' ? '📦 Scan & Add' : '💰 Scan & Sell'}</h2>
-    <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">
-      <div id="camera-preview" style="display:none;margin-bottom:12px">
-        <img id="preview-img" style="max-height:40vh;max-width:100%;border-radius:6px;margin-bottom:8px">
-      </div>
-      <div id="camera-buttons">
-        <button class="btn btn-ghost" onclick="document.getElementById('camera-input-1').click()" style="width:100%;margin-bottom:8px">📷 Take Photo</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('camera-input-2').click()" style="width:100%">🖼️ Choose from Gallery</button>
-      </div>
-      <input type="file" id="camera-input-1" accept="image/*" capture="environment" style="display:none" onchange="handleCameraCapture(this.files[0])">
-      <input type="file" id="camera-input-2" accept="image/*" style="display:none" onchange="handleCameraCapture(this.files[0])">
+function showScanCapture(mode) {
+  const modalBox = document.querySelector('.modal-box');
+  if (!modalBox) {
+    showModal(getScanCaptureHTML(mode));
+    return;
+  }
+  modalBox.innerHTML = getScanCaptureHTML(mode);
+}
+
+function getScanCaptureHTML(mode) {
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h3 style="margin:0">${mode === 'add' ? '📦 Scan & Add' : '💰 Scan & Sell'}</h3>
+      <button onclick="closeScanFlow()" style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;padding:0">✕</button>
     </div>
-    <button class="btn btn-accent" id="identify-btn" onclick="identifyCard()" style="width:100%;display:none;margin-bottom:8px">🤖 Identify Card</button>
-    <button class="btn btn-ghost" onclick="closeScanFlow()" style="width:100%">Cancel</button>
-  `);
+    <div id="scan-preview" style="display:none;margin-bottom:16px">
+      <img id="scan-img-preview" style="width:100%;max-height:40vh;object-fit:contain;border-radius:8px">
+    </div>
+    <div id="scan-buttons" style="display:flex;flex-direction:column;gap:8px">
+      <label style="display:block;width:100%;padding:16px;background:var(--accent);color:white;border-radius:10px;text-align:center;font-size:16px;font-weight:600;cursor:pointer">
+        📷 Take Photo
+        <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleScanImage(event, '${mode}')">
+      </label>
+      <label style="display:block;width:100%;padding:16px;background:var(--surface2);color:var(--text);border-radius:10px;text-align:center;font-size:16px;font-weight:600;cursor:pointer;border:1px solid var(--border)">
+        🖼️ Choose from Gallery
+        <input type="file" accept="image/*" style="display:none" onchange="handleScanImage(event, '${mode}')">
+      </label>
+    </div>
+    <button class="btn btn-accent" id="identify-btn" onclick="identifyCard()" style="width:100%;display:none;margin-top:12px;margin-bottom:8px">🤖 Identify Card</button>
+    <button class="btn btn-ghost" onclick="closeScanFlow()" style="width:100%;margin-top:8px">Cancel</button>
+  `;
 }
 
-function handleCameraCapture(file) {
+function handleScanImage(event, mode) {
+  const file = event.target.files?.[0];
   if (!file) return;
+
   const reader = new FileReader();
   reader.onload = (e) => {
-    const preview = document.getElementById('camera-preview');
-    const img = document.getElementById('preview-img');
+    const preview = document.getElementById('scan-preview');
+    const img = document.getElementById('scan-img-preview');
     const btn = document.getElementById('identify-btn');
-    const cameras = document.getElementById('camera-buttons');
+    const buttons = document.getElementById('scan-buttons');
+
+    if (!preview || !img || !btn || !buttons) return;
 
     img.src = e.target.result;
     img.onload = () => {
       _scannedCardData = { image: e.target.result, file: file };
       preview.style.display = 'block';
-      cameras.style.display = 'none';
+      buttons.style.display = 'none';
       btn.style.display = 'block';
     };
   };
@@ -4176,6 +4193,10 @@ function closeScanFlow() {
   _scannedCardData = null;
   _selectedInventoryId = null;
   closeModal();
+}
+
+function handleCameraCapture(file) {
+  handleScanImage({ target: { files: [file] } }, _scanMode);
 }
 
 /* ── Routes ──────────────────────────────────────────────────────────────── */

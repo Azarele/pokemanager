@@ -2359,4 +2359,65 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
   .bulk-toolbar .btn {
     width: 100%;
   }
+
+  /* Inventory icon button labels on mobile */
+  .btn-mobile-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    width: auto;
+  }
+
+  .btn-label {
+    display: inline;
+  }
+
+  /* Stack action buttons on mobile */
+  .inv-card-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Chart scroll wrapper on mobile */
+  .chart-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    padding-bottom: 8px;
+  }
+
+  .chart-scroll-wrapper > * {
+    min-width: 500px;
+  }
+
+  .chart-scroll-wrapper canvas {
+    display: block;
+  }
+
+  /* Listings page mobile layout fixes */
+  .listed-card, .unlisted-card {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .listed-actions, .unlisted-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .listed-card .btn, .unlisted-card .btn {
+    width: 100%;
+  }
+
+  .listed-info, .unlisted-info {
+    width: 100%;
+  }
+
+  .listed-thumb, .unlisted-thumb {
+    max-width: 80px;
+  }
 }
