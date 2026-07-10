@@ -2485,4 +2485,64 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
   .restock-card {
     flex-shrink: 0;
   }
+
+  /* Inventory card action buttons */
+  .inv-card-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 8px;
+    font-size: 13px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+  }
+
+  .inv-card-btn:hover {
+    background: var(--surface3);
+    border-color: var(--accent);
+  }
+
+  .inv-card-btn-accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .inv-card-btn-accent:hover {
+    background: var(--accent-dim);
+  }
+
+  .inv-card-btn-success {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+  }
+
+  .inv-card-btn-success:hover {
+    background: #3d8a6d;
+  }
+
+  .inv-card-btn-danger {
+    color: var(--danger);
+  }
+
+  .inv-card-btn-danger:hover {
+    background: rgba(255, 107, 107, 0.1);
+    border-color: var(--danger);
+  }
+
+  .btn-icon-emoji {
+    font-size: 16px;
+  }
+
+  .btn-label {
+    display: inline;
+  }
 }
