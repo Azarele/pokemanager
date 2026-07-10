@@ -3834,12 +3834,18 @@ let _selectedInventoryId = null;
 let _currentMatches = [];
 
 function initScanFAB() {
+  const existing = document.getElementById('scan-fab');
+  if (existing) existing.remove();
+
   const fab = document.createElement('div');
   fab.id = 'scan-fab';
-  fab.style.cssText = 'position:fixed;bottom:24px;right:20px;z-index:150;display:none';
-  fab.innerHTML = `<button onclick="openScanMenu()" style="width:56px;height:56px;border-radius:50%;background:var(--accent);border:none;color:white;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.4);transition:all 0.2s ease" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">📷</button>`;
+  fab.innerHTML = '<button onclick="openScanMenu()" style="width:60px;height:60px;border-radius:50%;background:#6c63ff;border:none;color:white;font-size:28px;cursor:pointer;box-shadow:0 4px 20px rgba(108,99,255,0.5);display:flex;align-items:center;justify-content:center">📷</button>';
+  fab.style.cssText = 'position:fixed;bottom:80px;right:20px;z-index:9999;display:none';
   document.body.appendChild(fab);
-  if (window.innerWidth <= 768) fab.style.display = 'block';
+
+  if (window.innerWidth <= 768) {
+    fab.style.display = 'flex';
+  }
 }
 
 function openScanMenu() {
@@ -4198,6 +4204,18 @@ window.addEventListener('popstate', routeCurrentPath);
   await updateNavUser();
   initMobileNav();
   initScanFAB();
+
+  // Show/hide FAB on resize
+  window.addEventListener('resize', () => {
+    const fab = document.getElementById('scan-fab');
+    if (fab) {
+      if (window.innerWidth <= 768) {
+        fab.style.display = 'flex';
+      } else {
+        fab.style.display = 'none';
+      }
+    }
+  });
 
   // Add admin link if user is admin
   if (S.user?.role === 'admin') {
