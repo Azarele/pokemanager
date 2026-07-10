@@ -606,7 +606,7 @@ function renderInventoryCard(item) {
         </label>
       </div>
 
-      <div style="display:flex;position:relative;overflow:hidden">
+      <div style="display:flex;position:relative">
         <div class="card-thumb" data-item-id="${item.item_id}" style="width:110px;min-width:110px;background:var(--surface2);padding:6px;box-sizing:border-box;display:flex;align-items:flex-start;margin-bottom:15px"><div class="thumb-spinner"></div></div>
 
         <div style="flex:1;padding:10px 12px;padding-right:36px;min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:6px;box-sizing:border-box">
