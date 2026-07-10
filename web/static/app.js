@@ -13,6 +13,7 @@ const S = {
 let _selectedPhotos = [];
 let _currentItems   = [];
 let _renderedCount  = 0;
+let _listingsFilter = 'all';
 const BATCH_SIZE    = 30;
 
 /* ── Chart theme (read CSS variables once at startup) ────────────────────── */
@@ -1763,17 +1764,29 @@ function buildListingsPage() {
       </div>`).join('')
     : emptyState('✅', 'All items listed', 'Every card in your inventory has an active eBay listing.');
 
+  const showListed = _listingsFilter === 'all' || _listingsFilter === 'listed';
+  const showUnlisted = _listingsFilter === 'all' || _listingsFilter === 'unlisted';
+
   document.getElementById('app').innerHTML = `
     <div class="page-header"><h1 class="page-title">Listings</h1></div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button onclick="setListingsFilter('all')" id="filter-all" class="btn ${_listingsFilter==='all'?'btn-accent':'btn-ghost'} btn-sm">All</button>
+      <button onclick="setListingsFilter('listed')" id="filter-listed" class="btn ${_listingsFilter==='listed'?'btn-accent':'btn-ghost'} btn-sm">Listed (${listed.length})</button>
+      <button onclick="setListingsFilter('unlisted')" id="filter-unlisted" class="btn ${_listingsFilter==='unlisted'?'btn-accent':'btn-ghost'} btn-sm">Unlisted (${unlisted.length})</button>
+    </div>
     <div class="listings-grid">
+      ${showListed ? `
       <div class="listings-panel">
         <div class="panel-header"><span class="panel-title">Active eBay Listings (${listed.length})</span></div>
         ${listedHtml}
       </div>
+      ` : ''}
+      ${showUnlisted ? `
       <div class="listings-panel">
         <div class="panel-header"><span class="panel-title">Not Listed — by Potential Profit (${unlisted.length})</span></div>
         ${unlistedHtml}
       </div>
+      ` : ''}
     </div>
     <div class="reprice-panel">
       <h2 style="font-size:1rem;font-weight:600;margin-bottom:14px">Reprice eBay Listings</h2>
@@ -1796,6 +1809,11 @@ function buildListingsPage() {
   observeThumbs();
   setTimeout(() => observeThumbs(), 300);
   connectWS();
+}
+
+function setListingsFilter(filter) {
+  _listingsFilter = filter;
+  buildListingsPage();
 }
 
 /* ── Listing drawer ──────────────────────────────────────────────────────── */
@@ -2794,7 +2812,7 @@ async function renderTrendChart() {
       return;
     }
 
-    container.innerHTML = `<canvas id="trend-chart" height="120"></canvas>`;
+    container.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%"><div style="min-width:500px"><canvas id="trend-chart" height="120"></canvas></div></div>`;
     const canvas = document.getElementById('trend-chart');
 
     S.charts.trend = safeCreateChart('trend-chart', {
@@ -2889,8 +2907,9 @@ async function renderConcentrationChart() {
           <span class="text-muted" style="font-size:0.8rem">Total value: ${fmt(data.total_value)}</span>
         </div>
         ${highRisk.length ? `<div class="risk-alert">⚠️ High concentration: ${highRisk.map(s => s.set).join(', ')} (&gt;30% each)</div>` : ''}
-        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
-          <div style="width:200px;height:200px;flex-shrink:0"><canvas id="concentration-chart"></canvas></div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;min-width:500px">
+            <div style="width:200px;height:200px;flex-shrink:0"><canvas id="concentration-chart"></canvas></div>
           <div style="flex:1;min-width:180px">
             ${top.map(s => `<div class="conc-row">
               <span class="conc-set">${esc(s.set)}</span>
@@ -2898,6 +2917,7 @@ async function renderConcentrationChart() {
               <span class="conc-val text-muted">${fmt(s.value)}</span>
             </div>`).join('')}
           </div>
+        </div>
         </div>
       </div>`;
 
