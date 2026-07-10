@@ -1668,7 +1668,7 @@ function drawVelocityChart(rows) {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: CHART_THEME.tick, maxRotation: 35, font: { size: 11 } }, grid: { color: CHART_THEME.grid } },
+        x: { ticks: { color: CHART_THEME.tick, maxRotation: window.innerWidth < 768 ? 45 : 35, minRotation: window.innerWidth < 768 ? 45 : 0, font: { size: window.innerWidth < 768 ? 9 : 11 } }, grid: { color: CHART_THEME.grid } },
         y: { ticks: { color: CHART_THEME.tick }, grid: { color: CHART_THEME.grid },
              title: { display: true, text: 'Days', color: CHART_THEME.tick } },
       },
@@ -1695,7 +1695,7 @@ function drawEfficiencyChart(items, avgDays, avgProfit) {
       datasets: Object.keys(colorMap).map(q => ({
         label: q,
         data: items.filter(i => i.quadrant === q).map(i => ({ x: i.days_to_sell, y: i.profit, label: i.card_name })),
-        backgroundColor: colorMap[q] + 'cc', pointRadius: 5, pointHoverRadius: 7,
+        backgroundColor: colorMap[q] + 'cc', pointRadius: window.innerWidth < 768 ? 3 : 5, pointHoverRadius: window.innerWidth < 768 ? 5 : 7,
       })),
     },
     options: {
@@ -1705,9 +1705,9 @@ function drawEfficiencyChart(items, avgDays, avgProfit) {
         tooltip: { callbacks: { label: ctx => `${ctx.raw.label || ''} — £${ctx.raw.y?.toFixed(2)}, ${ctx.raw.x}d` } },
       },
       scales: {
-        x: { ticks: { color: CHART_THEME.tick }, grid: { color: CHART_THEME.grid },
+        x: { ticks: { color: CHART_THEME.tick, font: { size: window.innerWidth < 768 ? 9 : 11 } }, grid: { color: CHART_THEME.grid },
              title: { display: true, text: 'Days to Sell', color: CHART_THEME.tick } },
-        y: { ticks: { color: CHART_THEME.tick }, grid: { color: CHART_THEME.grid },
+        y: { ticks: { color: CHART_THEME.tick, font: { size: window.innerWidth < 768 ? 9 : 11 } }, grid: { color: CHART_THEME.grid },
              title: { display: true, text: 'Profit (£)', color: CHART_THEME.tick } },
       },
     },
@@ -2831,10 +2831,10 @@ async function renderTrendChart() {
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { labels: { color: CHART_THEME.legend, boxWidth: 12 } } },
+        plugins: { legend: { labels: { color: CHART_THEME.legend, boxWidth: 12, font: { size: window.innerWidth < 768 ? 9 : 11 } } } },
         scales: {
-          x: { ticks: { color: CHART_THEME.tick, maxTicksLimit: 10, maxRotation: 0 }, grid: { color: CHART_THEME.grid } },
-          y: { ticks: { color: CHART_THEME.tick, callback: v => '£' + v }, grid: { color: CHART_THEME.grid } },
+          x: { ticks: { color: CHART_THEME.tick, maxTicksLimit: window.innerWidth < 768 ? 6 : 10, maxRotation: 0, font: { size: window.innerWidth < 768 ? 8 : 11 } }, grid: { color: CHART_THEME.grid } },
+          y: { ticks: { color: CHART_THEME.tick, callback: v => '£' + v, font: { size: window.innerWidth < 768 ? 9 : 11 } }, grid: { color: CHART_THEME.grid } },
         },
       },
     });
@@ -2877,8 +2877,8 @@ async function renderBestTimePanel() {
             return [`Sales: ${d.count}`, `Avg profit: ${fmt(d.avg_profit)}`];
           }}} },
         scales: {
-          x: { ticks: { color: CHART_THEME.tick }, grid: { color: CHART_THEME.grid } },
-          y: { ticks: { color: CHART_THEME.tick }, grid: { color: CHART_THEME.grid },
+          x: { ticks: { color: CHART_THEME.tick, font: { size: window.innerWidth < 768 ? 9 : 11 } }, grid: { color: CHART_THEME.grid } },
+          y: { ticks: { color: CHART_THEME.tick, font: { size: window.innerWidth < 768 ? 9 : 11 } }, grid: { color: CHART_THEME.grid },
                title: { display: true, text: 'Sales', color: CHART_THEME.tick } },
         },
       },
@@ -2933,7 +2933,7 @@ async function renderConcentrationChart() {
       },
       options: {
         responsive: true, maintainAspectRatio: true,
-        plugins: { legend: { display: false },
+        plugins: { legend: { display: false, labels: { font: { size: window.innerWidth < 768 ? 9 : 11 } } },
           tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed}%` }} },
         cutout: '60%',
       },
@@ -3112,8 +3112,10 @@ async function renderSettings() {
             }
           </div>
         </div>
-        <button class="btn btn-accent btn-sm" onclick="saveAccountSettings()">Save</button>
-        <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="confirmLogout()">Sign Out</button>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px">
+          <button class="btn btn-accent" onclick="saveAccountSettings()">Save Settings</button>
+          <button class="btn btn-ghost" onclick="confirmLogout()">Sign Out</button>
+        </div>
       </div>
 
       <!-- Your Plan Features -->

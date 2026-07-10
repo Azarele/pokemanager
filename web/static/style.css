@@ -2420,4 +2420,36 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
   .listed-thumb, .unlisted-thumb {
     max-width: 80px;
   }
+
+  /* Analytics page mobile fixes */
+  .chart-card, .sales-chart-card {
+    overflow: hidden !important;
+    max-width: 100vw !important;
+  }
+
+  canvas {
+    max-width: 100% !important;
+    display: block !important;
+  }
+
+  .chart-wrap {
+    height: 250px !important;
+    max-width: 100%;
+    overflow: hidden !important;
+  }
+
+  .chart-wrap-tall {
+    height: 300px !important;
+    max-width: 100%;
+    overflow: hidden !important;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .analytics-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
