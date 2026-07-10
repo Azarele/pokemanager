@@ -560,6 +560,8 @@ function renderInventoryCard(item) {
   const buyP   = item.purchase_price || 0;
   const profit = liveP - buyP;
   const pClass = profit > 0 ? 'profit-pos' : profit < 0 ? 'profit-neg' : '';
+  const roi = buyP > 0 ? ((profit / buyP) * 100).toFixed(1) : 0;
+  const roiClass = roi > 0 ? 'profit-pos' : roi < 0 ? 'profit-neg' : '';
   const isUW   = item.status === 'Inventory' && liveP > 0 && liveP < buyP;
   const isLE   = item.status === 'Inventory' && buyP > 0 && ((item.potential_profit ?? 0) / buyP) < 0.1;
   const isListed = item.ebay_listed === 'Yes';
@@ -589,36 +591,42 @@ function renderInventoryCard(item) {
             <button onclick="openSellModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:60px">💰 Sell</button>`
        }`;
 
+  const selected = S.selection?.has(item.item_id);
+
   return `
-    <div class="inv-card${isUW ? ' is-underwater' : ''}${S.selection?.has(item.item_id) ? ' is-selected' : ''}" data-id="${item.item_id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;margin-bottom:12px;position:relative">
-      <div style="position:absolute;top:8px;right:8px;z-index:10">
-        <input type="checkbox" class="bulk-cb inv-card-checkbox" data-id="${item.item_id}"
-               ${S.selection?.has(item.item_id) ? 'checked' : ''}
-               onchange="toggleSelectItem(${item.item_id})"
-               style="width:20px;height:20px">
+    <div class="inv-card${isUW ? ' is-underwater' : ''}${selected ? ' is-selected' : ''}" data-id="${item.item_id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;margin-bottom:12px;position:relative">
+      <div style="position:absolute;top:6px;right:6px;z-index:10">
+        <label style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--surface);border:2px solid var(--border);border-radius:6px;cursor:pointer;transition:all 0.2s">
+          <input type="checkbox" class="bulk-cb inv-card-checkbox" data-id="${item.item_id}"
+                 ${selected ? 'checked' : ''}
+                 onchange="toggleSelectItem(${item.item_id})"
+                 style="display:none">
+          <span class="check-indicator" style="font-size:14px;color:var(--accent);font-weight:700">${selected ? '✓' : ''}</span>
+        </label>
       </div>
 
-      <div style="display:flex;gap:0">
-        <div class="card-thumb" data-item-id="${item.item_id}" style="width:90px;min-width:90px;background:var(--surface2);height:140px"><div class="thumb-spinner"></div></div>
+      <div style="display:flex;min-height:130px;position:relative;overflow:hidden">
+        <div class="card-thumb" data-item-id="${item.item_id}" style="width:110px;min-width:110px;background:var(--surface2)"><div class="thumb-spinner"></div></div>
 
-        <div style="flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span class="inv-card-id" style="color:var(--text-muted);font-size:11px">#${item.item_id}</span>
-            <span style="color:var(--text-muted)">·</span>
-            <div class="inv-card-name" style="flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px" title="${esc(item.card_name || '')}">${esc(item.card_name || '—')}</div>
-            <div class="inv-card-badges" style="display:flex;gap:4px">${badges}</div>
+        <div style="flex:1;padding:10px 12px;padding-right:36px;min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:6px;box-sizing:border-box">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;overflow:hidden;max-width:100%">
+            <span class="inv-card-id" style="color:var(--text-muted);font-size:11px;flex-shrink:0">#${item.item_id}</span>
+            <span style="color:var(--text-muted);flex-shrink:0">·</span>
+            <div class="inv-card-name" style="flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;min-width:0" title="${esc(item.card_name || '')}">${esc(item.card_name || '—')}</div>
+            <div class="inv-card-badges" style="display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0;max-width:100%;box-sizing:border-box">${badges}</div>
           </div>
 
-          <div class="inv-card-cond" style="font-size:11px;color:var(--text-muted)">${esc(item.condition || '—')} · ${esc(item.region || 'EN')}</div>
+          <div class="inv-card-cond" style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(item.condition || '—')} · ${esc(item.region || 'EN')}</div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px">
-            <div><span style="color:var(--text-muted)">Bought</span><br><strong style="font-size:12px">${fmt(buyP)}</strong></div>
-            <div><span style="color:var(--text-muted)">Market</span><br><strong style="font-size:12px">${fmt(item.live_price)}</strong></div>
-            <div><span style="color:var(--text-muted)">Profit</span><br><strong style="font-size:12px;${pClass}">${profit >= 0 ? '+' : ''}${fmt(profit)}</strong></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;max-width:100%;box-sizing:border-box">
+            <div><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase">Bought</span><br><strong style="font-size:13px;font-weight:600">${fmt(buyP)}</strong></div>
+            <div><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase">Market</span><br><strong style="font-size:13px;font-weight:600">${fmt(item.live_price)}</strong></div>
+            <div><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase">Profit</span><br><strong style="font-size:13px;font-weight:600;${pClass}">${profit >= 0 ? '+' : ''}${fmt(profit)}</strong></div>
           </div>
 
-          <div style="font-size:11px">
-            <span style="color:var(--text-muted)">Quick</span> <strong style="color:var(--accent);font-size:12px">${fmt(item.quick_price)}</strong>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:12px;flex-wrap:wrap;max-width:100%;box-sizing:border-box">
+            <span style="color:var(--text-muted)">Quick <strong style="color:var(--accent);font-size:13px;font-weight:600">${fmt(item.quick_price)}</strong></span>
+            <span style="color:var(--text-muted)">ROI <strong style="color:${roi > 0 ? '#10b981' : roi < 0 ? '#ef4444' : '#6b7280'};font-size:13px;font-weight:600">${roi > 0 ? '+' : ''}${roi}%</strong></span>
           </div>
         </div>
       </div>
