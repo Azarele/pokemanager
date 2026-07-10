@@ -578,25 +578,33 @@ function renderInventoryCard(item) {
 
   const canList = canAccess('ebay_listing');
 
-  const actions = isSold
-    ? `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px">💰 Check</button>`
-    : `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px">💰 Check</button>
-       <button onclick="refreshSinglePrice(${item.item_id})" class="btn btn-ghost btn-sm refresh-price-btn" style="flex:1;min-width:60px">🔄 Refresh</button>
-       <button onclick="openEditModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px">✏️ Edit</button>
-       <button onclick="confirmRemove(${item.item_id})" class="btn btn-danger btn-sm" style="flex:1;min-width:60px">🗑️ Delete</button>
+  const mainActions = isSold
+    ? `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">💰 Check</button>`
+    : `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">💰 Check</button>
+       <button onclick="refreshSinglePrice(${item.item_id})" class="btn btn-ghost btn-sm refresh-price-btn" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🔄 Refresh</button>
+       <button onclick="openEditModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">✏️ Edit</button>
+       <button onclick="confirmRemove(${item.item_id})" class="btn btn-danger btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🗑️ Delete</button>
        ${isListed
-         ? `<button onclick="openSoldAndDelistModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:60px">💰 Sold</button>`
+         ? ''
          : canList
-         ? `<button onclick="openListingDrawer(${item.item_id})" class="btn btn-accent btn-sm" style="flex:1;min-width:60px">📋 List</button>
-            <button onclick="openSellModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:60px">💰 Sell</button>`
-         : `<button onclick="showUpgradePrompt('ebay_listing')" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px">🔒 List</button>
-            <button onclick="openSellModal(${item.item_id})" class="btn btn-success btn-sm" style="flex:1;min-width:60px">💰 Sell</button>`
+         ? `<button onclick="openListingDrawer(${item.item_id})" class="btn btn-accent btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">📋 List</button>`
+         : `<button onclick="showUpgradePrompt('ebay_listing')" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🔒 List</button>`
        }`;
+
+  const sellAction = isSold
+    ? `<div style="padding:0 8px 8px 8px;width:100%;box-sizing:border-box">
+         <button onclick="openSoldAndDelistModal(${item.item_id})" class="btn btn-success" style="width:100%;padding:10px">💰 Sold</button>
+       </div>`
+    : canList || !isListed
+    ? `<div style="padding:0 8px 8px 8px;width:100%;box-sizing:border-box">
+         <button onclick="openSellModal(${item.item_id})" class="btn btn-success" style="width:100%;padding:10px">💰 Sell</button>
+       </div>`
+    : '';
 
   const selected = S.selection?.has(item.item_id);
 
   return `
-    <div class="inv-card${isUW ? ' is-underwater' : ''}${selected ? ' is-selected' : ''}" data-id="${item.item_id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;margin-bottom:12px;position:relative">
+    <div class="inv-card${isUW ? ' is-underwater' : ''}${selected ? ' is-selected' : ''}" data-id="${item.item_id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;margin-bottom:12px;width:100%;box-sizing:border-box;position:relative">
       <div style="position:absolute;top:6px;right:6px;z-index:10">
         <label style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--surface);border:2px solid var(--border);border-radius:6px;cursor:pointer;transition:all 0.2s">
           <input type="checkbox" class="bulk-cb inv-card-checkbox" data-id="${item.item_id}"
@@ -612,12 +620,12 @@ function renderInventoryCard(item) {
           <div class="card-thumb" data-item-id="${item.item_id}" style="width:110px;height:100%;display:flex;align-items:center;justify-content:center"><div class="thumb-spinner"></div></div>
         </div>
 
-        <div style="padding:10px 12px;padding-right:36px;min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:6px;box-sizing:border-box">
+        <div style="padding:8px 8px 8px 8px;padding-right:32px;min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:6px;box-sizing:border-box;flex:1">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;overflow:hidden;max-width:100%">
             <span class="inv-card-id" style="color:var(--text-muted);font-size:11px;flex-shrink:0">#${item.item_id}</span>
             <span style="color:var(--text-muted);flex-shrink:0">·</span>
-            <div class="inv-card-name" style="flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;min-width:0" title="${esc(item.card_name || '')}">${esc(item.card_name || '—')}</div>
-            <div class="inv-card-badges" style="display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0;max-width:100%;box-sizing:border-box">${badges}</div>
+            <div class="inv-card-name" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-size:13px" title="${esc(item.card_name || '')}">${esc(item.card_name || '—')}</div>
+            <div class="inv-card-badges" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;overflow:hidden;max-width:100%;padding-right:30px;box-sizing:border-box">${badges}</div>
           </div>
 
           <div class="inv-card-cond" style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(item.condition || '—')} · ${esc(item.region || 'EN')}</div>
@@ -639,7 +647,8 @@ function renderInventoryCard(item) {
         <canvas class="sparkline-canvas" style="width:100%;height:65px;display:block"></canvas>
       </div>
 
-      <div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border);flex-wrap:wrap">${actions}</div>
+      <div style="display:flex;gap:4px;padding:8px;border-top:1px solid var(--border);flex-wrap:wrap;box-sizing:border-box;width:100%">${mainActions}</div>
+      ${sellAction}
     </div>`;
 }
 
