@@ -2143,3 +2143,35 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
     height: 220px;
   }
 }
+
+/* ── Floating Action Button (scan FAB) ───────────────────────────────────── */
+#scan-fab {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  #scan-fab {
+    display: block !important;
+  }
+}
+
+/* ── Scan modal styles ────────────────────────────────────────────────────── */
+.photo-drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(108, 99, 255, 0.04);
+}
+
+.photo-drop-zone:hover {
+  border-color: var(--accent);
+  background: rgba(108, 99, 255, 0.08);
+}
+
+.photo-drop-zone.dragover {
+  border-color: var(--accent);
+  background: rgba(108, 99, 255, 0.12);
+}

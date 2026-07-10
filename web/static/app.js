@@ -3823,6 +3823,331 @@ async function confirmAdminDeleteUser(userId, email) {
   }
 }
 
+/* ── Scan & Sell / Scan & Add (mobile camera) ────────────────────────────── */
+let _scanMode = null; // 'add' or 'sell'
+let _scannedCardData = null;
+let _selectedInventoryId = null;
+let _currentMatches = [];
+
+function initScanFAB() {
+  if (window.innerWidth > 768) return;
+  const fab = document.createElement('div');
+  fab.id = 'scan-fab';
+  fab.style.cssText = 'position:fixed;bottom:24px;right:20px;z-index:150;display:block';
+  fab.innerHTML = `<button onclick="openScanMenu()" style="width:56px;height:56px;border-radius:50%;background:var(--accent);border:none;color:white;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.4);transition:all 0.2s ease" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">📷</button>`;
+  document.body.appendChild(fab);
+}
+
+function openScanMenu() {
+  showModal(`
+    <h2 style="margin-bottom:20px;text-align:center">📱 Scan Card</h2>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <button class="btn btn-accent" onclick="startScanFlow('add')" style="width:100%;padding:16px;font-size:16px">
+        📦 Scan & Add
+      </button>
+      <button class="btn btn-ghost" onclick="startScanFlow('sell')" style="width:100%;padding:16px;font-size:16px">
+        💰 Scan & Sell
+      </button>
+    </div>
+    <button class="btn btn-ghost" onclick="closeModal()" style="width:100%;margin-top:12px">Cancel</button>
+  `);
+}
+
+function startScanFlow(mode) {
+  _scanMode = mode;
+  _scannedCardData = null;
+  closeModal();
+  showCameraCapture();
+}
+
+function showCameraCapture() {
+  showModal(`
+    <h2 style="margin-bottom:16px">${_scanMode === 'add' ? '📦 Scan & Add' : '💰 Scan & Sell'}</h2>
+    <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">
+      <div id="camera-preview" style="display:none;margin-bottom:12px">
+        <img id="preview-img" style="max-height:40vh;max-width:100%;border-radius:6px;margin-bottom:8px">
+      </div>
+      <div id="camera-buttons">
+        <button class="btn btn-ghost" onclick="document.getElementById('camera-input-1').click()" style="width:100%;margin-bottom:8px">📷 Take Photo</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('camera-input-2').click()" style="width:100%">🖼️ Choose from Gallery</button>
+      </div>
+      <input type="file" id="camera-input-1" accept="image/*" capture="environment" style="display:none" onchange="handleCameraCapture(this.files[0])">
+      <input type="file" id="camera-input-2" accept="image/*" style="display:none" onchange="handleCameraCapture(this.files[0])">
+    </div>
+    <button class="btn btn-accent" id="identify-btn" onclick="identifyCard()" style="width:100%;display:none;margin-bottom:8px">🤖 Identify Card</button>
+    <button class="btn btn-ghost" onclick="closeScanFlow()" style="width:100%">Cancel</button>
+  `);
+}
+
+function handleCameraCapture(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const preview = document.getElementById('camera-preview');
+    const img = document.getElementById('preview-img');
+    const btn = document.getElementById('identify-btn');
+    const cameras = document.getElementById('camera-buttons');
+
+    img.src = e.target.result;
+    img.onload = () => {
+      _scannedCardData = { image: e.target.result, file: file };
+      preview.style.display = 'block';
+      cameras.style.display = 'none';
+      btn.style.display = 'block';
+    };
+  };
+  reader.readAsDataURL(file);
+}
+
+async function identifyCard() {
+  if (!_scannedCardData) return;
+  const btn = document.getElementById('identify-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Analyzing…';
+
+  try {
+    const base64 = _scannedCardData.image.split(',')[1];
+    const resp = await api.post('/scan/identify', {
+      image: base64,
+      mime_type: _scannedCardData.file.type || 'image/jpeg'
+    });
+
+    if (resp.error) {
+      toast(resp.error === 'not a pokemon card' ? '❌ Not a Pokémon card' : `❌ ${resp.error}`, 'error');
+      btn.disabled = false;
+      btn.textContent = '🤖 Identify Card';
+      return;
+    }
+
+    _scannedCardData = { ...resp };
+    showCardConfirmation();
+    closeModal();
+  } catch (e) {
+    toast('Identification failed: ' + extractError(e.message), 'error');
+    btn.disabled = false;
+    btn.textContent = '🤖 Identify Card';
+  }
+}
+
+function showCardConfirmation() {
+  const card = _scannedCardData;
+  const title = _scanMode === 'add' ? '📦 Confirm Card' : '💰 Confirm Card';
+  showModal(`
+    <h2 style="margin-bottom:16px">${title}</h2>
+    <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
+      <div style="margin-bottom:8px"><strong>${esc(card.card_name || 'Unknown')}</strong></div>
+      <div style="color:var(--text-muted);font-size:14px">
+        ${card.card_number ? `#${esc(card.card_number)} · ` : ''}${esc(card.set_name || 'Unknown Set')}
+      </div>
+      ${card.confidence ? `<div style="color:var(--accent);font-size:13px;margin-top:8px">Confidence: ${card.confidence}</div>` : ''}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeScanFlow()">Rescan</button>
+      <button class="btn btn-accent" onclick="${_scanMode === 'add' ? 'proceedScanAdd()' : 'proceedScanSell()'}">${_scanMode === 'add' ? 'Confirm & Add' : 'Confirm & Sell'}</button>
+    </div>
+  `);
+}
+
+async function proceedScanAdd() {
+  closeModal();
+  toast('Searching for card price…', 'info', 2000);
+
+  try {
+    // For now, just open the add modal with pre-filled data
+    showModal(`
+      <h2 style="margin-bottom:16px">Add Cards</h2>
+      <div id="add-rows-container">
+        ${renderAddRow(1)}
+      </div>
+      <div class="modal-actions" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-accent" onclick="submitBulkAdd()">Add Card</button>
+      </div>
+    `);
+
+    // Pre-fill the card name
+    setTimeout(() => {
+      const nameInput = document.getElementById('pc-url-1');
+      if (nameInput) {
+        // For now just pre-fill card name in a comment; user fills in PC URL
+        console.log('Card identified:', _scannedCardData);
+        toast(`Card: ${_scannedCardData.card_name}. Enter PriceCharting URL and purchase price.`, 'info', 6000);
+      }
+    }, 100);
+
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
+  }
+}
+
+async function proceedScanSell() {
+  closeModal();
+  toast('Searching inventory…', 'info', 1000);
+
+  try {
+    const resp = await api.post('/scan/match-inventory', {
+      card_name: _scannedCardData.card_name
+    });
+
+    if (!resp.matches || resp.matches.length === 0) {
+      toast('No matching cards found in inventory', 'warning');
+      closeScanFlow();
+      return;
+    }
+
+    if (resp.matches.length === 1) {
+      // Single match — go straight to sell
+      const match = resp.matches[0];
+      showSellConfirmation(match);
+    } else {
+      // Multiple matches — show list
+      showMatchList(resp.matches);
+    }
+  } catch (e) {
+    toast('Search failed: ' + extractError(e.message), 'error');
+    closeScanFlow();
+  }
+}
+
+function showMatchList(matches) {
+  _currentMatches = matches;
+  showModal(`
+    <h2 style="margin-bottom:16px">Select Card to Sell</h2>
+    <p class="text-muted" style="margin-bottom:12px">Found ${matches.length} matching cards</p>
+    <div style="max-height:40vh;overflow-y:auto;background:var(--surface2);border-radius:8px">
+      ${matches.map(m => `
+        <div onclick="selectMatchAndShowSellForm(${m.item_id})"
+             style="padding:12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center"
+             onmouseover="this.style.background='rgba(108,99,255,0.1)'"
+             onmouseout="this.style.background='transparent'">
+          <div>
+            <div style="font-weight:600">#${m.item_id}</div>
+            <div style="font-size:13px;color:var(--text-muted)">${esc(m.card_name)}</div>
+            <div style="font-size:12px;color:var(--text-muted)">${esc(m.condition)} · Bought ${fmt(m.purchase_price)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:600">${fmt(m.current_price)}</div>
+            <div style="font-size:12px;color:var(--text-muted)">Current</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <button class="btn btn-ghost" onclick="closeScanFlow()" style="width:100%;margin-top:12px">Cancel</button>
+  `);
+}
+
+function selectMatchAndShowSellForm(itemId) {
+  const match = _currentMatches.find(m => m.item_id === itemId);
+  if (match) showSellConfirmation(match);
+}
+
+function showSellConfirmation(match) {
+  _selectedInventoryId = match.item_id;
+  const market = parseFloat(match.current_price || 0);
+  const suggested = market.toFixed(2);
+
+  showModal(`
+    <h2 style="margin-bottom:6px">💰 Sell Card</h2>
+    <p class="text-muted" style="margin-bottom:16px">${esc(match.card_name)}</p>
+
+    <div class="form-section">
+      <label class="form-label">Sale Price (£)</label>
+      <input type="number" id="scan-sell-price" class="form-input"
+             value="${suggested}" step="0.01" min="0.01" />
+      <div class="price-hints" style="margin-top:8px">
+        <button class="pill-btn" onclick="document.getElementById('scan-sell-price').value='${suggested}'">Market ${fmt(market)}</button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
+        <input type="checkbox" id="scan-ebay-fees" checked>
+        Include eBay fees (12.35%)
+      </label>
+      <div id="fee-calc" style="font-size:13px;color:var(--text-muted);margin-top:6px"></div>
+    </div>
+
+    <div class="form-section">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
+        <input type="checkbox" id="scan-postage" checked>
+        Include postage (£1.50)
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeScanFlow()">Cancel</button>
+      <button class="btn btn-success" onclick="confirmScanSell()">✅ Confirm Sale</button>
+    </div>
+  `);
+
+  const priceInput = document.getElementById('scan-sell-price');
+  const feesCheckbox = document.getElementById('scan-ebay-fees');
+  const postageCheckbox = document.getElementById('scan-postage');
+
+  function updateFeeCalc() {
+    const price = parseFloat(priceInput.value) || 0;
+    const feesOn = feesCheckbox.checked;
+    const postageOn = postageCheckbox.checked;
+    let fees = feesOn ? price * 0.1235 : 0;
+    let postage = postageOn ? 1.50 : 0;
+    let net = price - fees - postage;
+
+    const feeDiv = document.getElementById('fee-calc');
+    if (feesOn || postageOn) {
+      feeDiv.innerHTML = `
+        ${feesOn ? `Fees: -£${fees.toFixed(2)}<br>` : ''}
+        ${postageOn ? `Postage: -£${postage.toFixed(2)}<br>` : ''}
+        <strong>Net: £${Math.max(0, net).toFixed(2)}</strong>
+      `;
+    } else {
+      feeDiv.innerHTML = '';
+    }
+  }
+
+  priceInput.addEventListener('input', updateFeeCalc);
+  feesCheckbox.addEventListener('change', updateFeeCalc);
+  postageCheckbox.addEventListener('change', updateFeeCalc);
+  updateFeeCalc();
+  setTimeout(() => priceInput.focus(), 80);
+}
+
+async function confirmScanSell() {
+  if (!_selectedInventoryId) return;
+
+  const price = parseFloat(document.getElementById('scan-sell-price')?.value);
+  if (!price || price <= 0) { toast('Enter a valid price', 'error'); return; }
+
+  const btn = document.querySelector('.modal-actions .btn-success');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Processing…'; }
+
+  try {
+    const res = await api.post(`/inventory/${_selectedInventoryId}/sell`, { sell_price: price });
+    if (res.success === false) {
+      toast(res.error || 'Sell failed', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Sale'; }
+      return;
+    }
+
+    const item = S.inventory.find(i => i.item_id === _selectedInventoryId);
+    if (item) { item.status = 'Sold'; item.sell_price = price; }
+
+    closeModal();
+    closeScanFlow();
+    refreshInventoryGrid();
+    toast(`Sold for ${fmt(price)} ✅`, 'success');
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Sale'; }
+  }
+}
+
+function closeScanFlow() {
+  _scanMode = null;
+  _scannedCardData = null;
+  _selectedInventoryId = null;
+  closeModal();
+}
+
 /* ── Routes ──────────────────────────────────────────────────────────────── */
 const ROUTES = {
   '/':           renderInventory,
@@ -3848,6 +4173,7 @@ window.addEventListener('popstate', routeCurrentPath);
   updateStatus();
   await updateNavUser();
   initMobileNav();
+  initScanFAB();
 
   // Add admin link if user is admin
   if (S.user?.role === 'admin') {

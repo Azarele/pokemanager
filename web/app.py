@@ -15,7 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from web.routes import inventory, listings, analytics, pricing, watchlist, sales, calculator, price_history, auth_routes, settings, billing, legal, admin
+from web.routes import inventory, listings, analytics, pricing, watchlist, sales, calculator, price_history, auth_routes, settings, billing, legal, admin, scan
 from web.middleware.auth import AuthMiddleware
 from web.middleware.rate_limit import RateLimitMiddleware
 from web.ws_manager import manager
@@ -60,6 +60,7 @@ app.include_router(price_history.router, prefix="/api/price-history")
 app.include_router(settings.router,      prefix="/api/settings")
 app.include_router(billing.router,       prefix="/api/billing")
 app.include_router(admin.router,         prefix="/api/admin")
+app.include_router(scan.router,          prefix="/api/scan")
 app.include_router(legal.router,         prefix="")
 
 app.mount("/static", StaticFiles(directory=str(_here / "static")), name="static")
