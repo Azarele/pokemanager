@@ -2616,22 +2616,24 @@ async function renderRestockPanel() {
     if (!data.suggestions.length) return;
 
     container.innerHTML = `
-      <div class="chart-card">
+      <div class="chart-card" style="width:100%;max-width:100%;overflow:hidden;box-sizing:border-box">
         <div class="chart-header">
           <span class="chart-title">🔄 Restock Suggestions</span>
           <span class="text-muted" style="font-size:0.8rem">Fast-selling sets where you're low on stock</span>
         </div>
-        <div class="restock-cards">
-          ${data.suggestions.slice(0, 6).map(s => `
-            <div class="restock-card">
-              <div class="restock-set">${esc(s.set)}</div>
-              <div class="restock-stats">
-                <span>⚡ ${s.avg_days}d avg sell</span>
-                <span>💰 £${s.avg_profit.toFixed(2)} avg profit</span>
-                <span class="${s.current_stock < 2 ? 'restock-critical' : ''}">📦 ${s.current_stock} in stock</span>
-                <span class="text-muted">${s.total_sold} sold total</span>
-              </div>
-            </div>`).join('')}
+        <div style="overflow-y:auto;max-height:350px;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box">
+          <div class="restock-cards">
+            ${data.suggestions.slice(0, 6).map(s => `
+              <div class="restock-card">
+                <div class="restock-set">${esc(s.set)}</div>
+                <div class="restock-stats">
+                  <span>⚡ ${s.avg_days}d avg sell</span>
+                  <span>💰 £${s.avg_profit.toFixed(2)} avg profit</span>
+                  <span class="${s.current_stock < 2 ? 'restock-critical' : ''}">📦 ${s.current_stock} in stock</span>
+                  <span class="text-muted">${s.total_sold} sold total</span>
+                </div>
+              </div>`).join('')}
+          </div>
         </div>
       </div>`;
   } catch {}
@@ -2965,17 +2967,17 @@ async function renderPredictions() {
       : `<p class="text-muted" style="padding:12px 0">Not enough price history yet.</p>`;
 
     container.innerHTML = `
-      <div class="chart-card">
-        <div class="chart-header"><span class="chart-title">Price Predictions (Linear Regression)</span>
+      <div class="chart-card" style="width:100%;max-width:100%;overflow:hidden;box-sizing:border-box">
+        <div class="chart-header"><span class="chart-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Price Predictions (Linear Regression)</span>
           <span class="text-muted" style="font-size:0.8rem">${data.total_analysed} cards analysed</span>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <div>
-            <div style="color:var(--success);font-weight:600;margin-bottom:8px">Rising ↑</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%;box-sizing:border-box;overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <div style="min-width:0;overflow:hidden">
+            <div style="color:var(--success);font-weight:600;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Rising ↑</div>
             ${cardHtml(data.rising || [], 'rising')}
           </div>
-          <div>
-            <div style="color:var(--danger);font-weight:600;margin-bottom:8px">Falling ↓</div>
+          <div style="min-width:0;overflow:hidden">
+            <div style="color:var(--danger);font-weight:600;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Falling ↓</div>
             ${cardHtml(data.falling || [], 'falling')}
           </div>
         </div>

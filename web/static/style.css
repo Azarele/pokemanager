@@ -351,16 +351,18 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
 /* ── Card thumbnails ────────────────────────────────────────────────────── */
 .col-img { width: 52px; padding: 4px; overflow: hidden; vertical-align: middle; }
 .card-thumb {
-  width: 44px; height: 62px; border-radius: 5px; overflow: hidden;
+  width: 60px; height: 84px; border-radius: 5px; overflow: hidden;
   background: var(--surface2); display: flex; align-items: center;
   justify-content: center; position: relative; z-index: 0;
   contain: strict;
 }
 .card-thumb-img {
-  width: 44px; height: 62px; object-fit: cover; border-radius: 5px;
+  width: 60px; height: 84px; object-fit: contain; border-radius: 5px;
   cursor: zoom-in; transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1),
     box-shadow 0.25s ease;
   display: block;
+  image-rendering: high-quality;
+  -ms-interpolation-mode: nearest-neighbor;
 }
 .card-thumb-img:hover {
   transform: scale(2.5); transform-origin: center center;
@@ -1118,11 +1120,12 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
 
 /* ── Global card-thumb baseline — catches any context where specific CSS is missing ── */
 .card-thumb[data-item-id] {
-  min-height: 44px; display: flex; align-items: center;
-  justify-content: center; overflow: hidden;
+  min-height: 84px; min-width: 60px; display: flex; align-items: center;
+  justify-content: center; overflow: hidden; background: var(--surface2);
 }
 .card-thumb[data-item-id] .card-thumb-img {
-  max-width: 100%; max-height: 100%; object-fit: cover; display: block;
+  max-width: 100%; max-height: 100%; object-fit: contain; display: block;
+  image-rendering: high-quality;
 }
 
 /* ── Toast container must stack, not overlap ────────────────────────────── */
@@ -2451,5 +2454,35 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
 
   .analytics-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  /* Predictions grid single column on mobile */
+  [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .pred-row {
+    overflow: hidden;
+    word-break: break-word;
+  }
+
+  .pred-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pred-prices {
+    flex-wrap: wrap;
+  }
+
+  .restock-cards {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .restock-card {
+    flex-shrink: 0;
   }
 }

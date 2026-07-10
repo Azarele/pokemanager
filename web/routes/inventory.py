@@ -66,7 +66,9 @@ def _read_cache(cache_key: str) -> str | None:
         if time.time() - entry.get("ts", 0) > _NONE_TTL:
             raise KeyError(cache_key)  # expired — treat as miss, allow retry
         return None
-    return entry["url"]
+    url = entry["url"]
+    # Upgrade to higher resolution on read
+    return _upgrade_image_url(url) if url else url
 
 
 def _write_cache(cache_key: str, url: Optional[str]) -> None:
@@ -75,6 +77,7 @@ def _write_cache(cache_key: str, url: Optional[str]) -> None:
 
 
 _load_cache()
+_ensure_cache_upgraded()
 
 # Ordered by specificity — most likely first, broad fallbacks last.
 _IMG_CSS_SELECTORS = [
@@ -96,6 +99,19 @@ _IMG_CSS_SELECTORS = [
 _IMG_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif")
 
 
+def _upgrade_image_url(url: str) -> str:
+    """Upgrade TCGPlayer CDN image URLs to higher resolution versions."""
+    if not url:
+        return url
+    # TCGPlayer CDN size upgrade
+    url = url.replace('fit-in/64x89/', 'fit-in/400x557/')
+    url = url.replace('fit-in/128x178/', 'fit-in/400x557/')
+    url = url.replace('fit-in/146x204/', 'fit-in/400x557/')
+    url = url.replace('fit-in/200x279/', 'fit-in/400x557/')
+    url = url.replace('fit-in/300x417/', 'fit-in/400x557/')
+    return url
+
+
 def _resolve_src(src: str) -> Optional[str]:
     """Normalise a relative/protocol-relative src to an absolute https URL."""
     src = src.strip()
@@ -109,6 +125,8 @@ def _resolve_src(src: str) -> Optional[str]:
         return None
     if not any(ext in src.lower() for ext in _IMG_EXTENSIONS):
         return None
+    # Upgrade to higher resolution if applicable
+    src = _upgrade_image_url(src)
     return src
 
 
@@ -149,6 +167,22 @@ async def _scrape_pc_image(pc_url: str, item_id: int = 0) -> Optional[str]:
     if all_srcs:
         print(f"[image] Page img srcs: {all_srcs}")
     return None
+
+
+def _ensure_cache_upgraded() -> None:
+    """Upgrade existing cache entries to higher resolution image URLs."""
+    global _image_cache
+    updated = 0
+    for key, entry in list(_image_cache.items()):
+        if entry.get("url"):
+            old_url = entry["url"]
+            new_url = _upgrade_image_url(old_url)
+            if new_url != old_url:
+                _image_cache[key]["url"] = new_url
+                updated += 1
+    if updated > 0:
+        _save_cache()
+        print(f"[image_cache] Upgraded {updated} entries to higher resolution URLs")
 
 
 # ── Field allowlists for PATCH endpoints ─────────────────────────────────
