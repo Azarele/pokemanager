@@ -596,7 +596,7 @@ function renderInventoryCard(item) {
              onchange="toggleSelectItem(${item.item_id})"
              style="position:absolute;top:8px;left:8px;z-index:10;width:20px;height:20px">
 
-      <div style="display:flex;gap:0;flex:1;min-height:100px">
+      <div style="display:flex;gap:0;flex:1;min-height:110px">
         <div class="card-thumb" data-item-id="${item.item_id}" style="width:80px;min-width:80px;background:var(--surface2)"><div class="thumb-spinner"></div></div>
 
         <div style="flex:1;padding:12px;min-width:0;display:flex;flex-direction:column;gap:8px">
@@ -616,8 +616,11 @@ function renderInventoryCard(item) {
 
           <div style="display:flex;align-items:center;gap:8px;font-size:12px">
             <span><span style="color:var(--text-muted)">Quick</span> <strong style="color:var(--accent)">${fmt(item.quick_price)}</strong></span>
-            <canvas class="sparkline-canvas" width="120" height="22"></canvas>
           </div>
+        </div>
+
+        <div style="width:120px;min-width:120px;padding:8px;display:flex;align-items:center;justify-content:center">
+          <canvas class="sparkline-canvas" width="110" height="70"></canvas>
         </div>
       </div>
 
