@@ -4,10 +4,13 @@ eBay sales sync — auto-detect completed sales and offers, send Discord notific
 import asyncio
 import base64
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from typing import Optional
+import re
 
 import requests
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 
 from web.auth import get_current_user
@@ -303,6 +306,187 @@ async def _sync_user_sales(user_id: str) -> dict:
     return stats
 
 
+async def _check_best_offers(user_id: str, ebay_token: str) -> dict:
+    """
+    Check for pending Best Offer submissions using eBay Trading API.
+    Returns stats on checked/notified offers.
+    """
+    stats = {"checked": 0, "notified": 0, "errors": 0}
+
+    db_client = get_db()
+
+    # Get user inventory and settings
+    inventory_items = await db.get_all_items(user_id)
+    inventory_by_listing = {str(i.get("ebay_listing_id")): i for i in inventory_items if i.get("ebay_listing_id")}
+
+    user_profile = db_client.table("user_profiles").select(
+        "ebay_fee_rate", "postage_cost"
+    ).eq("id", user_id).single().execute()
+
+    user_data = user_profile.data or {}
+    ebay_fee_rate = float(user_data.get("ebay_fee_rate") or 0.1235)
+    postage_cost = float(user_data.get("postage_cost") or 1.50)
+
+    # Get Discord webhook for this user
+    discord_webhook = await _get_user_discord_webhook(user_id)
+    if not discord_webhook:
+        return stats
+
+    try:
+        # Call eBay Trading API GetBestOffers
+        headers = {
+            "X-EBAY-API-SITEID": "3",  # UK
+            "X-EBAY-API-COMPATIBILITY-LEVEL": "967",
+            "X-EBAY-API-CALL-NAME": "GetBestOffers",
+            "X-EBAY-API-IAF-TOKEN": ebay_token,
+            "Content-Type": "text/xml",
+        }
+
+        xml_body = '''<?xml version="1.0" encoding="utf-8"?>
+<GetBestOffersRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+    <RequesterCredentials>
+        <eBayAuthToken>{token}</eBayAuthToken>
+    </RequesterCredentials>
+    <BestOfferStatus>Pending</BestOfferStatus>
+    <Pagination>
+        <EntriesPerPage>20</EntriesPerPage>
+    </Pagination>
+</GetBestOffersRequest>'''.format(token=ebay_token)
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.ebay.com/ws/api.dll",
+                headers=headers,
+                content=xml_body,
+                timeout=30,
+            )
+
+        if response.status_code != 200:
+            print(f"[ebay_sync] GetBestOffers error: {response.status_code} {response.text}")
+            return stats
+
+        # Parse XML response
+        try:
+            root = ET.fromstring(response.text)
+        except ET.ParseError as e:
+            print(f"[ebay_sync] XML parse error: {e}")
+            return stats
+
+        # Extract offers from XML
+        ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
+        best_offer_list = root.findall(".//ebay:BestOffer", ns)
+
+        print(f"[ebay_sync] Found {len(best_offer_list)} pending best offers for user {user_id}")
+
+        for offer in best_offer_list:
+            try:
+                offer_id = offer.findtext("ebay:BestOfferID", namespaces=ns) or ""
+                item_id = offer.findtext("ebay:ItemID", namespaces=ns) or ""
+
+                # Check if already notified
+                existing = db_client.table("ebay_offers").select("id").eq(
+                    "offer_id", offer_id
+                ).eq("user_id", user_id).execute()
+
+                if existing.data:
+                    print(f"[ebay_sync] Already notified for offer {offer_id}")
+                    continue
+
+                # Get offer price
+                price_elem = offer.find(".//ebay:Price", ns)
+                if price_elem is not None:
+                    offer_price = float(price_elem.text or 0)
+                else:
+                    continue
+
+                # Find matching inventory item
+                inv_item = inventory_by_listing.get(str(item_id))
+                if not inv_item:
+                    print(f"[ebay_sync] No inventory item found for listing {item_id}")
+                    continue
+
+                # Calculate ROI
+                purchase_price = float(inv_item.get("purchase_price") or 0)
+                market_price = float(inv_item.get("live_price") or purchase_price)
+
+                ebay_fee = round(offer_price * ebay_fee_rate, 2)
+                net_received = round(offer_price - ebay_fee - postage_cost, 2)
+                profit = round(net_received - purchase_price, 2)
+                roi = (profit / purchase_price * 100) if purchase_price > 0 else 0
+                vs_market = ((offer_price - market_price) / market_price * 100) if market_price > 0 else 0
+
+                # Determine recommendation
+                if roi >= 15:
+                    recommendation = "✅ Accept"
+                    color = 5763719  # green
+                elif roi >= 0:
+                    recommendation = "⚠️ Counter"
+                    color = 16776960  # yellow
+                else:
+                    recommendation = "❌ Decline"
+                    color = 15548997  # red
+
+                # Send Discord notification
+                embed = {
+                    "embeds": [{
+                        "title": "💬 New Best Offer Received!",
+                        "description": (
+                            f"**{inv_item.get('card_name')}** (#{item_id})\n\n"
+                            f"📨 **Offer: £{offer_price:.2f}**\n"
+                            f"📊 **Analysis:**\n"
+                            f"• Net after fees & postage: £{net_received:.2f}\n"
+                            f"• Profit: {'+'if profit>=0 else ''}£{profit:.2f}\n"
+                            f"• ROI: {'+'if roi>=0 else ''}{roi:.1f}%\n"
+                            f"• Market value: £{market_price:.2f}\n"
+                            f"• Offer is {abs(vs_market):.1f}% {'above' if vs_market>=0 else 'below'} market\n\n"
+                            f"💡 **Recommendation: {recommendation}**"
+                        ),
+                        "color": color,
+                        "footer": {"text": "PokeManager • Reply on eBay to respond to offer"},
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }]
+                }
+
+                async with httpx.AsyncClient() as client:
+                    await client.post(discord_webhook, json=embed)
+
+                # Record notification
+                db_client.table("ebay_offers").insert({
+                    "user_id": user_id,
+                    "offer_id": offer_id,
+                    "item_id": str(item_id),
+                    "inventory_item_id": inv_item.get("item_id"),
+                    "offer_price": float(offer_price),
+                    "status": "pending",
+                }).execute()
+
+                stats["notified"] += 1
+                print(f"[ebay_sync] Sent best offer notification for item {item_id}: £{offer_price}")
+
+            except Exception as e:
+                stats["errors"] += 1
+                print(f"[ebay_sync] Error processing best offer: {e}")
+
+        stats["checked"] = len(best_offer_list)
+        return stats
+
+    except Exception as e:
+        print(f"[ebay_sync] Error checking best offers: {e}")
+        return stats
+
+
+async def _get_user_discord_webhook(user_id: str) -> Optional[str]:
+    """Get Discord webhook URL from user profile."""
+    try:
+        db_client = get_db()
+        profile = db_client.table("user_profiles").select(
+            "discord_webhook_url"
+        ).eq("id", user_id).single().execute()
+        return (profile.data or {}).get("discord_webhook_url")
+    except Exception:
+        return None
+
+
 @router.post("/sync-sales")
 async def sync_ebay_sales(user: dict = Depends(get_current_user)):
     """
@@ -444,8 +628,18 @@ async def sync_all_users_ebay():
 
         for user_id in user_ids:
             try:
+                # Sync completed sales
                 stats = await _sync_user_sales(user_id)
                 print(f"[ebay_sync] User {user_id}: synced={stats['synced']}, skipped={stats['skipped']}, errors={stats['errors']}")
+
+                # Check for pending best offers
+                try:
+                    access_token = await _get_user_ebay_token(user_id)
+                    offer_stats = await _check_best_offers(user_id, access_token)
+                    print(f"[ebay_sync] User {user_id}: best_offers checked={offer_stats['checked']}, notified={offer_stats['notified']}, errors={offer_stats['errors']}")
+                except Exception as e:
+                    print(f"[ebay_sync] Error checking best offers for user {user_id}: {e}")
+
             except Exception as e:
                 print(f"[ebay_sync] Error syncing user {user_id}: {e}")
 
