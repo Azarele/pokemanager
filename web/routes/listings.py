@@ -367,11 +367,58 @@ async def get_ebay_fulfillment_policies(user: dict = Depends(get_current_user)):
 @router.get("/ebay-policies-debug")
 async def debug_ebay_policies(user: dict = Depends(get_current_user)):
     """Debug endpoint: Fetch ALL policies (fulfillment, payment, return) from eBay with raw responses."""
+    print("\n" + "="*80)
+    print("[DEBUG] eBay Policies Debug Endpoint Called")
+    print("="*80)
+
     try:
+        # Log config values
+        print(f"\n[CONFIG] Current policy IDs from environment:")
+        print(f"  EBAY_FULFILLMENT_POLICY_ID: {config.EBAY_FULFILLMENT_POLICY_ID or '(empty)'}")
+        print(f"  EBAY_PAYMENT_POLICY_ID: {config.EBAY_PAYMENT_POLICY_ID or '(empty)'}")
+        print(f"  EBAY_RETURN_POLICY_ID: {config.EBAY_RETURN_POLICY_ID or '(empty)'}")
+
+        print(f"\n[FETCH] Fetching available policies from eBay...")
         async with user_config.apply(user):
             fulfillment = await lister_ebay_api.fetch_fulfillment_policies()
             payment = await lister_ebay_api.fetch_payment_policies()
             returns = await lister_ebay_api.fetch_return_policies()
+
+        # Log fetched policies
+        print(f"\n[SUCCESS] Fulfillment Policies ({len(fulfillment)} found):")
+        for p in fulfillment:
+            print(f"  - {p['name']} (ID: {p['id']})")
+            if p.get('description'):
+                print(f"    Description: {p['description']}")
+
+        print(f"\n[SUCCESS] Payment Policies ({len(payment)} found):")
+        for p in payment:
+            print(f"  - {p['name']} (ID: {p['id']})")
+            if p.get('description'):
+                print(f"    Description: {p['description']}")
+
+        print(f"\n[SUCCESS] Return Policies ({len(returns)} found):")
+        for p in returns:
+            print(f"  - {p['name']} (ID: {p['id']})")
+            if p.get('description'):
+                print(f"    Description: {p['description']}")
+
+        # Verify which policies from config are in the list
+        print(f"\n[VERIFY] Checking if config policies exist on eBay:")
+        if config.EBAY_FULFILLMENT_POLICY_ID:
+            found = any(p['id'] == config.EBAY_FULFILLMENT_POLICY_ID for p in fulfillment)
+            status = "✓ FOUND" if found else "✗ NOT FOUND"
+            print(f"  Fulfillment {config.EBAY_FULFILLMENT_POLICY_ID}: {status}")
+        if config.EBAY_PAYMENT_POLICY_ID:
+            found = any(p['id'] == config.EBAY_PAYMENT_POLICY_ID for p in payment)
+            status = "✓ FOUND" if found else "✗ NOT FOUND"
+            print(f"  Payment {config.EBAY_PAYMENT_POLICY_ID}: {status}")
+        if config.EBAY_RETURN_POLICY_ID:
+            found = any(p['id'] == config.EBAY_RETURN_POLICY_ID for p in returns)
+            status = "✓ FOUND" if found else "✗ NOT FOUND"
+            print(f"  Return {config.EBAY_RETURN_POLICY_ID}: {status}")
+
+        print("\n" + "="*80)
 
         return {
             "success": True,
@@ -388,8 +435,9 @@ async def debug_ebay_policies(user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         import traceback
-        print(f"[listings] Error in debug policies endpoint: {e}")
+        print(f"\n[ERROR] Failed to fetch eBay policies: {e}")
         print(traceback.format_exc())
+        print("="*80)
         return {
             "success": False,
             "error": str(e),
