@@ -1196,8 +1196,13 @@ async function syncExistingListing(itemId) {
       body: JSON.stringify({ ebay_listing_id: listingId })
     });
     if (res.ok) {
+      const item = S.inventory.find(i => i.item_id === itemId);
+      if (item) {
+        item.ebay_listing_id = listingId;
+        item.ebay_listed = 'Yes';
+      }
       toast('✅ Listing synced!', 'success');
-      await loadInventory();
+      refreshInventoryGrid();
     } else {
       const err = await res.json().catch(() => ({ error: 'Failed to sync' }));
       toast(err.error || 'Failed to sync listing', 'error');
