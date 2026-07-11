@@ -214,29 +214,50 @@ async def get_summary_stats(user_id: str) -> dict:
     inventory = [i for i in all_items if i["status"] == "Inventory"]
     sold       = [i for i in all_items if i["status"] == "Sold"]
 
-    total_cost     = sum(i["purchase_price"] for i in inventory)
-    total_value    = sum((i["live_price"] or 0) for i in inventory)
-    potential_prof = sum((i["potential_profit"] or 0) for i in inventory)
-    lifetime_prof  = sum((i["profit"] or 0) for i in sold)
-    total_cost_sold = sum(i["purchase_price"] for i in sold)
-    roi = (lifetime_prof / total_cost_sold * 100) if total_cost_sold else 0
+    # Current stock metrics
+    cost_in_stock     = sum(i["purchase_price"] for i in inventory)
+    potential_value   = sum((i["live_price"] or 0) for i in inventory)
+    potential_profit  = potential_value - cost_in_stock  # Potential profit = market value - what we paid
 
+    # Lifetime metrics from sold items
+    lifetime_revenue  = sum((i["sell_price"] or 0) for i in sold)
+    lifetime_profit   = sum((i["profit"] or 0) for i in sold)
+    cost_of_sold      = sum(i["purchase_price"] for i in sold)
+
+    # ROI calculations
+    lifetime_roi      = (lifetime_profit / cost_of_sold * 100) if cost_of_sold else 0
+    avg_margin_pct    = (lifetime_profit / lifetime_revenue * 100) if lifetime_revenue else 0
+    avg_profit_per_sale = lifetime_profit / len(sold) if sold else 0
+
+    # MTD (Month-to-date) metrics
     today = str(date.today())[:7]  # YYYY-MM
     mtd_sold = [i for i in sold if str(i.get("date_sold") or "").startswith(today)]
     mtd_profit = sum((i["profit"] or 0) for i in mtd_sold)
 
+    # 30-day estimate (if we sold mtd_count items per month consistently)
+    estimated_30d_profit = (mtd_profit / max(len(mtd_sold), 1)) * 30 if mtd_sold else 0
+
     return {
+        # Stock metrics
         "in_stock":                    len(inventory),
         "sold":                        len(sold),
-        "total_cost_in_stock":         round(total_cost, 2),
-        "total_potential_in_stock":    round(total_value, 2),
-        "total_potential_profit_in_stock": round(potential_prof, 2),
-        "total_profit":                round(lifetime_prof, 2),
-        "roi_pct":                     round(roi, 1),
-        "avg_margin_pct":              round((lifetime_prof / sum((i["sell_price"] or 0) for i in sold) * 100) if sold else 0, 1),
-        "avg_profit":                  round(lifetime_prof / len(sold), 2) if sold else 0,
+
+        # Current inventory value
+        "total_cost_in_stock":         round(cost_in_stock, 2),
+        "total_potential_in_stock":    round(potential_value, 2),
+        "total_potential_profit_in_stock": round(potential_profit, 2),
+
+        # Lifetime metrics
+        "total_profit":                round(lifetime_profit, 2),
+        "total_revenue":               round(lifetime_revenue, 2),
+        "roi_pct":                     round(lifetime_roi, 1),
+        "avg_margin_pct":              round(avg_margin_pct, 1),
+        "avg_profit":                  round(avg_profit_per_sale, 2),
+
+        # Time-based metrics
         "mtd_profit":                  round(mtd_profit, 2),
         "mtd_sold_count":              len(mtd_sold),
+        "est_30d_profit":              round(estimated_30d_profit, 2),
     }
 
 

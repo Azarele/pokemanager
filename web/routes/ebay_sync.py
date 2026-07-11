@@ -256,17 +256,23 @@ async def _sync_user_sales(user_id: str) -> dict:
                     price_paid = float(cost_obj or 0)
                 ebay_listing_id = item.get("legacyItemId", "")
 
-                # Mark as sold with order info
+                # Calculate profit: sale price - purchase price - ebay fees - postage
+                # Use user's configured rates as fallback (eBay doesn't provide ad fees in order API)
+                estimated_ebay_fee = round(price_paid * ebay_fee_rate, 2)
+                net_received = round(price_paid - estimated_ebay_fee, 2)
+                profit = round(net_received - purchase_price - postage_cost, 2)
+
+                # Mark as sold with order info and calculated profit
                 await db.edit_item(user_id, item_id, "status", "Sold")
                 await db.edit_item(user_id, item_id, "date_sold", order_creation_date)
                 await db.edit_item(user_id, item_id, "sell_price", price_paid)
+                await db.edit_item(user_id, item_id, "profit", profit)
                 if ebay_listing_id:
                     await db.edit_item(user_id, item_id, "ebay_listing_id", ebay_listing_id)
 
                 # Send Discord notification
                 purchase_price = float(inv_item.get("purchase_price") or 0)
-                profit_emoji = "📈" if price_paid > purchase_price else "📉"
-                profit = price_paid - purchase_price
+                profit_emoji = "📈" if profit > 0 else "📉"
                 roi = (profit / purchase_price * 100) if purchase_price > 0 else 0
 
                 await send_discord_notification(
@@ -276,10 +282,11 @@ async def _sync_user_sales(user_id: str) -> dict:
                         f"**{inv_item.get('card_name')}**\n"
                         f"💰 Sold for: **£{price_paid:.2f}**\n"
                         f"📦 Bought for: £{purchase_price:.2f}\n"
+                        f"📊 After fees & postage: £{net_received - postage_cost:.2f}\n"
                         f"{profit_emoji} Profit: **£{profit:.2f}** ({roi:.1f}% ROI)\n"
                         f"🏷️ eBay Order #{order_id}"
                     ),
-                    5763719,  # green
+                    5763719 if profit > 0 else 15548997,  # green if profitable, red if loss
                 )
 
                 stats["synced"] += 1

@@ -1600,18 +1600,16 @@ async function renderAnalytics() {
       </div>
     </div>
     <div class="card-grid" style="margin-bottom:20px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
-      ${stat('In Stock',         s.in_stock)}
-      ${stat('Sold',             s.sold)}
-      ${stat('Cost in Stock',    s.total_cost_in_stock,             s.total_cost_in_stock > 0 ? 'stat-neg' : '')}
-      ${stat('Potential Value',  s.total_potential_in_stock)}
-      ${stat('Potential Profit', s.total_potential_profit_in_stock, (s.total_potential_profit_in_stock ?? 0) >= 0 ? 'stat-pos' : 'stat-neg')}
-      ${stat('Lifetime Profit',  s.total_profit,                    (s.total_profit ?? 0) >= 0 ? 'stat-pos' : 'stat-neg')}
-      ${stat('ROI %',            s.roi_pct,                         (s.roi_pct ?? 0) >= 0 ? 'stat-pos' : 'stat-neg')}
-      ${stat('Avg Margin %',     s.avg_margin_pct)}
-      ${stat('MTD Profit',       s.mtd_profit,                      (s.mtd_profit ?? 0) >= 0 ? 'stat-pos' : 'stat-neg')}
-      ${stat('MTD Sold',         s.mtd_sold_count)}
-      ${stat('Avg Days Sell',    fc.avg_days_to_sell)}
-      ${stat('30d Est. Profit',  fc.est_profit_30d, 'stat-pos')}
+      ${stat('📦 Current Stock',    s.in_stock)}
+      ${stat('💰 Lifetime Profit',  s.total_profit,                    (s.total_profit ?? 0) >= 0 ? 'stat-pos' : 'stat-neg')}
+      ${stat('📈 Lifetime Revenue', s.total_revenue)}
+      ${stat('🏷️ Cost in Stock',     s.total_cost_in_stock,             s.total_cost_in_stock > 0 ? 'stat-neg' : '')}
+      ${stat('💎 Potential Value',  s.total_potential_in_stock)}
+      ${stat('✨ Potential Profit', s.total_potential_profit_in_stock, (s.total_potential_profit_in_stock ?? 0) >= 0 ? 'stat-pos' : 'stat-neg')}
+      ${stat('📊 Lifetime ROI %',    s.roi_pct,                         (s.roi_pct ?? 0) >= 0 ? 'stat-pos' : 'stat-neg')}
+      ${stat('🎯 Avg Margin %',     s.avg_margin_pct)}
+      ${stat('📅 MTD Profit',       s.mtd_profit,                      (s.mtd_profit ?? 0) >= 0 ? 'stat-pos' : 'stat-neg')}
+      ${stat('⚡ 30d Est. Profit',  s.est_30d_profit,                  (s.est_30d_profit ?? 0) >= 0 ? 'stat-pos' : 'stat-neg')}
     </div>
     <div class="analytics-grid">
       <div style="display:flex;flex-direction:column;gap:16px">
