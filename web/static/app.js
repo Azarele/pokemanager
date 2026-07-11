@@ -1899,6 +1899,17 @@ async function openListingDrawer(itemId) {
                placeholder="Custom price £" style="display:none;margin-top:8px" />
       </div>
       <div class="form-section">
+        <label class="form-label">
+          <input type="checkbox" id="use-promoted-listing" checked>
+          Use Promoted Listing
+        </label>
+        <div id="promoted-listing-controls" style="display:block;margin-top:8px">
+          <label class="form-label">Bid % (cost per sale)</label>
+          <input id="promoted-listing-pct" type="number" class="form-input" step="0.1" min="0" max="100" value="0">
+          <p style="color:var(--text-muted);font-size:12px;margin-top:4px">eBay charges this % of sale price to boost visibility</p>
+        </div>
+      </div>
+      <div class="form-section">
         <label>Photos (drop or click to upload)</label>
         <div style="display:flex;gap:8px;margin-bottom:8px">
           <div class="photo-drop-zone" id="photo-drop" style="flex:1">📷 Drop photos here or click to select</div>
@@ -1921,10 +1932,28 @@ async function openListingDrawer(itemId) {
   drawer.classList.add('open');
   document.getElementById('drawer-overlay').classList.add('visible');
 
+  // Load user's default promoted listing percentage
+  const settings = await api.get('/settings').catch(() => ({}));
+  const promotedPct = document.getElementById('promoted-listing-pct');
+  if (promotedPct && settings.promoted_listing_pct !== undefined) {
+    promotedPct.value = settings.promoted_listing_pct || 0;
+  }
+
   const titleInput = document.getElementById('listing-title');
   const updateLen  = () => { document.getElementById('title-len').textContent = titleInput.value.length; };
   titleInput.addEventListener('input', updateLen);
   updateLen();
+
+  // Toggle promoted listing controls visibility
+  const usePromoted = document.getElementById('use-promoted-listing');
+  const promotedControls = document.getElementById('promoted-listing-controls');
+  if (usePromoted && promotedControls) {
+    const updateVisibility = () => {
+      promotedControls.style.display = usePromoted.checked ? 'block' : 'none';
+    };
+    usePromoted.addEventListener('change', updateVisibility);
+    updateVisibility();
+  }
 
   document.querySelectorAll('[name=listing-strategy]').forEach(r => {
     r.addEventListener('change', () => {
@@ -2001,12 +2030,15 @@ async function submitListing(itemId) {
   const title    = document.getElementById('listing-title')?.value || '';
   const desc     = document.getElementById('listing-desc')?.value  || '';
   const custP    = parseFloat(document.getElementById('custom-price')?.value || '0');
+  const usePromoted = document.getElementById('use-promoted-listing')?.checked || false;
+  const promotedPct = usePromoted ? (parseFloat(document.getElementById('promoted-listing-pct')?.value) || 0) : 0;
   if (_selectedPhotos.length === 0) { toast('Add at least one photo', 'error'); return; }
   btn.disabled = true; btn.textContent = '⏳ Listing…';
   const fd = new FormData();
   fd.append('item_id', itemId); fd.append('strategy', strategy);
   fd.append('title', title);    fd.append('description', desc);
   if (custP > 0) fd.append('custom_price', custP);
+  if (promotedPct > 0) { fd.append('promoted_listing_pct', promotedPct); fd.append('use_promoted_listing', 'true'); }
   _selectedPhotos.slice(0, 5).forEach((f, i) => fd.append(`image${i+1}`, f));
   try {
     const res = await api.postForm('/listings/list-ebay', fd);
@@ -3230,6 +3262,12 @@ async function renderSettings() {
           <p style="color:var(--text-muted);font-size:12px;margin-top:4px">eBay Simple Delivery — buyer pays shipping, set to £0.00</p>
         </div>
         <div class="form-section">
+          <label class="form-label">Default Promoted Listing (%)</label>
+          <input id="s-promoted-listing" class="form-input" type="number" step="0.1" min="0" max="100"
+                 value="${settings?.promoted_listing_pct ?? 0}">
+          <p style="color:var(--text-muted);font-size:12px;margin-top:4px">Applied to all new eBay listings. Set to 0 to disable promotions by default.</p>
+        </div>
+        <div class="form-section">
           <label class="form-label">Korean Price Multiplier</label>
           <input id="s-korean" class="form-input" type="number" step="0.01"
                  value="${settings?.korean_multiplier ?? 0.7}">
@@ -3338,11 +3376,12 @@ async function saveEbaySettings() {
 async function savePricingSettings() {
   const feeRate  = parseFloat(document.getElementById('s-fee-rate')?.value) / 100;
   const postage  = parseFloat(document.getElementById('s-postage')?.value);
+  const promoted = parseFloat(document.getElementById('s-promoted-listing')?.value) || 0;
   const korean   = parseFloat(document.getElementById('s-korean')?.value);
   const autoSync = document.getElementById('s-auto-sync')?.checked;
   try {
     const resp = await api.patch('/settings', {
-      ebay_fee_rate: feeRate, postage_cost: postage,
+      ebay_fee_rate: feeRate, postage_cost: postage, promoted_listing_pct: promoted,
       korean_price_multiplier: korean, auto_sync_ebay_prices: autoSync,
     });
     if (resp.success) toast('Pricing saved', 'success');

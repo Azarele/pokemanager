@@ -101,16 +101,18 @@ async def reprice_all(req: RepriceAllRequest, user: dict = Depends(get_current_u
 
 @router.post("/list-ebay")
 async def list_ebay(
-    item_id:      int           = Form(...),
-    strategy:     str           = Form("quicksell"),
-    title:        str           = Form(""),
-    description:  str           = Form(""),
-    custom_price: float         = Form(0.0),
-    image1:       Optional[UploadFile] = File(None),
-    image2:       Optional[UploadFile] = File(None),
-    image3:       Optional[UploadFile] = File(None),
-    image4:       Optional[UploadFile] = File(None),
-    image5:       Optional[UploadFile] = File(None),
+    item_id:                int           = Form(...),
+    strategy:               str           = Form("quicksell"),
+    title:                  str           = Form(""),
+    description:            str           = Form(""),
+    custom_price:           float         = Form(0.0),
+    promoted_listing_pct:   float         = Form(0.0),
+    use_promoted_listing:   str           = Form("false"),
+    image1:                 Optional[UploadFile] = File(None),
+    image2:                 Optional[UploadFile] = File(None),
+    image3:                 Optional[UploadFile] = File(None),
+    image4:                 Optional[UploadFile] = File(None),
+    image5:                 Optional[UploadFile] = File(None),
     user: dict = Depends(get_current_user),
 ):
     try:
@@ -150,6 +152,10 @@ async def list_ebay(
             print(f"[images] Reusing {len(tmp_paths)} stored image(s) for item {item_id}")
 
     try:
+        # Prepare promoted listing settings
+        use_promo = use_promoted_listing.lower() == 'true' and promoted_listing_pct > 0
+        promo_pct = promoted_listing_pct if use_promo else None
+
         async with user_config.apply(user):
             result = await lister_ebay_api.list_item_on_ebay(
                 item_name   = title or item["card_name"],
@@ -161,11 +167,16 @@ async def list_ebay(
                 card_name   = item["card_name"],
                 pc_url      = item.get("pc_url") or "",
                 item_id     = item_id,
+                promoted_listing_pct = promo_pct,
             )
         if result.success and result.listing_url:
             listing_id = result.listing_url.rstrip("/").split("/")[-1].split("?")[0]
             await db.mark_ebay_listed(user["id"], item_id, listing_id)
             await db.update_sell_price(user["id"], item_id, price)
+            # Store per-item promotion settings
+            if use_promo:
+                await db.edit_item(user["id"], item_id, "promoted_listing_pct", promoted_listing_pct)
+                await db.edit_item(user["id"], item_id, "use_promoted_listing", True)
         return {
             "success":     result.success,
             "listing_url": result.listing_url,

@@ -272,9 +272,13 @@ async def _sync_user_sales(user_id: str) -> dict:
                             if isinstance(amount_obj, dict):
                                 ebay_fee += float(amount_obj.get("value", 0))
 
-                # If no fee data available, fall back to estimate (shouldn't happen with real eBay data)
+                # If no fee data available, estimate based on item's promotion settings or flat rate
                 if ebay_fee == 0 and price_paid > 0:
-                    ebay_fee = round(price_paid * ebay_fee_rate, 2)
+                    # Check if item has promoted listing percentage set
+                    if inv_item.get("promoted_listing_pct"):
+                        ebay_fee = round(price_paid * (float(inv_item.get("promoted_listing_pct")) / 100), 2)
+                    else:
+                        ebay_fee = round(price_paid * ebay_fee_rate, 2)
                 else:
                     ebay_fee = round(ebay_fee / max(len(line_items), 1), 2) if ebay_charges else 0
 

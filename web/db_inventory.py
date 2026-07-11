@@ -92,6 +92,8 @@ _EDITABLE_FIELDS = {
     "ebay_listed": "ebay_listed",
     "date_sold": "date_sold", "price_verified": "price_verified",
     "source": "source", "image_urls": "image_urls",
+    "ebay_fee": "ebay_fee", "net_received": "net_received",
+    "promoted_listing_pct": "promoted_listing_pct", "use_promoted_listing": "use_promoted_listing",
 }
 
 

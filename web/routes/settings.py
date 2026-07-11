@@ -10,18 +10,19 @@ router = APIRouter()
 async def get_settings(user: dict = Depends(get_current_user)):
     """Return current settings — mask sensitive values."""
     return {
-        "display_name":    user.get("display_name", ""),
-        "email":           user.get("email", ""),
-        "plan":            user.get("plan", "free"),
-        "has_ebay":        bool(user.get("ebay_app_id")),
-        "has_gemini":      bool(user.get("gemini_api_key")),
-        "has_discord":     bool(user.get("discord_webhook_url")),
-        "ebay_fee_rate":   user.get("ebay_fee_rate", 0.1235),
-        "postage_cost":    user.get("postage_cost", 1.50),
-        "auto_sync_ebay":  user.get("auto_sync_ebay_prices", True),
+        "display_name":      user.get("display_name", ""),
+        "email":             user.get("email", ""),
+        "plan":              user.get("plan", "free"),
+        "has_ebay":          bool(user.get("ebay_app_id")),
+        "has_gemini":        bool(user.get("gemini_api_key")),
+        "has_discord":       bool(user.get("discord_webhook_url")),
+        "ebay_fee_rate":     user.get("ebay_fee_rate", 0.1235),
+        "postage_cost":      user.get("postage_cost", 1.50),
+        "promoted_listing_pct": float(user.get("promoted_listing_pct") or 0),
+        "auto_sync_ebay":    user.get("auto_sync_ebay_prices", True),
         "korean_multiplier": user.get("korean_price_multiplier", 0.7),
-        "effort_minutes":  user.get("effort_minutes_per_card", 15),
-        "hourly_rate":     user.get("hourly_rate_gbp", 12.0),
+        "effort_minutes":    user.get("effort_minutes_per_card", 15),
+        "hourly_rate":       user.get("hourly_rate_gbp", 12.0),
     }
 
 
@@ -30,7 +31,7 @@ async def update_settings(body: dict, user: dict = Depends(get_current_user)):
     """Update user settings and API keys."""
     db = get_db()
     allowed = {
-        "display_name", "ebay_fee_rate", "postage_cost",
+        "display_name", "ebay_fee_rate", "postage_cost", "promoted_listing_pct",
         "auto_sync_ebay_prices", "korean_price_multiplier",
         "effort_minutes_per_card", "hourly_rate_gbp",
         # API keys — only update if non-empty string provided
