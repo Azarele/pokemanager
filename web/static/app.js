@@ -3293,6 +3293,34 @@ async function renderSettings() {
         </div>
       </div>
 
+      <!-- eBay Business Policies -->
+      <div class="settings-card">
+        <h3 class="settings-section-title">eBay Business Policies</h3>
+        <p class="text-muted" style="font-size:13px;margin-bottom:14px">
+          Fulfillment, Payment, and Return policies required for eBay listings.
+        </p>
+        <div class="form-section">
+          <label class="form-label">Fulfillment Policy ID</label>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input id="s-fulfillment-policy" class="form-input" type="text" placeholder="Policy ID" style="flex:1"
+                   value="${settings?.ebay_fulfillment_policy_id || ''}">
+            <button class="btn btn-ghost btn-sm" onclick="fetchEbayPolicies()">🔄 Fetch Policies</button>
+          </div>
+          <div id="ebay-policies-list" style="margin-top:8px"></div>
+        </div>
+        <div class="form-section">
+          <label class="form-label">Payment Policy ID</label>
+          <input id="s-payment-policy" class="form-input" type="text" placeholder="Policy ID"
+                 value="${settings?.ebay_payment_policy_id || ''}">
+        </div>
+        <div class="form-section">
+          <label class="form-label">Return Policy ID</label>
+          <input id="s-return-policy" class="form-input" type="text" placeholder="Policy ID"
+                 value="${settings?.ebay_return_policy_id || ''}">
+        </div>
+        <button class="btn btn-accent btn-sm" onclick="saveEbayPolicies()">Save Policies</button>
+      </div>
+
       <!-- Pricing settings -->
       <div class="settings-card">
         <h3 class="settings-section-title">Pricing</h3>
@@ -3416,6 +3444,60 @@ async function saveEbaySettings() {
   try {
     const resp = await api.patch('/settings', updates);
     if (resp.success) { toast('eBay keys saved', 'success'); renderSettings(); }
+    else toast('Failed: ' + resp.error, 'error');
+  } catch (e) {
+    toast('Failed: ' + extractError(e.message), 'error');
+  }
+}
+
+async function fetchEbayPolicies() {
+  const btn = event?.target;
+  if (btn) btn.disabled = true;
+  try {
+    const resp = await api.get('/listings/ebay-policies');
+    if (!resp.success) {
+      toast('Failed to fetch policies: ' + resp.error, 'error');
+      return;
+    }
+    const policies = resp.policies || [];
+    const div = document.getElementById('ebay-policies-list');
+    if (!policies.length) {
+      div.innerHTML = '<p class="text-muted" style="font-size:12px">No fulfillment policies found. Create one at ebay.co.uk → Account → Business policies</p>';
+      return;
+    }
+    div.innerHTML = `
+      <div style="background:rgba(76,175,125,0.08);border:1px solid rgba(76,175,125,0.2);border-radius:8px;padding:8px">
+        <p style="font-size:12px;font-weight:600;margin:0 0 8px 0">Available Fulfillment Policies:</p>
+        ${policies.map(p => `
+          <div style="padding:4px;margin:4px 0;cursor:pointer;background:var(--bg-secondary);border-radius:4px;border:1px solid var(--border)"
+               onclick="document.getElementById('s-fulfillment-policy').value='${p.id}';this.parentElement.parentElement.innerHTML=''">
+            <div style="font-weight:600">${p.name}</div>
+            <div style="font-size:11px;color:var(--text-muted)">ID: ${p.id}</div>
+            ${p.description ? `<div style="font-size:11px">${p.description}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+    toast(`Found ${policies.length} fulfillment policy(ies)`, 'success');
+  } catch (e) {
+    toast('Error fetching policies: ' + extractError(e.message), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function saveEbayPolicies() {
+  const fulfillment = document.getElementById('s-fulfillment-policy')?.value.trim();
+  const payment     = document.getElementById('s-payment-policy')?.value.trim();
+  const returnPolicy = document.getElementById('s-return-policy')?.value.trim();
+  const updates = {};
+  if (fulfillment) updates.ebay_fulfillment_policy_id = fulfillment;
+  if (payment)     updates.ebay_payment_policy_id = payment;
+  if (returnPolicy) updates.ebay_return_policy_id = returnPolicy;
+  if (!Object.keys(updates).length) { toast('No changes', 'info'); return; }
+  try {
+    const resp = await api.patch('/settings', updates);
+    if (resp.success) { toast('eBay policies saved', 'success'); renderSettings(); }
     else toast('Failed: ' + resp.error, 'error');
   } catch (e) {
     toast('Failed: ' + extractError(e.message), 'error');

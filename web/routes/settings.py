@@ -23,6 +23,9 @@ async def get_settings(user: dict = Depends(get_current_user)):
         "korean_multiplier": user.get("korean_price_multiplier", 0.7),
         "effort_minutes":    user.get("effort_minutes_per_card", 15),
         "hourly_rate":       user.get("hourly_rate_gbp", 12.0),
+        "ebay_fulfillment_policy_id": user.get("ebay_fulfillment_policy_id", ""),
+        "ebay_payment_policy_id":     user.get("ebay_payment_policy_id", ""),
+        "ebay_return_policy_id":      user.get("ebay_return_policy_id", ""),
     }
 
 

@@ -340,6 +340,30 @@ async def apply_promotion_to_all(user: dict = Depends(get_current_user)):
     }
 
 
+# ── Fetch valid eBay fulfillment policies ─────────────────────────────────
+
+@router.get("/ebay-policies")
+async def get_ebay_fulfillment_policies(user: dict = Depends(get_current_user)):
+    """Fetch valid fulfillment policy IDs from eBay Account API (EBAY_GB marketplace)."""
+    try:
+        async with user_config.apply(user):
+            policies = await lister_ebay_api.fetch_fulfillment_policies()
+        return {
+            "success": True,
+            "policies": policies,
+            "current_policy_id": config.EBAY_FULFILLMENT_POLICY_ID or None,
+        }
+    except Exception as e:
+        import traceback
+        print(f"[listings] Error fetching eBay fulfillment policies: {e}")
+        print(traceback.format_exc())
+        return {
+            "success": False,
+            "error": str(e),
+            "policies": [],
+        }
+
+
 # ── AI description generator ──────────────────────────────────────────────
 
 class DescRequest(BaseModel):
