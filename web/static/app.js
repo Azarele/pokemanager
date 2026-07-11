@@ -1659,7 +1659,10 @@ async function renderAnalytics() {
     if (isNaN(n)) return;
     const label  = el.closest('.stat-card').querySelector('.stat-label').textContent;
     const hasPct = label.includes('%');
-    animateCount(el, 0, n, 900, hasPct ? '' : '£', hasPct ? '%' : '');
+    const isCount = label.includes('Current Stock') || label.includes('Sold') || label.includes('Count');
+    const prefix = hasPct ? '' : (isCount ? '' : '£');
+    const suffix = hasPct ? '%' : '';
+    animateCount(el, 0, n, 900, prefix, suffix);
   });
 
   S._velGroup = 'set';

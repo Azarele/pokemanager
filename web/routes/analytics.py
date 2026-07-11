@@ -70,13 +70,16 @@ async def analytics_by_source(user: dict = Depends(get_current_user)):
     sold = await db.get_all_items(user["id"], status_filter="Sold")
     sources: dict = defaultdict(lambda: {"count": 0, "revenue": 0.0, "cost": 0.0, "profit": 0.0})
     for item in sold:
-        src  = str(item.get("source") or "Unknown") or "Unknown"
+        # Rename empty source to "eBay / Other" for clarity
+        src  = str(item.get("source") or "eBay / Other") or "eBay / Other"
         sell = float(item.get("sell_price") or 0)
         cost = float(item.get("purchase_price") or 0)
+        # Use actual profit from database (with fee deductions) instead of sell - cost
+        profit = float(item.get("profit") or 0)
         sources[src]["count"]   += 1
         sources[src]["revenue"] += sell
         sources[src]["cost"]    += cost
-        sources[src]["profit"]  += sell - cost
+        sources[src]["profit"]  += profit
     result = []
     for src, d in sources.items():
         roi = (d["profit"] / d["cost"] * 100) if d["cost"] else 0

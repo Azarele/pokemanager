@@ -19,7 +19,8 @@ async def get_today_sales(user: dict = Depends(get_current_user)):
     today_sales = [i for i in all_items if str(i.get("date_sold", "") or "").startswith(today)]
     revenue = sum(float(i.get("sell_price") or 0) for i in today_sales)
     cost    = sum(float(i.get("purchase_price") or 0) for i in today_sales)
-    profit  = revenue - cost
+    # Use actual profit from database (includes fee deductions) instead of simple margin
+    profit  = sum(float(i.get("profit") or 0) for i in today_sales)
     return {
         "date":    today,
         "sales":   today_sales,
