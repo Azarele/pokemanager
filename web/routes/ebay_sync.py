@@ -203,12 +203,12 @@ async def _sync_user_sales(user_id: str) -> dict:
     # Get user's settings and inventory once
     db_client = get_db()
     user_profile = db_client.table("user_profiles").select(
-        "ebay_fee_rate", "postage_cost"
+        "ebay_fee_rate"
     ).eq("id", user_id).single().execute()
 
     user_data = user_profile.data or {}
     ebay_fee_rate = float(user_data.get("ebay_fee_rate") or 0.1235)
-    postage_cost = float(user_data.get("postage_cost") or 1.50)
+    # Postage is always £0 for eBay sales - buyer pays via Simple Delivery
 
     # Fetch all inventory items once for this user
     inventory_items = await db.get_all_items(user_id)
@@ -259,11 +259,11 @@ async def _sync_user_sales(user_id: str) -> dict:
                     price_paid = float(cost_obj or 0)
                 ebay_listing_id = item.get("legacyItemId", "")
 
-                # Calculate profit: sale price - purchase price - ebay fees - postage
-                # Use user's configured rates as fallback (eBay doesn't provide ad fees in order API)
+                # Calculate profit: sale price - purchase price - ebay fees
+                # Buyer pays postage via eBay Simple Delivery (we don't deduct postage)
                 estimated_ebay_fee = round(price_paid * ebay_fee_rate, 2)
                 net_received = round(price_paid - estimated_ebay_fee, 2)
-                profit = round(net_received - purchase_price - postage_cost, 2)
+                profit = round(net_received - purchase_price, 2)
 
                 # Mark as sold with order info and calculated profit
                 await db.edit_item(user_id, item_id, "status", "Sold")
@@ -285,7 +285,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                         f"**{inv_item.get('card_name')}**\n"
                         f"💰 Sold for: **£{price_paid:.2f}**\n"
                         f"📦 Bought for: £{purchase_price:.2f}\n"
-                        f"📊 After fees & postage: £{net_received - postage_cost:.2f}\n"
+                        f"📊 After fees: £{net_received:.2f}\n"
                         f"{profit_emoji} Profit: **£{profit:.2f}** ({roi:.1f}% ROI)\n"
                         f"🏷️ eBay Order #{order_id}"
                     ),

@@ -193,7 +193,8 @@ async def sales_by_date(
     items = result.data or []
 
     ebay_fee_rate = float(user.get("ebay_fee_rate") or 0.1235)
-    postage_cost  = float(user.get("postage_cost") or 1.50)
+    # Postage is always £0 for eBay sales - buyer pays via Simple Delivery
+    postage_cost  = 0.00
 
     sales = []
     for item in items:

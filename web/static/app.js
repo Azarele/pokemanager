@@ -1050,7 +1050,7 @@ async function openSoldAndDelistModal(itemId) {
       <ul style="margin:6px 0 0 16px;line-height:1.8">
         <li>End the eBay listing (${item.ebay_listing_id || 'no listing ID'})</li>
         <li>Mark item as Sold in your inventory</li>
-        <li>Record the profit</li>
+        <li>Record the profit (postage paid by buyer via Simple Delivery)</li>
       </ul>
     </div>
 
@@ -3220,7 +3220,8 @@ async function renderSettings() {
         <div class="form-section">
           <label class="form-label">Postage Cost (£)</label>
           <input id="s-postage" class="form-input" type="number" step="0.01"
-                 value="${settings?.postage_cost ?? 1.50}">
+                 value="${settings?.postage_cost ?? 0.00}">
+          <p style="color:var(--text-muted);font-size:12px;margin-top:4px">eBay Simple Delivery — buyer pays shipping, set to £0.00</p>
         </div>
         <div class="form-section">
           <label class="form-label">Korean Price Multiplier</label>
