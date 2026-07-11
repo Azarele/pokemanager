@@ -452,3 +452,140 @@ async def sync_all_users_ebay():
         print("[ebay_sync] Background sync complete")
     except Exception as e:
         print(f"[ebay_sync] Background sync failed: {e}")
+
+
+@router.post("/backfill-fees")
+async def backfill_historical_fees(user: dict = Depends(get_current_user)):
+    """
+    One-time endpoint to backfill actual eBay fees for historical sales.
+    Fetches orders from last 90 days, extracts fees, and updates profit calculations.
+    """
+    if not user.get("ebay_refresh_token"):
+        raise HTTPException(status_code=400, detail="eBay credentials not configured")
+
+    stats = {"updated": 0, "skipped": 0, "errors": 0, "details": []}
+
+    try:
+        access_token = await _get_user_ebay_token(user["id"])
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not get eBay token: {e}")
+
+    # Get user settings
+    db_client = get_db()
+    user_profile = db_client.table("user_profiles").select(
+        "postage_cost"
+    ).eq("id", user["id"]).single().execute()
+
+    postage_cost = float((user_profile.data or {}).get("postage_cost") or 1.50)
+
+    # Fetch all orders from last 90 days
+    try:
+        resp = requests.get(
+            "https://api.ebay.com/sell/fulfillment/v1/order",
+            headers=_get_ebay_headers(access_token),
+            params={
+                "sort": "lastModifiedDate:desc",
+                "limit": 100,
+            },
+            timeout=30,
+        )
+
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=f"eBay API error: {resp.text}")
+
+        data = resp.json()
+        orders = data.get("orders", [])
+        print(f"[ebay_sync] Backfill: fetched {len(orders)} orders for user {user['id']}")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch eBay orders: {e}")
+
+    # Get all sold items for this user
+    inventory = await db.get_all_items(user["id"], status_filter="Sold")
+    sold_by_listing = {str(i.get("ebay_listing_id")): i for i in inventory if i.get("ebay_listing_id")}
+
+    # Process each order
+    for order in orders:
+        try:
+            order_id = order.get("orderId")
+            line_items = order.get("lineItems", [])
+
+            # Extract fees from order
+            # eBay doesn't return ad fees in Fulfillment API, but we can get order-related fees
+            order_fees = 0.0
+            ebay_charges = order.get("ebayCollectedCharges", {})
+            if isinstance(ebay_charges, dict):
+                for charge in ebay_charges.get("charges", []):
+                    if isinstance(charge, dict):
+                        amount_obj = charge.get("amount", {})
+                        if isinstance(amount_obj, dict):
+                            order_fees += float(amount_obj.get("value", 0))
+
+            for item in line_items:
+                sku = item.get("sku", "")
+                legacy_id = str(item.get("legacyItemId", ""))
+
+                if not legacy_id or legacy_id not in sold_by_listing:
+                    continue
+
+                inv_item = sold_by_listing[legacy_id]
+
+                # Extract sale price
+                cost_obj = item.get("lineItemCost", {})
+                if isinstance(cost_obj, dict):
+                    price_paid = float(cost_obj.get("value", 0))
+                else:
+                    price_paid = float(cost_obj or 0)
+
+                if not price_paid:
+                    stats["skipped"] += 1
+                    continue
+
+                # Calculate actual profit with order fees
+                # Note: eBay Fulfillment API doesn't return ad fees, only order-related fees
+                # We use the order-related fees and estimate ad fees with user's fee rate
+                purchase_price = float(inv_item.get("purchase_price") or 0)
+
+                # Order-related fees from ebayCollectedCharges
+                item_share_of_fees = order_fees / len(line_items) if line_items else 0
+
+                # Estimate ad fees (promoted listing, insertion fees, etc)
+                # eBay doesn't provide these in the API, so we use a conservative estimate
+                estimated_ad_fees = round(price_paid * 0.0735, 2)  # ~7.35% for ad/insertion fees
+
+                total_fees = round(item_share_of_fees + estimated_ad_fees, 2)
+                net_received = round(price_paid - total_fees, 2)
+                profit = round(net_received - purchase_price - postage_cost, 2)
+
+                # Update the inventory item
+                current_profit = float(inv_item.get("profit") or 0)
+
+                # Only update if profit changed significantly (more than 1 pence difference)
+                if abs(profit - current_profit) > 0.01:
+                    await db.edit_item(user["id"], inv_item["item_id"], "profit", profit)
+                    stats["updated"] += 1
+                    stats["details"].append({
+                        "item_id": inv_item["item_id"],
+                        "card_name": inv_item.get("card_name"),
+                        "old_profit": round(current_profit, 2),
+                        "new_profit": profit,
+                        "fees": total_fees,
+                    })
+                    print(f"[ebay_sync] Updated item {inv_item['item_id']}: profit {current_profit} → {profit}")
+                else:
+                    stats["skipped"] += 1
+
+        except Exception as e:
+            stats["errors"] += 1
+            print(f"[ebay_sync] Backfill error processing order {order.get('orderId')}: {e}")
+
+    return {
+        "success": True,
+        "summary": {
+            "updated": stats["updated"],
+            "skipped": stats["skipped"],
+            "errors": stats["errors"],
+        },
+        "updated_items": stats["details"][:20],  # Return first 20 for brevity
+        "note": "Ad fees (promoted listing, insertion) are estimated at 7.35% since eBay Fulfillment API doesn't provide them",
+    }
