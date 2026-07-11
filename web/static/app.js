@@ -587,7 +587,8 @@ function renderInventoryCard(item) {
        ${isListed
          ? ''
          : canList
-         ? `<button onclick="openListingDrawer(${item.item_id})" class="btn btn-accent btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">📋 List</button>`
+         ? `<button onclick="openListingDrawer(${item.item_id})" class="btn btn-accent btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">📋 List</button>
+            <button onclick="document.getElementById('already-listed-${item.item_id}').style.display='block'" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🔗 Already Listed</button>`
          : `<button onclick="showUpgradePrompt('ebay_listing')" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🔒 List</button>`
        }`;
 
@@ -654,6 +655,16 @@ function renderInventoryCard(item) {
       </div>
 
       <div style="display:flex;gap:4px;padding:8px;border-top:1px solid var(--border);flex-wrap:wrap;box-sizing:border-box;width:100%">${mainActions}</div>
+      <div id="already-listed-${item.item_id}" style="display:none;padding:8px 12px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Enter your eBay listing ID or URL:</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" placeholder="336xxxxxxxxx or ebay.co.uk/itm/..."
+                 style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px"
+                 id="listing-input-${item.item_id}">
+          <button onclick="syncExistingListing(${item.item_id})" class="btn btn-accent btn-sm">Sync</button>
+          <button onclick="document.getElementById('already-listed-${item.item_id}').style.display='none'" class="btn btn-ghost btn-sm">✕</button>
+        </div>
+      </div>
       ${sellAction}
     </div>`;
 }
@@ -1163,6 +1174,36 @@ async function confirmDelete() {
     // Network error or connection dropped (e.g. server reload mid-request)
     toast('Connection lost — server may have restarted. Try again.', 'warning');
     console.error('[delete] Network error:', e);
+  }
+}
+
+/* ── Sync existing eBay listing ──────────────────────────────────────────── */
+async function syncExistingListing(itemId) {
+  const input = document.getElementById('listing-input-' + itemId)?.value.trim();
+  if (!input) { toast('Enter a listing ID or URL', 'warning'); return; }
+
+  // Extract listing ID from URL or use directly
+  let listingId = input.includes('ebay')
+    ? input.match(/\/(\d{12,})/)?.[1] || input.match(/itm\/(\d+)/)?.[1]
+    : input.replace(/\D/g, '');
+
+  if (!listingId) { toast('Invalid listing ID or URL', 'error'); return; }
+
+  try {
+    const res = await fetch(`/api/inventory/${itemId}/set-listing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ebay_listing_id: listingId })
+    });
+    if (res.ok) {
+      toast('✅ Listing synced!', 'success');
+      await loadInventory();
+    } else {
+      const err = await res.json().catch(() => ({ error: 'Failed to sync' }));
+      toast(err.error || 'Failed to sync listing', 'error');
+    }
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
   }
 }
 

@@ -514,3 +514,37 @@ async def import_csv(
         "errors": errors,
         "details": error_details[:10],
     }
+
+
+# ── Sync existing eBay listing ───────────────────────────────────────────
+
+class SetListingRequest(BaseModel):
+    ebay_listing_id: str
+
+
+@router.post("/{item_id}/set-listing")
+async def set_listing(
+    item_id: int,
+    req: SetListingRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Set the eBay listing ID for an existing eBay listing."""
+    try:
+        item = await db.get_item(user["id"], item_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    listing_id = req.ebay_listing_id.strip()
+    if not listing_id or not listing_id.replace(" ", "").isdigit():
+        raise HTTPException(status_code=400, detail="Invalid listing ID format")
+
+    try:
+        # Update the item with the listing ID and mark as listed
+        await db.edit_item(user["id"], item_id, "ebay_listing_id", listing_id)
+        await db.edit_item(user["id"], item_id, "ebay_listed", "Yes")
+
+        print(f"[web] Set eBay listing for item {item_id}: {listing_id}")
+        return {"success": True, "item_id": item_id, "ebay_listing_id": listing_id}
+    except Exception as e:
+        print(f"[web] Set listing error for {item_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to set listing: {e}")
