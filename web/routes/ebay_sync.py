@@ -109,17 +109,17 @@ async def _get_recent_orders(
     Returns:
         List of order dicts with orderId, orderLineItems[], etc.
     """
-    cutoff = (datetime.utcnow() - timedelta(days=days_back)).isoformat() + "Z"
-
     try:
+        params = {
+            "sort": "lastModifiedDate:desc",
+            "limit": 100,
+        }
+        headers = _get_ebay_headers(access_token)
+
         resp = requests.get(
             "https://api.ebay.com/sell/fulfillment/v1/order",
-            headers=_get_ebay_headers(access_token),
-            params={
-                "filter": f"orderstatus:{{'COMPLETED'}}",
-                "sort": "lastModifiedDate:desc",
-                "limit": 100,
-            },
+            headers=headers,
+            params=params,
             timeout=30,
         )
 
@@ -129,7 +129,7 @@ async def _get_recent_orders(
 
         data = resp.json()
         orders = data.get("orders", [])
-        print(f"[ebay_sync] Found {len(orders)} completed orders for user {user_id}")
+        print(f"[ebay_sync] Found {len(orders)} orders for user {user_id}")
         return orders
     except Exception as e:
         print(f"[ebay_sync] Error fetching orders: {e}")
@@ -155,14 +155,17 @@ async def _get_pending_offers(
             "https://api.ebay.com/sell/inventory/v1/offers",
             headers=_get_ebay_headers(access_token),
             params={
-                "filter": "status:ACTIVE",
                 "limit": 100,
             },
             timeout=30,
         )
 
         if resp.status_code != 200:
-            print(f"[ebay_sync] get_pending_offers HTTP {resp.status_code}: {resp.text}")
+            # 404 or other errors might mean no offers or insufficient permissions
+            if resp.status_code == 404:
+                print(f"[ebay_sync] No active offers found or endpoint not available (HTTP 404)")
+            else:
+                print(f"[ebay_sync] get_pending_offers HTTP {resp.status_code}: {resp.text}")
             return []
 
         data = resp.json()
@@ -221,10 +224,19 @@ async def _sync_user_sales(user_id: str) -> dict:
                 if not sku:
                     continue
 
-                # SKU format is typically item_id
+                # SKU format is "pokemaz-{item_id}" — extract the number
+                # Skip bundles (pokemaz-bundle-*) as they represent multiple items
+                if "-bundle-" in sku:
+                    print(f"[ebay_sync] Skipping bundle SKU: {sku}")
+                    continue
+
                 try:
-                    item_id = int(sku)
-                except (ValueError, TypeError):
+                    if sku.startswith("pokemaz-"):
+                        item_id = int(sku.split("-", 1)[1])
+                    else:
+                        item_id = int(sku)
+                except (ValueError, TypeError, IndexError):
+                    print(f"[ebay_sync] Could not parse SKU: {sku}")
                     continue
 
                 # Check if item exists and is not already sold
@@ -236,8 +248,12 @@ async def _sync_user_sales(user_id: str) -> dict:
                     stats["skipped"] += 1
                     continue
 
-                # Extract order data
-                price_paid = float(item.get("lineItemCost", 0))
+                # Extract order data - lineItemCost is a dict with value/currency
+                cost_obj = item.get("lineItemCost", {})
+                if isinstance(cost_obj, dict):
+                    price_paid = float(cost_obj.get("value", 0))
+                else:
+                    price_paid = float(cost_obj or 0)
                 ebay_listing_id = item.get("legacyItemId", "")
 
                 # Mark as sold with order info
