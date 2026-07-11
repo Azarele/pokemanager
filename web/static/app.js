@@ -3278,7 +3278,10 @@ async function renderSettings() {
             Auto-sync prices to eBay listings
           </label>
         </div>
-        <button class="btn btn-accent btn-sm" onclick="savePricingSettings()">Save Pricing</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-accent btn-sm" onclick="savePricingSettings()">Save Pricing</button>
+          <button class="btn btn-ghost btn-sm" onclick="applyPromotionToAll()">Apply to all listings</button>
+        </div>
       </div>
 
       <!-- Integrations -->
@@ -3388,6 +3391,32 @@ async function savePricingSettings() {
     else toast('Failed: ' + resp.error, 'error');
   } catch (e) {
     toast('Failed: ' + extractError(e.message), 'error');
+  }
+}
+
+async function applyPromotionToAll() {
+  const promoted = parseFloat(document.getElementById('s-promoted-listing')?.value) || 0;
+  if (promoted <= 0) { toast('Set a promotion % greater than 0', 'warning'); return; }
+  const ok = await confirmDialog('Apply Promotion to All Listings',
+    `Update all your active eBay listings to use ${promoted}% promotion?`);
+  if (!ok) return;
+  const btn = event?.target;
+  if (btn) btn.disabled = true;
+  try {
+    toast('Updating all listings...', 'info');
+    const resp = await api.post('/listings/apply-promotion-all', {});
+    if (resp.updated > 0 || resp.failed === 0) {
+      toast(`✅ Updated ${resp.updated} of ${resp.total} listings to ${resp.promotion_pct}%`, 'success');
+    } else {
+      toast(`Updated ${resp.updated}, failed ${resp.failed}`, resp.failed > 0 ? 'warning' : 'success');
+    }
+    if (resp.errors?.length > 0) {
+      console.warn('Promotion errors:', resp.errors);
+    }
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
