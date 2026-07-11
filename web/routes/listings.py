@@ -152,11 +152,17 @@ async def list_ebay(
             print(f"[images] Reusing {len(tmp_paths)} stored image(s) for item {item_id}")
 
     try:
+        import traceback
+
         # Prepare promoted listing settings
         use_promo = use_promoted_listing.lower() == 'true' and promoted_listing_pct > 0
         promo_pct = promoted_listing_pct if use_promo else None
 
+        print(f"[listings] Listing item {item_id}: price={price}, use_promo={use_promo}, promo_pct={promo_pct}")
+
         async with user_config.apply(user):
+            # Note: promoted_listing_pct is stored in database for future API integration
+            # For now, we only store the preference; eBay API call doesn't support it yet
             result = await lister_ebay_api.list_item_on_ebay(
                 item_name   = title or item["card_name"],
                 price_gbp   = price,
@@ -167,7 +173,6 @@ async def list_ebay(
                 card_name   = item["card_name"],
                 pc_url      = item.get("pc_url") or "",
                 item_id     = item_id,
-                promoted_listing_pct = promo_pct,
             )
         if result.success and result.listing_url:
             listing_id = result.listing_url.rstrip("/").split("/")[-1].split("?")[0]
@@ -183,6 +188,11 @@ async def list_ebay(
             "price":       price,
             "error":       result.error,
         }
+    except Exception as e:
+        import traceback
+        print(f"[listings] Error creating eBay listing for item {item_id}: {e}")
+        print(traceback.format_exc())
+        raise
     finally:
         for p in tmp_paths:
             try:
