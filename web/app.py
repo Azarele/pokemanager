@@ -6,6 +6,7 @@ _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _root not in sys.path:
     sys.path.insert(0, _root)
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from web.routes import inventory, listings, analytics, pricing, watchlist, sales, calculator, price_history, auth_routes, settings, billing, legal, admin, scan
+from web.routes import inventory, listings, analytics, pricing, watchlist, sales, calculator, price_history, auth_routes, settings, billing, legal, admin, scan, ebay_sync
 from web.middleware.auth import AuthMiddleware
 from web.middleware.rate_limit import RateLimitMiddleware
 from web.ws_manager import manager
@@ -61,6 +62,7 @@ app.include_router(settings.router,      prefix="/api/settings")
 app.include_router(billing.router,       prefix="/api/billing")
 app.include_router(admin.router,         prefix="/api/admin")
 app.include_router(scan.router,          prefix="/api/scan")
+app.include_router(ebay_sync.router,     prefix="/api/ebay")
 app.include_router(legal.router,         prefix="")
 
 app.mount("/static", StaticFiles(directory=str(_here / "static")), name="static")
@@ -75,6 +77,19 @@ async def startup_check():
         logger.warning("Some features will not work. Check your .env file.")
     else:
         logger.info("PokeManager starting — all required env vars present")
+
+    asyncio.create_task(ebay_sync_background_loop())
+
+
+async def ebay_sync_background_loop():
+    """Background task: sync eBay sales every 30 minutes for all users."""
+    await asyncio.sleep(60)  # Wait 1 minute before first sync
+    while True:
+        try:
+            await ebay_sync.sync_all_users_ebay()
+        except Exception as e:
+            logger.error(f"Error in eBay sync background loop: {e}")
+        await asyncio.sleep(1800)  # 30 minutes
 
 
 @app.exception_handler(404)

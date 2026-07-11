@@ -3202,7 +3202,10 @@ async function renderSettings() {
           <label class="form-label">Refresh Token</label>
           <input id="s-ebay-token" class="form-input" type="password" placeholder="${settings?.has_ebay ? '••••••• (set)' : 'Run generate_ebay_token.py'}">
         </div>
-        <button class="btn btn-accent btn-sm" onclick="saveEbaySettings()">Save eBay Keys</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-accent btn-sm" onclick="saveEbaySettings()">Save eBay Keys</button>
+          ${settings?.has_ebay ? `<button class="btn btn-ghost btn-sm" onclick="syncEbaySales()">🔄 Sync Sales Now</button>` : ''}
+        </div>
       </div>
 
       <!-- Pricing settings -->
@@ -3367,6 +3370,25 @@ async function testDiscordWebhook() {
     }
   } catch (e) {
     toast('Error: ' + extractError(e.message), 'error');
+  }
+}
+
+async function syncEbaySales() {
+  try {
+    const btn = event?.target;
+    if (btn) btn.disabled = true;
+    toast('🔄 Syncing eBay sales...', 'info');
+    const resp = await api.post('/ebay/sync-sales', {});
+    if (resp.success) {
+      const msg = `✅ Synced: ${resp.synced}, Skipped: ${resp.skipped}, Errors: ${resp.errors}`;
+      toast(msg, 'success');
+    } else {
+      toast('Failed: ' + resp.error, 'error');
+    }
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
+  } finally {
+    if (event?.target) event.target.disabled = false;
   }
 }
 
