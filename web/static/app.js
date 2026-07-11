@@ -632,11 +632,17 @@ function renderInventoryCard(item) {
 
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;max-width:100%;box-sizing:border-box">
             <div><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase">Bought</span><br><strong style="font-size:13px;font-weight:600">${fmt(buyP)}</strong></div>
-            <div><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase">Market</span><br><strong style="font-size:13px;font-weight:600">${fmt(item.live_price)}</strong></div>
-            <div><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase">Profit</span><br><strong style="font-size:13px;font-weight:600;${pClass}">${profit >= 0 ? '+' : ''}${fmt(profit)}</strong></div>
+            <div><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase">${isSold ? 'Sold for' : 'Market'}</span><br><strong style="font-size:13px;font-weight:600;${isSold ? 'color:var(--success)' : ''}">${isSold ? fmt(item.sell_price) : fmt(item.live_price)}</strong></div>
+            <div><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase">Profit</span><br><strong style="font-size:13px;font-weight:600;${isSold ? 'color:var(--success)' : pClass}">${isSold ? (item.profit >= 0 ? '+' : '') + fmt(item.profit) : (profit >= 0 ? '+' : '') + fmt(profit)}</strong></div>
           </div>
 
-          <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:12px;flex-wrap:wrap;max-width:100%;box-sizing:border-box">
+          ${isSold && item.date_sold ? `
+            <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:11px;padding:6px 0;border-top:1px solid var(--border);color:var(--text-muted);box-sizing:border-box">
+              <span>Sold on ${new Date(item.date_sold).toLocaleDateString('en-GB')}</span>
+            </div>
+          ` : ''}
+
+          <div style="display:flex;align-items:center;gap:12px;margin-top:${isSold && item.date_sold ? '0' : '4'}px;font-size:12px;flex-wrap:wrap;max-width:100%;box-sizing:border-box">
             <span style="color:var(--text-muted)">Quick <strong style="color:var(--accent);font-size:13px;font-weight:600">${fmt(item.quick_price)}</strong></span>
             <span style="color:var(--text-muted)">ROI <strong style="color:${roi > 0 ? '#10b981' : roi < 0 ? '#ef4444' : '#6b7280'};font-size:13px;font-weight:600">${roi > 0 ? '+' : ''}${roi}%</strong></span>
           </div>
