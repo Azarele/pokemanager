@@ -203,10 +203,11 @@ async def sales_by_date(
 
         # Use stored database values, not recalculated estimates
         # eBay fee should be the actual value from the order, not 12.35% estimate
-        ebay_fee      = item.get("ebay_fee") or round(sell_price * ebay_fee_rate, 2)
+        stored_fee = item.get("ebay_fee")
+        ebay_fee   = float(stored_fee) if stored_fee else round(sell_price * ebay_fee_rate, 2)
         # Profit already calculated with actual fees in sync process
-        profit        = item.get("profit") or round(sell_price - purchase_price, 2)
-        net_received  = item.get("net_received") or round(sell_price - ebay_fee - postage_cost, 2)
+        profit     = float(item.get("profit") or 0)
+        net_received = float(item.get("net_received") or 0) or round(sell_price - ebay_fee - postage_cost, 2)
         roi_pct       = round((profit / purchase_price * 100), 1) if purchase_price > 0 else 0
 
         sales.append({
