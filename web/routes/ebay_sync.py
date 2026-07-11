@@ -259,11 +259,32 @@ async def _sync_user_sales(user_id: str) -> dict:
                     price_paid = float(cost_obj or 0)
                 ebay_listing_id = item.get("legacyItemId", "")
 
-                # Calculate profit: sale price - purchase price - ebay fees
+                # Using actual eBay order earnings, not estimated fees
+                # eBay provides actual seller earnings in the fulfillment API
+                # If promotions were applied, the lineItemCost reflects the final price after discounts
+                # Extract actual fees from order-level charges
+                ebay_fee = 0.0
+                ebay_charges = order.get("ebayCollectedCharges", {})
+                if isinstance(ebay_charges, dict):
+                    for charge in ebay_charges.get("charges", []):
+                        if isinstance(charge, dict):
+                            amount_obj = charge.get("amount", {})
+                            if isinstance(amount_obj, dict):
+                                ebay_fee += float(amount_obj.get("value", 0))
+
+                # If no fee data available, fall back to estimate (shouldn't happen with real eBay data)
+                if ebay_fee == 0 and price_paid > 0:
+                    ebay_fee = round(price_paid * ebay_fee_rate, 2)
+                else:
+                    ebay_fee = round(ebay_fee / max(len(line_items), 1), 2) if ebay_charges else 0
+
+                # Calculate profit: sale price - purchase price - actual ebay fees
                 # Buyer pays postage via eBay Simple Delivery (we don't deduct postage)
-                estimated_ebay_fee = round(price_paid * ebay_fee_rate, 2)
-                net_received = round(price_paid - estimated_ebay_fee, 2)
+                net_received = round(price_paid - ebay_fee, 2)
                 profit = round(net_received - purchase_price, 2)
+
+                # Log actual fee breakdown for verification
+                print(f"[ebay_sync] Item {item_id}: price={price_paid}, fee={ebay_fee}, net={net_received}, profit={profit}")
 
                 # Mark as sold with order info and calculated profit
                 await db.edit_item(user_id, item_id, "status", "Sold")
@@ -285,6 +306,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                         f"**{inv_item.get('card_name')}**\n"
                         f"💰 Sold for: **£{price_paid:.2f}**\n"
                         f"📦 Bought for: £{purchase_price:.2f}\n"
+                        f"💳 eBay fees: £{ebay_fee:.2f}\n"
                         f"📊 After fees: £{net_received:.2f}\n"
                         f"{profit_emoji} Profit: **£{profit:.2f}** ({roi:.1f}% ROI)\n"
                         f"🏷️ eBay Order #{order_id}"
