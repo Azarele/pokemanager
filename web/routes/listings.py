@@ -364,6 +364,43 @@ async def get_ebay_fulfillment_policies(user: dict = Depends(get_current_user)):
         }
 
 
+@router.get("/ebay-policies-debug")
+async def debug_ebay_policies(user: dict = Depends(get_current_user)):
+    """Debug endpoint: Fetch ALL policies (fulfillment, payment, return) from eBay with raw responses."""
+    try:
+        async with user_config.apply(user):
+            fulfillment = await lister_ebay_api.fetch_fulfillment_policies()
+            payment = await lister_ebay_api.fetch_payment_policies()
+            returns = await lister_ebay_api.fetch_return_policies()
+
+        return {
+            "success": True,
+            "config_values": {
+                "fulfillment_policy_id": config.EBAY_FULFILLMENT_POLICY_ID or "(empty)",
+                "payment_policy_id": config.EBAY_PAYMENT_POLICY_ID or "(empty)",
+                "return_policy_id": config.EBAY_RETURN_POLICY_ID or "(empty)",
+            },
+            "available_policies": {
+                "fulfillment": fulfillment,
+                "payment": payment,
+                "returns": returns,
+            }
+        }
+    except Exception as e:
+        import traceback
+        print(f"[listings] Error in debug policies endpoint: {e}")
+        print(traceback.format_exc())
+        return {
+            "success": False,
+            "error": str(e),
+            "config_values": {
+                "fulfillment_policy_id": config.EBAY_FULFILLMENT_POLICY_ID or "(empty)",
+                "payment_policy_id": config.EBAY_PAYMENT_POLICY_ID or "(empty)",
+                "return_policy_id": config.EBAY_RETURN_POLICY_ID or "(empty)",
+            }
+        }
+
+
 # ── AI description generator ──────────────────────────────────────────────
 
 class DescRequest(BaseModel):

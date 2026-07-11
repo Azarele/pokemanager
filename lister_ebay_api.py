@@ -1323,6 +1323,76 @@ async def fetch_fulfillment_policies() -> list[dict]:
     ]
 
 
+async def fetch_payment_policies() -> list[dict]:
+    """
+    Fetch payment policy IDs from eBay Account API.
+    Returns list of dicts with 'id', 'name', 'description' keys.
+    """
+    token = await _get_access_token()
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type":  "application/json",
+    }
+
+    def _fetch():
+        return requests.get(
+            f"{_ACCOUNT_URL}/payment_policy?marketplace_id=EBAY_GB",
+            headers=headers,
+            timeout=30,
+        )
+
+    resp = await asyncio.to_thread(_fetch)
+    if resp.status_code != 200:
+        raise RuntimeError(
+            f"[ebay_api] Failed to fetch payment policies: HTTP {resp.status_code} — {resp.text[:500]}"
+        )
+
+    policies = resp.json().get("paymentPolicies", [])
+    return [
+        {
+            "id": p.get("paymentPolicyId", ""),
+            "name": p.get("name", ""),
+            "description": p.get("description", ""),
+        }
+        for p in policies
+    ]
+
+
+async def fetch_return_policies() -> list[dict]:
+    """
+    Fetch return policy IDs from eBay Account API.
+    Returns list of dicts with 'id', 'name', 'description' keys.
+    """
+    token = await _get_access_token()
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type":  "application/json",
+    }
+
+    def _fetch():
+        return requests.get(
+            f"{_ACCOUNT_URL}/return_policy?marketplace_id=EBAY_GB",
+            headers=headers,
+            timeout=30,
+        )
+
+    resp = await asyncio.to_thread(_fetch)
+    if resp.status_code != 200:
+        raise RuntimeError(
+            f"[ebay_api] Failed to fetch return policies: HTTP {resp.status_code} — {resp.text[:500]}"
+        )
+
+    policies = resp.json().get("returnPolicies", [])
+    return [
+        {
+            "id": p.get("returnPolicyId", ""),
+            "name": p.get("name", ""),
+            "description": p.get("description", ""),
+        }
+        for p in policies
+    ]
+
+
 async def print_policies() -> None:
     """Fetch and print all business policy IDs for the authenticated eBay account.
  
