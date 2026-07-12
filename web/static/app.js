@@ -4335,9 +4335,6 @@ async function identifyCard() {
 
     console.log('[scan] Calling showCardConfirmation()...');
     showCardConfirmation();
-
-    console.log('[scan] Closing current modal...');
-    closeModal();
     console.log('[scan] Identification complete');
   } catch (e) {
     console.error('[scan] Exception caught:', e);
