@@ -26,6 +26,7 @@ async def get_settings(user: dict = Depends(get_current_user)):
         "ebay_fulfillment_policy_id": user.get("ebay_fulfillment_policy_id", ""),
         "ebay_payment_policy_id":     user.get("ebay_payment_policy_id", ""),
         "ebay_return_policy_id":      user.get("ebay_return_policy_id", ""),
+        "onboarding_dismissed": user.get("onboarding_dismissed", False),
     }
 
 
@@ -41,6 +42,7 @@ async def update_settings(body: dict, user: dict = Depends(get_current_user)):
         "ebay_app_id", "ebay_dev_id", "ebay_cert_id", "ebay_refresh_token",
         "ebay_fulfillment_policy_id", "ebay_payment_policy_id", "ebay_return_policy_id",
         "gemini_api_key", "discord_webhook_url",
+        "onboarding_dismissed",
     }
     updates = {k: v for k, v in body.items() if k in allowed and v is not None}
     if not updates:

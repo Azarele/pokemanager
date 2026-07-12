@@ -220,6 +220,7 @@ function initMobileNav() {
       <a onclick="navigate('/sales');toggleMobileMenu()" class="mobile-nav-link">💰 Sales</a>
       <a onclick="navigate('/calculator');toggleMobileMenu()" class="mobile-nav-link">🧮 Calculator</a>
       <a onclick="navigate('/upgrade');toggleMobileMenu()" class="mobile-nav-link">⭐ Upgrade</a>
+      <a onclick="navigate('/guide');toggleMobileMenu()" class="mobile-nav-link">📖 Guide</a>
       <a onclick="navigate('/settings');toggleMobileMenu()" class="mobile-nav-link">⚙️ Settings</a>
     </nav>
     <div style="margin-top:auto;padding-top:20px;border-top:1px solid var(--border)">
@@ -4502,6 +4503,362 @@ function handleCameraCapture(file) {
   handleScanImage({ target: { files: [file] } }, _scanMode);
 }
 
+/* ── Guide Page ──────────────────────────────────────────────────────────── */
+async function renderGuide() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">📖 Guide</h1>
+      <p class="text-muted">Learn how to use PokeManager to track and sell your Pokémon TCG collection</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:250px 1fr;gap:24px;margin-bottom:40px">
+      <!-- Sidebar navigation -->
+      <div style="position:sticky;top:100px;height:fit-content">
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px">
+          <button class="guide-nav-btn active" onclick="scrollToGuideSection('getting-started')" style="text-align:left;padding:8px 12px;border:none;background:var(--border);border-radius:4px;cursor:pointer;color:var(--text)">🚀 Getting Started</button>
+          <button class="guide-nav-btn" onclick="scrollToGuideSection('ebay-setup')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">🏷️ eBay Setup</button>
+          <button class="guide-nav-btn" onclick="scrollToGuideSection('listing')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">📤 Listing on eBay</button>
+          <button class="guide-nav-btn" onclick="scrollToGuideSection('sales')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">💰 Sales & Profit</button>
+          <button class="guide-nav-btn" onclick="scrollToGuideSection('analytics')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">📊 Analytics</button>
+          <button class="guide-nav-btn" onclick="scrollToGuideSection('discord')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">🔔 Discord</button>
+          <button class="guide-nav-btn" onclick="scrollToGuideSection('plans')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">💎 Plans</button>
+          <button class="guide-nav-btn" onclick="scrollToGuideSection('faq')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">❓ FAQ</button>
+        </div>
+      </div>
+
+      <!-- Main content -->
+      <div class="guide-content">
+        <!-- Getting Started -->
+        <div class="guide-section" data-section="getting-started">
+          <h2>🚀 Getting Started</h2>
+
+          <h3>Adding Inventory Items</h3>
+          <p>Click <strong>+ Add Item</strong> in the Inventory tab to add cards you own:</p>
+          <ul style="margin:12px 0 16px 20px">
+            <li><strong>Card Name</strong> — e.g., "Charizard Holo Base Set"</li>
+            <li><strong>PriceCharting URL</strong> — Copy the URL from <a href="https://www.pricecharting.com" target="_blank" style="color:var(--accent)">pricecharting.com</a>. We'll auto-fetch the current market price</li>
+            <li><strong>Purchase Price</strong> — How much you paid for the card</li>
+            <li><strong>Market Price</strong> — Optional; we fetch this automatically from PriceCharting</li>
+            <li><strong>Condition</strong> — Ungraded (Near Mint, Lightly Played, etc.) or graded (PSA 10, BGS 9.5, etc.)</li>
+            <li><strong>Region</strong> — English, Japanese, or Korean</li>
+          </ul>
+
+          <h3>Scan & Add (Mobile)</h3>
+          <p>On mobile, tap the <strong>📷 camera icon</strong> at the bottom right to scan a card with your phone's camera. We'll identify the card and pre-fill the form for you.</p>
+
+          <h3>Understanding Prices</h3>
+          <p><strong>Market Price (Live Price)</strong> — The current average price on PriceCharting. We refresh this daily for all your items.</p>
+          <p><strong>Quick Sell Price</strong> — 85% of market price. This is our recommended price if you want to sell quickly. Lower prices = faster sales.</p>
+          <p><strong>Potential Profit</strong> — Quick Sell Price − eBay Fees − Purchase Price. Your expected profit per card.</p>
+        </div>
+
+        <!-- eBay Setup -->
+        <div class="guide-section" data-section="ebay-setup">
+          <h2>🏷️ eBay Setup</h2>
+          <p>To list cards and auto-detect sales, you need to connect your eBay account. This requires a one-time setup:</p>
+
+          <h3>Step 1: Get Developer Keys</h3>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Go to <a href="https://developer.ebay.com" target="_blank" style="color:var(--accent)">developer.ebay.com</a></li>
+            <li>Sign in with your eBay account</li>
+            <li>Go to <strong>Keys & Tokens</strong></li>
+            <li>Copy your <strong>App ID</strong> and <strong>Cert ID</strong></li>
+          </ol>
+
+          <h3>Step 2: Generate Refresh Token</h3>
+          <p>Run this command from your computer (where PokeManager is installed):</p>
+          <pre style="background:var(--bg-secondary);padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">python web/generate_ebay_token.py</pre>
+          <p>Follow the instructions and copy the <strong>Refresh Token</strong></p>
+
+          <h3>Step 3: Add Keys to PokeManager</h3>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Go to <strong>Settings → eBay API</strong></li>
+            <li>Paste your App ID, Cert ID, and Refresh Token</li>
+            <li>Click <strong>Save eBay Keys</strong></li>
+          </ol>
+
+          <h3>Step 4: Create Business Policies</h3>
+          <p>Go to <a href="https://www.ebay.co.uk/sh/selling/policies" target="_blank" style="color:var(--accent)">eBay Business Policies</a> and create 3 policies:</p>
+          <ul style="margin:12px 0 16px 20px">
+            <li><strong>Postage Policy</strong> — Use "Simple Delivery", buyer pays shipping</li>
+            <li><strong>Payment Policy</strong> — Managed Payments (standard)</li>
+            <li><strong>Return Policy</strong> — 30 days with full refund</li>
+          </ul>
+
+          <h3>Step 5: Fetch & Save Policies</h3>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Go to <strong>Settings → eBay Business Policies</strong></li>
+            <li>Click <strong>🔄 Fetch Policies</strong></li>
+            <li>Click on each policy to auto-fill the IDs</li>
+            <li>Click <strong>Save Policies</strong></li>
+          </ol>
+        </div>
+
+        <!-- Listing on eBay -->
+        <div class="guide-section" data-section="listing">
+          <h2>📤 Listing on eBay</h2>
+
+          <h3>List a Single Card</h3>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Go to <strong>Inventory</strong></li>
+            <li>Find your card and click <strong>List</strong></li>
+            <li>Choose your pricing strategy:</li>
+          </ol>
+          <ul style="margin:12px 0 16px 20px">
+            <li><strong>Quick Sell</strong> — 85% of market price, sells faster</li>
+            <li><strong>Market</strong> — 115% of market price (good for mid-range cards)</li>
+            <li><strong>Custom</strong> — Set your own price</li>
+          </ul>
+          <ol start="4" style="margin:12px 0 16px 20px">
+            <li>Add photos and description</li>
+            <li>Optional: Enable <strong>Promoted Listing</strong> (% commission to eBay for visibility)</li>
+            <li>Click <strong>List on eBay</strong></li>
+          </ol>
+
+          <h3>Auto-Reprice Existing Listings</h3>
+          <p>To automatically adjust prices when market price changes, enable <strong>Settings → Pricing → Auto-sync prices to eBay listings</strong></p>
+          <p>Or manually reprice all listings: <strong>Listings → Reprice All</strong></p>
+        </div>
+
+        <!-- Sales & Profit -->
+        <div class="guide-section" data-section="sales">
+          <h2>💰 Sales & Profit Tracking</h2>
+
+          <h3>How Sales Are Detected</h3>
+          <p>We check your eBay account every 30 minutes for new completed sales and automatically add them to your Sales log. You can also manually sync anytime:</p>
+          <p><strong>Settings → Sync Sales Now</strong></p>
+
+          <h3>How Profit Is Calculated</h3>
+          <pre style="background:var(--bg-secondary);padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">Profit = Sell Price − eBay Fees − Purchase Price</pre>
+
+          <h3>Accurate Fee Tracking</h3>
+          <p>eBay fees depend on your sales history and marketplace. For the most accurate profit calculation:</p>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Download your monthly eBay statement from <strong>eBay → Account → Reports</strong></li>
+            <li>Go to <strong>Settings → Pricing</strong> and adjust the <strong>eBay Fee Rate (%)</strong> to match your actual fees</li>
+          </ol>
+        </div>
+
+        <!-- Analytics -->
+        <div class="guide-section" data-section="analytics">
+          <h2>📊 Analytics</h2>
+
+          <h3>KPI Cards</h3>
+          <p>The top of Analytics shows your key metrics:</p>
+          <ul style="margin:12px 0 16px 20px">
+            <li><strong>Total Value</strong> — Sum of purchase prices for all unsold inventory</li>
+            <li><strong>Market Value</strong> — Current market price of your collection</li>
+            <li><strong>Potential Profit</strong> — Total profit if you sold all cards at Quick Sell price</li>
+            <li><strong>Total Sold</strong> — Total profit from completed sales</li>
+          </ul>
+
+          <h3>Price Predictions</h3>
+          <p>Based on 30-day price history, we predict which cards are trending up or down. High ROI cards are great candidates to list.</p>
+
+          <h3>Restock Suggestions</h3>
+          <p>We show cards that sell well and have low prices, so you can restock and resell them at profit.</p>
+
+          <h3>Exports</h3>
+          <p>Available on Gym Leader and Champion plans:</p>
+          <ul style="margin:12px 0 16px 20px">
+            <li><strong>HMRC</strong> — For UK tax reporting</li>
+            <li><strong>Xero</strong> — Cloud accounting software</li>
+            <li><strong>QuickBooks</strong> — Desktop/online accounting</li>
+          </ul>
+        </div>
+
+        <!-- Discord -->
+        <div class="guide-section" data-section="discord">
+          <h2>🔔 Discord Notifications</h2>
+          <p>Get instant alerts for sales, offers, and price changes in Discord.</p>
+
+          <h3>Setting Up Discord Webhook</h3>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Open your Discord server</li>
+            <li>Go to <strong>Server Settings → Integrations → Webhooks</strong></li>
+            <li>Click <strong>New Webhook</strong></li>
+            <li>Name it "PokeManager"</li>
+            <li>Click <strong>Copy Webhook URL</strong></li>
+            <li>Go to <strong>Settings → Integrations</strong> in PokeManager</li>
+            <li>Paste the URL in <strong>Discord Webhook URL</strong></li>
+            <li>Click <strong>Save</strong> and then <strong>Test</strong></li>
+          </ol>
+
+          <h3>What You'll Get</h3>
+          <ul style="margin:12px 0 16px 20px">
+            <li><strong>Sale alerts</strong> — Price, profit, card name</li>
+            <li><strong>Best offer notifications</strong> — With ROI analysis</li>
+            <li><strong>Price spikes</strong> — Cards trending up</li>
+            <li><strong>Watklist hits</strong> — Cards you're monitoring dropped in price</li>
+          </ul>
+        </div>
+
+        <!-- Plans -->
+        <div class="guide-section" data-section="plans">
+          <h2>💎 Pricing Tiers</h2>
+
+          <h3>🎒 Trainer (Free)</h3>
+          <ul style="margin:12px 0 16px 20px">
+            <li>Up to 50 cards in inventory</li>
+            <li>Price tracking & market analysis</li>
+            <li>Buying calculator</li>
+            <li>Analytics dashboard</li>
+          </ul>
+
+          <h3>🏅 Gym Leader (£7.99/month)</h3>
+          <ul style="margin:12px 0 16px 20px">
+            <li>Everything in Trainer</li>
+            <li>Unlimited inventory</li>
+            <li>eBay listing & auto-sync</li>
+            <li>AI descriptions (bring your own Gemini API key)</li>
+            <li>Scan & Add (your Gemini key)</li>
+            <li>Price history & sparklines</li>
+            <li>HMRC / Xero / QuickBooks export</li>
+          </ul>
+
+          <h3>🏆 Champion (£14.99/month)</h3>
+          <ul style="margin:12px 0 16px 20px">
+            <li>Everything in Gym Leader</li>
+            <li>AI descriptions — we provide the API key (no setup)</li>
+            <li>Scan & Add — no API key needed</li>
+            <li>Priority support</li>
+            <li>Early access to new features</li>
+          </ul>
+        </div>
+
+        <!-- FAQ -->
+        <div class="guide-section" data-section="faq">
+          <h2>❓ FAQ</h2>
+
+          <h3>Why is my listing failing?</h3>
+          <p>❌ Make sure you've created business policies on eBay and fetched them in Settings → eBay Business Policies. Without these, eBay will reject your listing.</p>
+
+          <h3>Why isn't my sale showing in Sales?</h3>
+          <p>💡 Sales are synced every 30 minutes. You can also manually sync: Settings → Sync Sales Now</p>
+
+          <h3>How do I scan cards?</h3>
+          <p>📷 Tap the camera icon at the bottom right on mobile (not available on desktop). We'll identify the card using AI.</p>
+
+          <h3>What is Quick Sell price?</h3>
+          <p>💰 It's 85% of the current market price on PriceCharting. Good for selling fast without racing to the bottom.</p>
+
+          <h3>How accurate are price predictions?</h3>
+          <p>📈 Based on 30-day history from PriceCharting. Accurate for most cards, but graded cards and new sets can be unpredictable.</p>
+
+          <h3>Can I bulk import from Excel?</h3>
+          <p>📤 Yes! Go to Settings → Import from Excel. Your inventory.xlsx from the Discord bot will be imported.</p>
+
+          <h3>What happens to my data if I cancel?</h3>
+          <p>🔒 Your inventory, sales, and settings are kept for 30 days. After that, they're deleted. Cancel anytime — no penalty.</p>
+
+          <h3>Is there a desktop app?</h3>
+          <p>💻 Not yet, but PokeManager works great in your browser. On mobile, tap "Add to Home Screen" for a native-like experience.</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function scrollToGuideSection(sectionId) {
+  const section = document.querySelector(`[data-section="${sectionId}"]`);
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelectorAll('.guide-nav-btn').forEach(btn => {
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--text-muted)';
+    });
+    event.target.style.background = 'var(--border)';
+    event.target.style.color = 'var(--text)';
+  }
+}
+
+/* ── Onboarding Modal ─────────────────────────────────────────────────────── */
+async function showOnboardingIfNeeded() {
+  const [settings, inv] = await Promise.all([
+    api.get('/settings').catch(() => ({})),
+    api.get('/inventory').catch(() => ({ items: [] }))
+  ]);
+
+  if (inv.items.length === 0 && !settings.onboarding_dismissed) {
+    showOnboardingModal();
+  }
+}
+
+function showOnboardingModal() {
+  const steps = [
+    {
+      title: 'Welcome to PokeManager 👋',
+      content: 'Your all-in-one Pokémon TCG reselling platform.\n\nLet\'s get you set up in 5 quick steps.'
+    },
+    {
+      title: '📦 Add Your Inventory',
+      content: 'Click "+ Add Item" to add cards you own.\n\n• Enter the PriceCharting URL for automatic pricing\n• Set your purchase price\n• Add condition and region\n\n💡 Tip: Use "Scan & Add" on mobile to scan a card with your camera'
+    },
+    {
+      title: '🏷️ Connect eBay (Optional but Recommended)',
+      content: 'To list cards and auto-detect sales:\n\n1. Get Developer Keys at developer.ebay.com\n2. Run: python web/generate_ebay_token.py\n3. Add keys in Settings → eBay API\n4. Create 3 business policies on eBay\n5. Fetch them in Settings → eBay Business Policies'
+    },
+    {
+      title: '🔔 Get Notified on Discord (Optional)',
+      content: 'Get alerts for:\n• 💰 Items sold\n• 💬 Best offers received\n• 📈 Price spikes\n\n1. Create a Discord webhook in your server\n2. Paste it in Settings → Integrations → Discord Webhook URL\n3. Click Test'
+    },
+    {
+      title: '🚀 You\'re All Set!',
+      content: 'Here\'s what you can do:\n\n• 📦 Inventory — track your cards\n• 📊 Analytics — see profits & trends\n• 🏷️ Listings — manage eBay listings\n• 💰 Sales — track every sale\n• 📖 Guide — help anytime\n\nNeed help? Click the "Guide" tab.'
+    }
+  ];
+
+  let currentStep = 0;
+
+  function renderStep() {
+    const step = steps[currentStep];
+    const isFirstStep = currentStep === 0;
+    const isLastStep = currentStep === steps.length - 1;
+
+    showModal(`
+      <div style="text-align:center;padding:24px">
+        <h2 style="margin:0 0 16px 0">${step.title}</h2>
+        <p style="color:var(--text-muted);white-space:pre-line;line-height:1.6;margin-bottom:24px">${step.content}</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="skipOnboarding()">Skip</button>
+          ${!isFirstStep ? '<button class="btn btn-ghost" onclick="onboardingPrev()">← Previous</button>' : ''}
+          ${!isLastStep ? '<button class="btn btn-accent" onclick="onboardingNext()">Next →</button>' : ''}
+          ${isLastStep ? '<button class="btn btn-accent" onclick="completeOnboarding()">Let\'s Go 🚀</button>' : ''}
+        </div>
+        <div style="margin-top:16px;font-size:12px;color:var(--text-muted)">Step ${currentStep + 1} of ${steps.length}</div>
+      </div>
+    `);
+  }
+
+  window.onboardingNext = function() {
+    if (currentStep < steps.length - 1) {
+      currentStep++;
+      renderStep();
+    }
+  };
+
+  window.onboardingPrev = function() {
+    if (currentStep > 0) {
+      currentStep--;
+      renderStep();
+    }
+  };
+
+  window.skipOnboarding = function() {
+    api.patch('/settings', { onboarding_dismissed: true }).catch(() => {});
+    closeModal();
+  };
+
+  window.completeOnboarding = function() {
+    api.patch('/settings', { onboarding_dismissed: true }).catch(() => {});
+    closeModal();
+    navigate('/');
+  };
+
+  renderStep();
+}
+
 /* ── Routes ──────────────────────────────────────────────────────────────── */
 const ROUTES = {
   '/':           renderInventory,
@@ -4510,6 +4867,7 @@ const ROUTES = {
   '/watchlist':  renderWatchlist,
   '/sales':      renderSales,
   '/calculator': renderCalculator,
+  '/guide':      renderGuide,
   '/settings':   renderSettings,
   '/upgrade':    renderUpgrade,
   '/admin':      renderAdmin,
@@ -4526,6 +4884,7 @@ window.addEventListener('popstate', routeCurrentPath);
   startGlobalEventStream();
   updateStatus();
   await updateNavUser();
+  showOnboardingIfNeeded();
   initMobileNav();
   initScanFAB();
 
