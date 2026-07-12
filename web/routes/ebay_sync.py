@@ -274,9 +274,41 @@ async def _sync_user_sales(user_id: str) -> dict:
                         continue
                     elif stored_order_id and stored_order_id != order_id:
                         # Different order = re-sold after cancellation/relist
-                        print(f"[ebay_sync] Item {item_id} re-sold! Previous order: {stored_order_id}, New order: {order_id}")
-                        print(f"[ebay_sync] ⚠️ Manual action needed: Create duplicate inventory item for re-sale with order {order_id}")
-                        stats["skipped"] += 1
+                        print(f"[ebay_sync] Item {item_id} re-sold after cancellation! Previous order: {stored_order_id}, New order: {order_id}")
+                        # Extract order data for re-sale
+                        cost_obj = item.get("lineItemCost", {})
+                        if isinstance(cost_obj, dict):
+                            price_paid = float(cost_obj.get("value", 0))
+                        else:
+                            price_paid = float(cost_obj or 0)
+
+                        # Calculate fees and profit for re-sale
+                        ebay_fee = 0.0
+                        ebay_charges = order.get("ebayCollectedCharges", {})
+                        if isinstance(ebay_charges, dict):
+                            for charge in ebay_charges.get("charges", []):
+                                if isinstance(charge, dict):
+                                    amount_obj = charge.get("amount", {})
+                                    if isinstance(amount_obj, dict):
+                                        ebay_fee += float(amount_obj.get("value", 0))
+
+                        if ebay_fee == 0 and price_paid > 0:
+                            if inv_item.get("promoted_listing_pct"):
+                                ebay_fee = round(price_paid * (float(inv_item.get("promoted_listing_pct")) / 100), 2)
+                            else:
+                                ebay_fee = round(price_paid * ebay_fee_rate, 2)
+
+                        profit = round(price_paid - ebay_fee - purchase_price, 2)
+
+                        # Update item with new sale data
+                        await db.edit_item(user_id, item_id, "sell_price", price_paid)
+                        await db.edit_item(user_id, item_id, "profit", profit)
+                        await db.edit_item(user_id, item_id, "ebay_fee", ebay_fee)
+                        await db.edit_item(user_id, item_id, "date_sold", order_creation_date)
+                        await db.edit_item(user_id, item_id, "ebay_order_id", order_id)
+
+                        print(f"[ebay_sync] ✓ Item {item_id} re-sold after cancellation - updated with new order {order_id}, profit: £{profit}")
+                        stats["synced"] += 1
                         continue
                     else:
                         # No order_id stored (from before this feature), sync now
