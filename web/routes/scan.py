@@ -136,7 +136,7 @@ async def identify_card(req: IdentifyRequest, user: dict = Depends(get_current_u
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
 
     client = genai.Client(api_key=api_key)
-    model_name = "gemini-1.5-flash-latest"
+    model_name = "gemini-3.5-flash"
 
     try:
         prompt = """Identify this Pokémon card. Return ONLY valid JSON with no markdown, no explanations, no code blocks:
