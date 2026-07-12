@@ -406,6 +406,16 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
         )
         print(f"[add] Item added successfully: item_id={item_id}")
 
+        # Fetch and cache the card image in background (don't block add response)
+        try:
+            cache_key = f"{item_id}_{user['id']}"
+            image_url = await _scrape_pc_image(req.pc_url, item_id) if req.pc_url else None
+            async with _cache_lock:
+                _write_cache(cache_key, image_url)
+            print(f"[add] Image cached for item {item_id}: {image_url is not None}")
+        except Exception as e:
+            print(f"[add] Image cache failed (non-blocking): {e}")
+
         audit.log_mutation("web_add", item_id, "added", {
             "card_name": card_name, "purchase_price": req.purchase_price,
             "live_price": live_price, "source": "web_dashboard", "user_id": user["id"],

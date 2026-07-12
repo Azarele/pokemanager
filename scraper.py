@@ -458,7 +458,28 @@ def _pc_requests(url: str, condition: str) -> Tuple[str, Optional[float]]:
     except requests.RequestException as exc:
         raise ValueError(f"Network error ({type(exc).__name__}): {exc}") from exc
 
-    return _soup_extract(BeautifulSoup(resp.text, "lxml"), condition, url, _path="requests")
+    # Debug: print first 2000 chars of HTML to see what we got
+    print(f"[scraper/_pc_requests] HTML response (first 2000 chars):\n{resp.text[:2000]}")
+
+    # Check for price indicators in HTML
+    has_complete_cost = "complete_cost" in resp.text
+    has_price_class = "class=\"price" in resp.text
+    has_completed_auctions = "completed_auctions" in resp.text
+    print(f"[scraper/_pc_requests] HTML analysis: has_complete_cost={has_complete_cost}, has_price_class={has_price_class}, has_completed_auctions={has_completed_auctions}")
+
+    soup = BeautifulSoup(resp.text, "lxml")
+
+    # Debug: check for specific price elements
+    complete_cost = soup.find(id="complete_cost")
+    print(f"[scraper/_pc_requests] Found <span id='complete_cost'>: {complete_cost is not None}")
+    if complete_cost:
+        print(f"[scraper/_pc_requests] complete_cost content: {complete_cost.get_text()[:100]}")
+
+    # Check for completed_auctions table
+    auctions_table = soup.find("table", id="completed_auctions")
+    print(f"[scraper/_pc_requests] Found <table id='completed_auctions'>: {auctions_table is not None}")
+
+    return _soup_extract(soup, condition, url, _path="requests")
 
 
 async def _pw_pricecharting(url: str, condition: str) -> Tuple[str, float]:
