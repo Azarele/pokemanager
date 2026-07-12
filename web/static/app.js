@@ -4361,49 +4361,38 @@ window.proceedScanAdd = function(result) {
     return;
   }
 
-  const cardName = (result.card_name || '') + (result.set_name ? ' (' + result.set_name + ')' : '');
-  const pcUrl = result.pc_url || '';
-  const marketPrice = result.market_price || 0;
+  console.log('[scan] Opening add modal directly (no close first)...');
 
-  console.log('[scan] Stored card data - name:', cardName, 'pcUrl:', pcUrl, 'marketPrice:', marketPrice);
+  // Open add modal immediately - this replaces scan modal content
+  openAddItemModal();
+  console.log('[scan] openAddItemModal() called');
 
-  // Close scan modal
-  closeModal();
-  console.log('[scan] Closed confirmation modal');
-
-  // Wait for DOM to settle then open add modal
+  // Pre-fill after modal renders
   setTimeout(function() {
-    console.log('[scan] Opening add item modal (100ms later)...');
-    openAddItemModal();
-    console.log('[scan] openAddItemModal() called');
+    console.log('[scan] Pre-filling form (300ms after add modal)...');
+    const urlInput = document.getElementById('pc-url-1');
+    const priceInput = document.getElementById('price-1');
 
-    // Pre-fill after modal renders
-    setTimeout(function() {
-      console.log('[scan] Pre-filling form (300ms after add modal)...');
-      const urlInput = document.getElementById('pc-url-1');
-      const priceInput = document.getElementById('price-1');
+    console.log('[scan] pc-url-1 element:', urlInput ? 'found' : 'NOT FOUND');
+    console.log('[scan] price-1 element:', priceInput ? 'found' : 'NOT FOUND');
 
-      console.log('[scan] pc-url-1 element:', urlInput ? 'found' : 'NOT FOUND');
-      console.log('[scan] price-1 element:', priceInput ? 'found' : 'NOT FOUND');
+    if (urlInput && result.pc_url) {
+      urlInput.value = result.pc_url;
+      console.log('[scan] Set PC URL to:', result.pc_url);
+    }
 
-      if (urlInput) {
-        urlInput.value = pcUrl;
-        console.log('[scan] Set PC URL to:', pcUrl);
+    if (priceInput) {
+      if (result.market_price) {
+        priceInput.placeholder = '£' + result.market_price.toFixed(2) + ' (market)';
       }
+      priceInput.focus();
+      console.log('[scan] Set price placeholder and focused');
+    }
 
-      if (priceInput) {
-        if (marketPrice) {
-          priceInput.placeholder = '£' + marketPrice.toFixed(2) + ' (market)';
-        }
-        priceInput.focus();
-        console.log('[scan] Set price placeholder and focused');
-      }
-
-      const toastMsg = '📦 ' + (result.card_name || 'Card') + ' — enter your purchase price';
-      console.log('[scan] Showing toast:', toastMsg);
-      toast(toastMsg, 'info', 5000);
-    }, 300);
-  }, 100);
+    const toastMsg = '📦 ' + (result.card_name || 'Card') + ' — enter your purchase price';
+    console.log('[scan] Showing toast:', toastMsg);
+    toast(toastMsg, 'info', 5000);
+  }, 300);
 };
 
 async function proceedScanSell() {
