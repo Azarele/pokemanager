@@ -47,6 +47,55 @@
       50% { transform: translateY(-20px) rotate(5deg); }
     }
 
+    @keyframes orbPulse {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.2); opacity: 1; }
+    }
+
+    @keyframes shimmer {
+      0% { left: -100%; }
+      100% { left: 200%; }
+    }
+
+    @keyframes btnGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(108,99,255,0.3); }
+      50% { box-shadow: 0 0 40px rgba(108,99,255,0.6), 0 0 80px rgba(108,99,255,0.2); }
+    }
+
+    /* Glowing orbs */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+      animation: orbPulse 8s ease-in-out infinite;
+    }
+    .orb1 {
+      width: 400px;
+      height: 400px;
+      background: rgba(108,99,255,0.08);
+      top: -100px;
+      right: -100px;
+      animation-delay: 0s;
+    }
+    .orb2 {
+      width: 300px;
+      height: 300px;
+      background: rgba(139,92,246,0.06);
+      bottom: 20%;
+      left: -80px;
+      animation-delay: 3s;
+    }
+    .orb3 {
+      width: 200px;
+      height: 200px;
+      background: rgba(167,139,250,0.05);
+      top: 50%;
+      right: 20%;
+      animation-delay: 5s;
+    }
+
     /* Particles canvas */
     #particles {
       position: fixed;
@@ -190,6 +239,17 @@
       line-height: 1.2;
       letter-spacing: -1px;
       text-shadow: 0 0 80px rgba(108,99,255,0.3);
+      position: relative;
+    }
+
+    h1::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+      animation: shimmer 4s ease infinite;
     }
 
     [data-theme="light"] h1 {
@@ -229,6 +289,7 @@
     .btn-primary {
       background: var(--accent);
       color: white;
+      animation: btnGlow 3s ease-in-out infinite;
     }
 
     .btn-primary:hover {
@@ -317,6 +378,22 @@
       transition: all 0.3s ease;
       opacity: 0;
       transform: translateY(30px);
+      position: relative;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 15px;
+      background: linear-gradient(135deg, rgba(108,99,255,0), rgba(108,99,255,0.3), rgba(108,99,255,0));
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: -1;
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
     }
 
     .feature-card.visible {
@@ -589,11 +666,8 @@
     .modal-overlay {
       display: none;
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
       z-index: 1000;
       align-items: center;
       justify-content: center;
@@ -604,12 +678,12 @@
     }
 
     .modal-content {
-      background: var(--lp-surface);
-      border: 1px solid var(--lp-border);
+      background: #1a1a2e;
+      border: 1px solid rgba(108,99,255,0.3);
       border-radius: 16px;
-      padding: 40px;
+      padding: 36px;
       width: 100%;
-      max-width: 400px;
+      max-width: 420px;
       max-height: 90vh;
       overflow-y: auto;
       position: relative;
@@ -720,10 +794,15 @@
   <!-- Particle background -->
   <canvas id="particles"></canvas>
 
+  <!-- Glowing orbs -->
+  <div class="bg-orb orb1"></div>
+  <div class="bg-orb orb2"></div>
+  <div class="bg-orb orb3"></div>
+
   <!-- Nav -->
   <nav class="nav">
     <a href="/" class="nav-brand">
-      <img src="/static/logo.png" alt="PokeManager">
+      <img src="/static/logo.png" onerror="this.style.display='none'" style="width:32px;height:32px;border-radius:8px" alt="PokeManager">
       <span>PokeManager</span>
     </a>
     <ul class="nav-links" id="nav-links">
@@ -995,44 +1074,108 @@
       icon.textContent = current === 'dark' ? '☀️' : '🌙';
     }
 
-    // Particles
-    function initParticles() {
+    // Background
+    function initBackground() {
       const canvas = document.getElementById('particles');
+      if (!canvas) return;
       const ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
 
-      const particles = Array.from({length: 80}, () => ({
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      const particles = Array.from({length: 100}, () => ({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
         size: Math.random() * 1.5 + 0.3,
-        speedX: (Math.random() - 0.5) * 0.4,
-        speedY: (Math.random() - 0.5) * 0.4,
-        opacity: Math.random() * 0.6 + 0.1
+        speedX: (Math.random() - 0.5) * 0.3,
+        speedY: (Math.random() - 0.5) * 0.3,
+        opacity: Math.random() * 0.5 + 0.1,
+        color: Math.random() > 0.5 ? '108, 99, 255' : '167, 139, 250'
       }));
+
+      const stars = [];
+      function addStar() {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: 0,
+          len: Math.random() * 100 + 50,
+          speed: Math.random() * 3 + 2,
+          opacity: 1,
+          angle: Math.PI / 4
+        });
+      }
+      setInterval(addStar, 3000);
+
+      let mouse = { x: null, y: null };
+      window.addEventListener('mousemove', e => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+      });
 
       function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        particles.forEach((p, i) => {
+          particles.slice(i + 1).forEach(p2 => {
+            const dx = p.x - p2.x;
+            const dy = p.y - p2.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 120) {
+              ctx.beginPath();
+              ctx.strokeStyle = `rgba(108,99,255,${0.08 * (1 - dist/120)})`;
+              ctx.lineWidth = 0.5;
+              ctx.moveTo(p.x, p.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.stroke();
+            }
+          });
+        });
+
         particles.forEach(p => {
+          if (mouse.x) {
+            const dx = p.x - mouse.x;
+            const dy = p.y - mouse.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 100) {
+              p.x += dx * 0.02;
+              p.y += dy * 0.02;
+            }
+          }
+
           p.x += p.speedX;
           p.y += p.speedY;
           if (p.x < 0) p.x = canvas.width;
           if (p.x > canvas.width) p.x = 0;
           if (p.y < 0) p.y = canvas.height;
           if (p.y > canvas.height) p.y = 0;
+
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(108, 99, 255, ${p.opacity})`;
+          ctx.fillStyle = `rgba(${p.color}, ${p.opacity})`;
           ctx.fill();
         });
+
+        for (let i = stars.length - 1; i >= 0; i--) {
+          const s = stars[i];
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(167,139,250,${s.opacity})`;
+          ctx.lineWidth = 1.5;
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(s.x - Math.cos(s.angle) * s.len, s.y - Math.sin(s.angle) * s.len);
+          ctx.stroke();
+          s.x += Math.cos(s.angle) * s.speed;
+          s.y += Math.sin(s.angle) * s.speed;
+          s.opacity -= 0.015;
+          if (s.opacity <= 0) stars.splice(i, 1);
+        }
+
         requestAnimationFrame(animate);
       }
       animate();
-
-      window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-      });
     }
 
     // Animate counter
@@ -1059,14 +1202,18 @@
 
     // Stats
     async function loadStats() {
+      console.log('[stats] fetching...');
       try {
         const r = await fetch('/api/analytics/public-stats');
         const d = await r.json();
+        console.log('[stats] got:', d);
         animateCounter(document.getElementById('stat-revenue'), parseInt(d.total_revenue) || 0, '£');
         animateCounter(document.getElementById('stat-sold'), parseInt(d.total_sold) || 0, '', '+');
         animateCounter(document.getElementById('stat-stock'), parseInt(d.total_in_stock) || 0, '', '+');
         animateCounter(document.getElementById('stat-users'), parseInt(d.total_users) || 0, '', '+');
-      } catch(e) {}
+      } catch(e) {
+        console.error('[stats] error:', e);
+      }
     }
 
     // Scroll reveal
@@ -1182,7 +1329,7 @@
 
     // Init
     initTheme();
-    initParticles();
+    initBackground();
     loadStats();
     document.getElementById('login-form').addEventListener('submit', handleLogin);
     document.getElementById('register-form').addEventListener('submit', handleRegister);

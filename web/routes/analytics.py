@@ -450,27 +450,23 @@ async def get_data_health(user: dict = Depends(get_current_user)):
 
 @router.get("/public-stats")
 async def public_stats():
-    """Get public aggregate stats across all users (no auth required)."""
     try:
-        from web.database import get_db
-        sb = get_db()
+        from web.database import get_supabase
+        sb = get_supabase()
 
-        # Total sold items and revenue
-        sold = sb.table("inventory_items").select("sell_price, profit").eq("status", "Sold").execute()
-        inventory = sb.table("inventory_items").select("item_id").eq("status", "Inventory").execute()
-        users = sb.table("user_profiles").select("id").execute()
+        sold_result = sb.table("inventory_items").select("sell_price").eq("status", "Sold").execute()
+        inventory_result = sb.table("inventory_items").select("item_id").eq("status", "Inventory").execute()
+        users_result = sb.table("user_profiles").select("id").execute()
 
-        total_revenue = sum(float(i.get("sell_price") or 0) for i in (sold.data or []))
-        total_sold = len(sold.data or [])
-        total_in_stock = len(inventory.data or [])
-        total_users = len(users.data or [])
+        total_revenue = sum(float(row.get("sell_price") or 0) for row in sold_result.data)
 
         return {
-            "total_revenue": round(total_revenue),
-            "total_sold": total_sold,
-            "total_in_stock": total_in_stock,
-            "total_users": total_users
+            "total_revenue": int(total_revenue),
+            "total_sold": len(sold_result.data),
+            "total_in_stock": len(inventory_result.data),
+            "total_users": len(users_result.data)
         }
     except Exception as e:
         print(f"[public-stats] Error: {e}")
+        import traceback; traceback.print_exc()
         return {"total_revenue": 0, "total_sold": 0, "total_in_stock": 0, "total_users": 0}
