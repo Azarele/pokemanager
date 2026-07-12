@@ -55,6 +55,57 @@ function updateThemeIcon() {
 // Initialize theme on boot
 initTheme();
 
+/* ── Particle System ───────────────────────────────────────────────────── */
+function initParticles() {
+  const canvas = document.createElement('canvas');
+  canvas.id = 'particles-bg';
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.3';
+  document.body.insertBefore(canvas, document.body.firstChild);
+
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const particles = Array.from({length: 50}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    size: Math.random() * 2 + 0.5,
+    speedX: (Math.random() - 0.5) * 0.3,
+    speedY: (Math.random() - 0.5) * 0.3,
+    opacity: Math.random() * 0.5 + 0.1
+  }));
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.x += p.speedX;
+      p.y += p.speedY;
+      if (p.x < 0) p.x = canvas.width;
+      if (p.x > canvas.width) p.x = 0;
+      if (p.y < 0) p.y = canvas.height;
+      if (p.y > canvas.height) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(108, 99, 255, ${p.opacity})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  });
+}
+
+// Initialize particles after DOM ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initParticles);
+} else {
+  initParticles();
+}
+
 /* ── Tier / Plan Features ──────────────────────────────────────────────────── */
 const PLAN_FEATURES = {
   unlimited_items:      ['gym_leader', 'champion'],
@@ -3716,7 +3767,14 @@ async function updateNavUser() {
     S.user = data.user;
     S.plan = data.user.role === 'admin' ? 'champion' : (data.user.plan || 'free');
     const el = document.getElementById('nav-user');
-    if (el) el.textContent = data.user.display_name || data.user.email;
+    if (el) {
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0">
+          <span style="font-size:13px;font-weight:500;white-space:nowrap">${data.user.display_name || data.user.email}</span>
+          <button onclick="confirmLogout()" title="Sign out" style="background:none;border:none;cursor:pointer;font-size:16px;opacity:0.7;transition:0.15s ease" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">🚪</button>
+        </div>
+      `;
+    }
   }
 }
 
