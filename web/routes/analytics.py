@@ -446,3 +446,50 @@ async def get_data_health(user: dict = Depends(get_current_user)):
         "stale_price": slim(stale_price),
         "total":       len(zero_price) + len(no_pc_url) + len(stale_price),
     }
+
+
+@router.get("/public-stats")
+async def get_public_stats():
+    """Get public aggregate stats across all users (no auth required)."""
+    try:
+        from web.database import get_db
+        db_client = get_db()
+        
+        # Total revenue (sum of all sell_price for sold items)
+        revenue_result = db_client.table("inventory_items").select(
+            "sell_price"
+        ).eq("status", "Sold").execute()
+        total_revenue = sum(float(item.get("sell_price", 0)) for item in (revenue_result.data or []))
+        
+        # Total sold items
+        sold_result = db_client.table("inventory_items").select(
+            "item_id"
+        ).eq("status", "Sold").execute()
+        total_sold = len(sold_result.data or [])
+        
+        # Total in stock
+        stock_result = db_client.table("inventory_items").select(
+            "item_id"
+        ).eq("status", "Inventory").execute()
+        total_in_stock = len(stock_result.data or [])
+        
+        # Total users
+        users_result = db_client.table("user_profiles").select(
+            "id"
+        ).execute()
+        total_users = len(users_result.data or [])
+        
+        return {
+            "total_revenue": round(total_revenue, 2),
+            "total_sold": total_sold,
+            "total_in_stock": total_in_stock,
+            "total_users": total_users,
+        }
+    except Exception as e:
+        print(f"[analytics] Error fetching public stats: {e}")
+        return {
+            "total_revenue": 0,
+            "total_sold": 0,
+            "total_in_stock": 0,
+            "total_users": 0,
+        }

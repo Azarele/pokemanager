@@ -24,8 +24,9 @@ from web.ws_manager import manager
 logger = logging.getLogger(__name__)
 
 _here = Path(__file__).parent
-_index_html  = (_here / "templates" / "index.html").read_text()
-_login_html  = (_here / "templates" / "login.html").read_text()
+_index_html   = (_here / "templates" / "index.html").read_text()
+_login_html   = (_here / "templates" / "login.html").read_text()
+_landing_html = (_here / "templates" / "landing.html").read_text()
 
 app = FastAPI(title="PokeManager", version="1.0.0")
 
@@ -159,6 +160,11 @@ async def ws_updates(websocket: WebSocket):
 @app.get("/login", response_class=HTMLResponse)
 async def login_page():
     return HTMLResponse(content=_login_html)
+
+
+@app.get("/landing", response_class=HTMLResponse)
+async def landing_page():
+    return HTMLResponse(content=_landing_html)
 
 
 @app.get("/{full_path:path}", response_class=HTMLResponse)
