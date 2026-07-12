@@ -28,6 +28,33 @@ const CHART_THEME = {
   accent:  _cs.getPropertyValue('--accent').trim()   || '#6c63ff',
 };
 
+/* ── Theme toggle ──────────────────────────────────────────────────────── */
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeIcon();
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  updateThemeIcon();
+}
+
+function updateThemeIcon() {
+  const icon = document.getElementById('theme-icon');
+  const iconMobile = document.getElementById('theme-icon-mobile');
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const iconText = current === 'dark' ? '☀️' : '🌙';
+  if (icon) icon.textContent = iconText;
+  if (iconMobile) iconMobile.textContent = iconText;
+}
+
+// Initialize theme on boot
+initTheme();
+
 /* ── Tier / Plan Features ──────────────────────────────────────────────────── */
 const PLAN_FEATURES = {
   unlimited_items:      ['gym_leader', 'champion'],
@@ -222,7 +249,10 @@ function initMobileNav() {
       <img src="/static/logo.png" style="width:28px;height:28px;border-radius:6px">
       <span style="font-weight:700;font-size:16px">PokeManager</span>
     </div>
-    <button onclick="toggleMobileMenu()" style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;padding:4px 8px;line-height:1">☰</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="toggleTheme()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px 8px;color:var(--text)" title="Toggle theme"><span id="theme-icon-mobile">🌙</span></button>
+      <button onclick="toggleMobileMenu()" style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;padding:4px 8px;line-height:1">☰</button>
+    </div>
   `;
   document.body.insertBefore(topbar, document.body.firstChild);
 

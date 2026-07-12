@@ -21,6 +21,23 @@
   --transition:  0.15s ease;
 }
 
+[data-theme="light"] {
+  --bg:          #f4f6fb;
+  --surface:     #ffffff;
+  --surface2:    #f0f2f7;
+  --surface3:    #e8ecf3;
+  --border:      #e2e6ed;
+  --accent:      #6c63ff;
+  --accent-dim:  #5b52d5;
+  --accent2:     #ef4444;
+  --success:     #10b981;
+  --warning:     #f59e0b;
+  --text:        #1a1d2e;
+  --text-muted:  #6b7280;
+  --text-dim:    #9ca3af;
+  --shadow:      0 4px 24px rgba(0,0,0,0.08);
+}
+
 /* ── Reset ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 14px; scroll-behavior: smooth; }
@@ -2560,4 +2577,40 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
   .btn-label {
     display: inline;
   }
+}
+
+/* ── Animations ────────────────────────────────────────────────────────── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Theme transition ──────────────────────────────────────────────────── */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
