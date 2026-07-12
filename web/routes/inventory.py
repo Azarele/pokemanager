@@ -374,14 +374,24 @@ class AddItemWebRequest(BaseModel):
 
 @router.post("/add")
 async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_user)):
+    print(f"[add] === Received POST /inventory/add ===")
+    print(f"[add] pc_url={req.pc_url}, purchase_price={req.purchase_price}, condition={req.condition}, source={req.source}, region={req.region}")
+
     if not req.pc_url.strip():
         return {"success": False, "error": "PriceCharting URL is required"}
     if req.purchase_price <= 0:
         return {"success": False, "error": "Purchase price must be greater than 0"}
+
     try:
+        print(f"[add] Scraping card from {req.pc_url}")
         card_name, live_price = await scraper.scrape_card(req.pc_url, req.condition, req.region)
+        print(f"[add] Scrape result: card_name={card_name}, live_price={live_price}")
+
         if not card_name:
+            print(f"[add] ERROR: Could not scrape card data")
             return {"success": False, "error": "Could not scrape card data from PriceCharting URL"}
+
+        print(f"[add] Adding item to database: user_id={user['id']}, card_name={card_name}")
         item_id = await db.add_item(
             user["id"],
             card_name=card_name,
@@ -394,10 +404,14 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
             source=req.source,
             status="Inventory",
         )
+        print(f"[add] Item added successfully: item_id={item_id}")
+
         audit.log_mutation("web_add", item_id, "added", {
             "card_name": card_name, "purchase_price": req.purchase_price,
             "live_price": live_price, "source": "web_dashboard", "user_id": user["id"],
         })
+        print(f"[add] SUCCESS: item_id={item_id}, card_name={card_name}, live_price={live_price}")
+
         return {
             "success":    True,
             "item_id":    item_id,
@@ -406,6 +420,9 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
             "margin":     round((live_price or 0) - req.purchase_price, 2),
         }
     except Exception as e:
+        import traceback
+        print(f"[add] EXCEPTION: {type(e).__name__}: {e}")
+        print(f"[add] Traceback:\n{traceback.format_exc()}")
         return {"success": False, "error": str(e)}
 
 

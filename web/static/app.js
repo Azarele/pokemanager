@@ -1293,10 +1293,12 @@ function removeAddRow(index) {
 }
 
 async function submitBulkAdd() {
+  console.log('[add] === submitBulkAdd() called ===');
   const btn = document.querySelector('.modal-actions .btn-accent');
 
   // Collect all rows
   const rows = document.querySelectorAll('.add-row');
+  console.log('[add] Found rows:', rows.length);
   const cards = [];
 
   for (const row of rows) {
@@ -1306,14 +1308,20 @@ async function submitBulkAdd() {
     const cond  = document.getElementById(`condition-${id}`)?.value;
     const src   = document.getElementById(`source-${id}`)?.value.trim();
 
-    if (!url && !price) continue; // skip empty rows
-    if (!url) { toast(`Row ${id}: PriceCharting URL is required`, 'error'); return; }
-    if (!price || price <= 0) { toast(`Row ${id}: Enter a valid price`, 'error'); return; }
+    console.log(`[add] Row ${id}: url="${url}", price=${price}, cond="${cond}", src="${src}"`);
 
+    if (!url && !price) { console.log(`[add] Row ${id}: Empty, skipping`); continue; }
+    if (!url) { console.log(`[add] Row ${id}: Missing URL`); toast(`Row ${id}: PriceCharting URL is required`, 'error'); return; }
+    if (!price || price <= 0) { console.log(`[add] Row ${id}: Invalid price=${price}`); toast(`Row ${id}: Enter a valid price`, 'error'); return; }
+
+    console.log(`[add] Row ${id}: Valid, adding to cards`);
     cards.push({ pc_url: url, purchase_price: price, condition: cond, source: src });
   }
 
-  if (!cards.length) { toast('Add at least one card', 'error'); return; }
+  if (!cards.length) { console.log('[add] No valid cards to add'); toast('Add at least one card', 'error'); return; }
+
+  console.log(`[add] Submitting ${cards.length} card(s):`);
+  cards.forEach((c, i) => console.log(`[add] Card ${i+1}:`, JSON.stringify(c)));
 
   btn.disabled = true;
   btn.textContent = `Adding ${cards.length} card${cards.length > 1 ? 's' : ''}…`;
@@ -1322,24 +1330,33 @@ async function submitBulkAdd() {
   let failed = 0;
   const errors = [];
 
-  for (const card of cards) {
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
     try {
+      console.log(`[add] Sending card ${i+1} to API...`);
       const resp = await api.post('/inventory/add', card);
-      if (resp.success) {
+      console.log(`[add] Card ${i+1} response:`, JSON.stringify(resp));
+
+      if (resp && resp.success) {
+        console.log(`[add] Card ${i+1}: SUCCESS`);
         added++;
       } else {
+        console.log(`[add] Card ${i+1}: FAILED -`, resp?.error || 'no error message');
         failed++;
-        errors.push(resp.error || 'Unknown error');
+        errors.push(resp?.error || 'Unknown error');
       }
     } catch (e) {
+      console.log(`[add] Card ${i+1}: EXCEPTION -`, e.message);
       failed++;
       errors.push(extractError(e.message));
     }
   }
 
+  console.log(`[add] Results: added=${added}, failed=${failed}`);
   closeModal();
 
   if (added > 0) {
+    console.log('[add] Refreshing inventory...');
     toast(`✅ Added ${added} card${added > 1 ? 's' : ''}${failed ? `, ${failed} failed` : ''}`, 'success', 5000);
     const data = await api.get('/inventory');
     S.inventory = data.items;
@@ -1347,7 +1364,10 @@ async function submitBulkAdd() {
   }
 
   if (errors.length > 0) {
-    console.error('[bulk-add] Errors:', errors);
+    console.error('[add] Errors:', errors);
+    if (added === 0) {
+      toast(`❌ Failed to add cards: ${errors.join('; ')}`, 'error', 10000);
+    }
   }
 
   _addRowCount = 1;
