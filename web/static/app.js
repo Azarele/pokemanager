@@ -173,7 +173,9 @@ function showModal(html) {
     ov = document.createElement('div');
     ov.id = 'modal-overlay';
     ov.className = 'modal-overlay hidden';
-    ov.addEventListener('click', e => { if (e.target === ov) closeModal(); });
+    ov.addEventListener('click', e => {
+      if (e.target === ov && !window._preventModalClose) closeModal();
+    });
     document.body.appendChild(ov);
   }
   ov.innerHTML = `<div class="modal-box">${html}</div>`;
@@ -4362,6 +4364,10 @@ window.proceedScanAdd = function(result) {
   }
 
   console.log('[scan] Opening add modal directly (no close first)...');
+
+  // Prevent modal auto-close for 500ms while transitioning
+  window._preventModalClose = true;
+  setTimeout(() => { window._preventModalClose = false; }, 500);
 
   // Open add modal immediately - this replaces scan modal content
   openAddItemModal();
