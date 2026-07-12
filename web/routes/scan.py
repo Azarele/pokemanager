@@ -1,11 +1,15 @@
 """
 Gemini Vision-powered card identification for Scan & Add and Scan & Sell flows.
 """
+import asyncio
 import base64
 import json
 import os
+import re
+import aiohttp
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from bs4 import BeautifulSoup
 
 import scraper
 import lister_ebay_api
@@ -25,6 +29,98 @@ class MatchInventoryRequest(BaseModel):
     card_name: str
 
 
+async def search_pricecharting(card_name: str, card_number: str = "") -> dict:
+    """
+    Search PriceCharting for a card by name and optional number.
+    Returns {pc_url, pc_name, market_price_gbp} or empty dict if not found.
+    """
+    try:
+        # Build search query: card name + number
+        search_q = card_name.strip()
+        if card_number:
+            search_q = f"{search_q} {card_number}"
+
+        pc_search = (
+            "https://www.pricecharting.com/search-products"
+            f"?q={search_q.replace(' ', '+')}&type=prices"
+        )
+
+        # Fetch search results
+        ua = {"User-Agent": "Mozilla/5.0"}
+        async with aiohttp.ClientSession() as session:
+            async with session.get(pc_search, headers=ua, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    return {}
+                pc_html = await resp.text()
+
+        # Parse results table
+        pc_soup = BeautifulSoup(pc_html, "html.parser")
+        rows = pc_soup.select("table#games_table tbody tr")
+
+        best_href = None
+        best_name = None
+
+        # Try to find exact match by card number first
+        for row in rows[:5]:
+            link = row.select_one("td a")
+            if not link:
+                continue
+            href = link.get("href") or ""
+            pc_name = link.get_text(strip=True)
+
+            # Check if card number matches URL slug
+            if card_number:
+                slug_m = re.search(r"-(\d+)$", href.rstrip("/"))
+                slug_num = slug_m.group(1).lstrip("0") if slug_m else None
+                if slug_num == card_number.lstrip("0"):
+                    best_href, best_name = href, pc_name
+                    break
+                # Also check if card number appears in the name
+                if card_number in pc_name:
+                    best_href, best_name = href, pc_name
+                    break
+
+        # Fallback to first result if no exact match
+        if not best_href and rows:
+            link = rows[0].select_one("td a")
+            if link:
+                best_href = link.get("href") or ""
+                best_name = link.get_text(strip=True)
+
+        if not best_href:
+            return {}
+
+        # Convert relative URL to absolute
+        if best_href.startswith("/"):
+            pc_url = f"https://www.pricecharting.com{best_href}"
+        else:
+            pc_url = best_href if best_href.startswith("http") else f"https://www.pricecharting.com/{best_href}"
+
+        # Scrape the price from the product page
+        try:
+            card_name_from_pc, market_price_usd = await scraper.scrape_card(pc_url, "Near mint or better", "")
+            if market_price_usd is None:
+                return {"pc_url": pc_url, "pc_name": best_name}
+
+            # Convert USD to GBP
+            fx_rate = await asyncio.to_thread(scraper.get_usd_to_gbp)
+            market_price_gbp = round(market_price_usd * fx_rate, 2)
+
+            return {
+                "pc_url": pc_url,
+                "pc_name": best_name,
+                "market_price_gbp": market_price_gbp,
+            }
+        except Exception as e:
+            # Return PC URL even if price scrape fails
+            print(f"[scan] Failed to scrape price for {pc_url}: {e}")
+            return {"pc_url": pc_url, "pc_name": best_name}
+
+    except Exception as e:
+        print(f"[scan] PriceCharting search failed for '{card_name}': {e}")
+        return {}
+
+
 @router.post("/identify")
 async def identify_card(req: IdentifyRequest, user: dict = Depends(get_current_user)):
     """
@@ -33,6 +129,7 @@ async def identify_card(req: IdentifyRequest, user: dict = Depends(get_current_u
     """
     try:
         from google import genai
+        from google.genai import types
     except ImportError:
         raise HTTPException(status_code=500, detail="Gemini SDK not installed")
 
@@ -41,9 +138,7 @@ async def identify_card(req: IdentifyRequest, user: dict = Depends(get_current_u
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
 
     client = genai.Client(api_key=api_key)
-
-    # Use flash model for faster response (both free and champion use flash for image identification)
-    model_name = "gemini-2.0-flash-exp"
+    model_name = "gemini-2.0-flash"
 
     try:
         # Decode base64 image
@@ -53,20 +148,14 @@ async def identify_card(req: IdentifyRequest, user: dict = Depends(get_current_u
 {"card_name": "full card name", "card_number": "number/total", "set_name": "set name", "confidence": "high/medium/low"}
 If not a Pokémon card, return: {"error": "not a pokemon card"}"""
 
-        # Use the Blob type for image data
-        response = await client.aio.models.generate_content(
+        response = client.models.generate_content(
             model=model_name,
             contents=[
-                genai.Content(
-                    role="user",
-                    parts=[
-                        genai.Part.from_text(prompt),
-                        genai.Part.from_blob(
-                            mime_type=req.mime_type,
-                            data=image_data
-                        )
-                    ]
-                )
+                types.Part.from_bytes(
+                    data=image_data,
+                    mime_type=req.mime_type
+                ),
+                prompt
             ]
         )
 
@@ -83,6 +172,19 @@ If not a Pokémon card, return: {"error": "not a pokemon card"}"""
             result = json.loads(text)
         except json.JSONDecodeError:
             result = {"error": "could_not_parse_response"}
+            return result
+
+        # If Gemini successfully identified the card, search PriceCharting for pricing
+        if "error" not in result and result.get("card_name"):
+            pc_data = await search_pricecharting(
+                result.get("card_name", ""),
+                result.get("card_number", "")
+            )
+            if pc_data:
+                result["pc_url"] = pc_data.get("pc_url")
+                result["pc_name"] = pc_data.get("pc_name")
+                if "market_price_gbp" in pc_data:
+                    result["market_price"] = pc_data["market_price_gbp"]
 
         return result
 
@@ -129,12 +231,20 @@ async def get_card_price(req: dict, user: dict = Depends(get_current_user)):
     Used to pre-populate price fields in Scan & Add and Scan & Sell flows.
     """
     card_name = req.get("card_name", "").strip()
+    card_number = req.get("card_number", "").strip()
     if not card_name:
         return {"price": None, "error": "no_card_name"}
 
     try:
-        # Try to search PriceCharting for the card (simplified version)
-        # In a real implementation, you'd use the scraper to find the PC URL first
-        return {"price": None, "source": "pricecharting_search_not_implemented"}
+        pc_data = await search_pricecharting(card_name, card_number)
+        if not pc_data:
+            return {"price": None, "error": "card_not_found_on_pricecharting"}
+
+        return {
+            "pc_url": pc_data.get("pc_url"),
+            "pc_name": pc_data.get("pc_name"),
+            "market_price": pc_data.get("market_price_gbp"),
+            "success": True,
+        }
     except Exception as e:
         return {"error": str(e)}
