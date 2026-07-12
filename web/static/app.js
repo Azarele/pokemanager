@@ -4317,6 +4317,10 @@ function showCardConfirmation() {
     return;
   }
 
+  // Store result globally so onclick handlers can access it
+  window._scanResult = card;
+  console.log('[scan] Stored result in window._scanResult');
+
   const title = _scanMode === 'add' ? '📦 Confirm Card' : '💰 Confirm Card';
   const marketPrice = card.market_price ? `£${card.market_price.toFixed(2)}` : 'Not found';
 
@@ -4342,77 +4346,65 @@ function showCardConfirmation() {
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeScanFlow()">Rescan</button>
-      <button class="btn btn-accent" onclick="${_scanMode === 'add' ? 'proceedScanAdd()' : 'proceedScanSell()'}">${_scanMode === 'add' ? 'Confirm & Add' : 'Confirm & Sell'}</button>
+      <button class="btn btn-accent" onclick="${_scanMode === 'add' ? 'proceedScanAdd(window._scanResult)' : 'proceedScanSell()'}">${_scanMode === 'add' ? 'Confirm & Add' : 'Confirm & Sell'}</button>
     </div>
   `);
 }
 
-async function proceedScanAdd() {
+window.proceedScanAdd = function(result) {
   console.log('[scan] === proceedScanAdd() called ===');
-  console.log('[scan] _scannedCardData:', JSON.stringify(_scannedCardData, null, 2));
+  console.log('[scan] result:', JSON.stringify(result, null, 2));
 
+  if (!result) {
+    console.error('[scan] No result passed to proceedScanAdd');
+    toast('❌ Error: No scan result', 'error');
+    return;
+  }
+
+  const cardName = (result.card_name || '') + (result.set_name ? ' (' + result.set_name + ')' : '');
+  const pcUrl = result.pc_url || '';
+  const marketPrice = result.market_price || 0;
+
+  console.log('[scan] Stored card data - name:', cardName, 'pcUrl:', pcUrl, 'marketPrice:', marketPrice);
+
+  // Close scan modal
   closeModal();
   console.log('[scan] Closed confirmation modal');
 
-  try {
-    // Open the add modal with pre-filled data from scan
-    console.log('[scan] Opening add modal...');
-    showModal(`
-      <h2 style="margin-bottom:16px">Add Cards</h2>
-      <div id="add-rows-container">
-        ${renderAddRow(1)}
-      </div>
-      <div class="modal-actions" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-accent" onclick="submitBulkAdd()">Add Card</button>
-      </div>
-    `);
+  // Wait for DOM to settle then open add modal
+  setTimeout(function() {
+    console.log('[scan] Opening add item modal (100ms later)...');
+    openAddItemModal();
+    console.log('[scan] openAddItemModal() called');
 
-    // Pre-fill form fields after modal renders
-    setTimeout(() => {
-      console.log('[scan] Pre-filling form (100ms after modal)...');
-      const card = _scannedCardData;
-
-      // Pre-fill PriceCharting URL
-      if (card.pc_url) {
-        const pcUrlInput = document.getElementById('pc-url-1');
-        console.log('[scan] pc-url-1 element:', pcUrlInput ? 'found' : 'NOT FOUND');
-        if (pcUrlInput) {
-          pcUrlInput.value = card.pc_url;
-          console.log('[scan] Set PC URL to:', card.pc_url);
-        }
-      } else {
-        console.log('[scan] No pc_url in card data');
-      }
-
-      // Show market price as hint
-      if (card.market_price) {
-        const priceInput = document.getElementById('price-1');
-        console.log('[scan] price-1 element:', priceInput ? 'found' : 'NOT FOUND');
-        if (priceInput) {
-          priceInput.placeholder = `Market: £${card.market_price.toFixed(2)} (enter purchase price)`;
-          console.log('[scan] Set price placeholder to market price');
-        }
-      }
-
-      // Focus on purchase price for user to enter
+    // Pre-fill after modal renders
+    setTimeout(function() {
+      console.log('[scan] Pre-filling form (300ms after add modal)...');
+      const urlInput = document.getElementById('pc-url-1');
       const priceInput = document.getElementById('price-1');
-      if (priceInput) {
-        priceInput.focus();
-        console.log('[scan] Focused on price input');
+
+      console.log('[scan] pc-url-1 element:', urlInput ? 'found' : 'NOT FOUND');
+      console.log('[scan] price-1 element:', priceInput ? 'found' : 'NOT FOUND');
+
+      if (urlInput) {
+        urlInput.value = pcUrl;
+        console.log('[scan] Set PC URL to:', pcUrl);
       }
 
-      // Show toast with card details
-      const toastMsg = `📦 ${esc(card.card_name)} #${esc(card.card_number || '?')} from ${esc(card.set_name)}. Enter purchase price.`;
+      if (priceInput) {
+        if (marketPrice) {
+          priceInput.placeholder = '£' + marketPrice.toFixed(2) + ' (market)';
+        }
+        priceInput.focus();
+        console.log('[scan] Set price placeholder and focused');
+      }
+
+      const toastMsg = '📦 ' + (result.card_name || 'Card') + ' — enter your purchase price';
       console.log('[scan] Showing toast:', toastMsg);
       toast(toastMsg, 'info', 5000);
-    }, 100);
-
-  } catch (e) {
-    console.error('[scan] Exception in proceedScanAdd:', e);
-    toast('Error: ' + extractError(e.message), 'error');
-  }
-}
+    }, 300);
+  }, 100);
+};
 
 async function proceedScanSell() {
   closeModal();

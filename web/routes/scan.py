@@ -32,88 +32,100 @@ async def search_pricecharting(card_name: str, card_number: str = "") -> dict:
     """
     Search PriceCharting for a card by name and optional number.
     Returns {pc_url, pc_name, market_price_gbp} or empty dict if not found.
+    Tries card name first, then card name + number if no results.
     """
     try:
-        # Build search query: card name + number
-        search_q = card_name.strip()
+        # Try card name first (some sets like Pokémon GO use different naming)
+        search_queries = [card_name.strip()]
         if card_number:
-            search_q = f"{search_q} {card_number}"
+            search_queries.append(f"{card_name.strip()} {card_number}")
 
-        pc_search = (
-            "https://www.pricecharting.com/search-products"
-            f"?q={search_q.replace(' ', '+')}&type=prices"
-        )
+        for search_q in search_queries:
+            print(f"[scan] Searching PriceCharting for: {search_q}")
 
-        # Fetch search results
-        ua = {"User-Agent": "Mozilla/5.0"}
-        async with aiohttp.ClientSession() as session:
-            async with session.get(pc_search, headers=ua, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                if resp.status != 200:
-                    return {}
-                pc_html = await resp.text()
+            pc_search = (
+                "https://www.pricecharting.com/search-products"
+                f"?q={search_q.replace(' ', '+')}&type=prices"
+            )
 
-        # Parse results table
-        pc_soup = BeautifulSoup(pc_html, "html.parser")
-        rows = pc_soup.select("table#games_table tbody tr")
+            # Fetch search results
+            ua = {"User-Agent": "Mozilla/5.0"}
+            async with aiohttp.ClientSession() as session:
+                async with session.get(pc_search, headers=ua, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status != 200:
+                        continue
+                    pc_html = await resp.text()
 
-        best_href = None
-        best_name = None
+            # Parse results table
+            pc_soup = BeautifulSoup(pc_html, "html.parser")
+            rows = pc_soup.select("table#games_table tbody tr")
 
-        # Try to find exact match by card number first
-        for row in rows[:5]:
-            link = row.select_one("td a")
-            if not link:
+            if not rows:
+                print(f"[scan] No results for '{search_q}', trying next query...")
                 continue
-            href = link.get("href") or ""
-            pc_name = link.get_text(strip=True)
 
-            # Check if card number matches URL slug
-            if card_number:
-                slug_m = re.search(r"-(\d+)$", href.rstrip("/"))
-                slug_num = slug_m.group(1).lstrip("0") if slug_m else None
-                if slug_num == card_number.lstrip("0"):
-                    best_href, best_name = href, pc_name
-                    break
-                # Also check if card number appears in the name
-                if card_number in pc_name:
-                    best_href, best_name = href, pc_name
-                    break
+            best_href = None
+            best_name = None
 
-        # Fallback to first result if no exact match
-        if not best_href and rows:
-            link = rows[0].select_one("td a")
-            if link:
-                best_href = link.get("href") or ""
-                best_name = link.get_text(strip=True)
+            # Try to find exact match by card number first
+            for row in rows[:5]:
+                link = row.select_one("td a")
+                if not link:
+                    continue
+                href = link.get("href") or ""
+                pc_name = link.get_text(strip=True)
 
-        if not best_href:
-            return {}
+                # Check if card number matches URL slug
+                if card_number:
+                    slug_m = re.search(r"-(\d+)$", href.rstrip("/"))
+                    slug_num = slug_m.group(1).lstrip("0") if slug_m else None
+                    if slug_num == card_number.lstrip("0"):
+                        best_href, best_name = href, pc_name
+                        break
+                    # Also check if card number appears in the name
+                    if card_number in pc_name:
+                        best_href, best_name = href, pc_name
+                        break
 
-        # Convert relative URL to absolute
-        if best_href.startswith("/"):
-            pc_url = f"https://www.pricecharting.com{best_href}"
-        else:
-            pc_url = best_href if best_href.startswith("http") else f"https://www.pricecharting.com/{best_href}"
+            # Fallback to first result if no exact match
+            if not best_href and rows:
+                link = rows[0].select_one("td a")
+                if link:
+                    best_href = link.get("href") or ""
+                    best_name = link.get_text(strip=True)
 
-        # Scrape the price from the product page
-        try:
-            card_name_from_pc, market_price_usd = await scraper.scrape_card(pc_url, "Near mint or better", "")
-            if market_price_usd is None:
+            if not best_href:
+                continue
+
+            # Found a result, convert URL and scrape price
+            if best_href.startswith("/"):
+                pc_url = f"https://www.pricecharting.com{best_href}"
+            else:
+                pc_url = best_href if best_href.startswith("http") else f"https://www.pricecharting.com/{best_href}"
+
+            # Scrape the price from the product page
+            try:
+                card_name_from_pc, market_price_usd = await scraper.scrape_card(pc_url, "Near mint or better", "")
+                if market_price_usd is None:
+                    return {"pc_url": pc_url, "pc_name": best_name}
+
+                # Convert USD to GBP
+                fx_rate = await asyncio.to_thread(scraper.get_usd_to_gbp)
+                market_price_gbp = round(market_price_usd * fx_rate, 2)
+
+                print(f"[scan] Found card on PriceCharting: {best_name} @ £{market_price_gbp}")
+                return {
+                    "pc_url": pc_url,
+                    "pc_name": best_name,
+                    "market_price_gbp": market_price_gbp,
+                }
+            except Exception as e:
+                # Return PC URL even if price scrape fails
+                print(f"[scan] Failed to scrape price for {pc_url}: {e}")
                 return {"pc_url": pc_url, "pc_name": best_name}
 
-            # Convert USD to GBP
-            fx_rate = await asyncio.to_thread(scraper.get_usd_to_gbp)
-            market_price_gbp = round(market_price_usd * fx_rate, 2)
-
-            return {
-                "pc_url": pc_url,
-                "pc_name": best_name,
-                "market_price_gbp": market_price_gbp,
-            }
-        except Exception as e:
-            # Return PC URL even if price scrape fails
-            print(f"[scan] Failed to scrape price for {pc_url}: {e}")
-            return {"pc_url": pc_url, "pc_name": best_name}
+        print(f"[scan] No PriceCharting results found for '{card_name}'")
+        return {}
 
     except Exception as e:
         print(f"[scan] PriceCharting search failed for '{card_name}': {e}")
