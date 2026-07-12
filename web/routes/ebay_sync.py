@@ -113,11 +113,16 @@ async def _get_recent_orders(
         List of order dicts with orderId, orderLineItems[], etc.
     """
     try:
+        # Filter to orders from last N days
+        cutoff_date = (datetime.utcnow() - timedelta(days=days_back)).isoformat()
         params = {
             "sort": "lastModifiedDate:desc",
             "limit": 100,
+            "filter": f"lastModifiedDate:[{cutoff_date}Z TO ]",
         }
         headers = _get_ebay_headers(access_token)
+
+        print(f"[ebay_sync] Querying orders from last {days_back} days (since {cutoff_date})")
 
         resp = requests.get(
             "https://api.ebay.com/sell/fulfillment/v1/order",
@@ -245,9 +250,15 @@ async def _sync_user_sales(user_id: str) -> dict:
                 # Check if item exists and is not already sold
                 inv_item = inventory_by_id.get(item_id)
                 if not inv_item:
+                    print(f"[ebay_sync] No inventory item found for SKU: {sku}")
                     continue
 
-                if inv_item.get("status") == "Sold":
+                already_sold = inv_item.get("status") == "Sold"
+                ebay_listing_id = item.get("legacyItemId", "")
+                print(f"[ebay_sync] Checking order {order_id}, item {item_id}, listing_id {ebay_listing_id}, status {inv_item.get('status')}")
+
+                if already_sold:
+                    print(f"[ebay_sync] Item already sold: {already_sold}")
                     stats["skipped"] += 1
                     continue
 
@@ -257,7 +268,9 @@ async def _sync_user_sales(user_id: str) -> dict:
                     price_paid = float(cost_obj.get("value", 0))
                 else:
                     price_paid = float(cost_obj or 0)
-                ebay_listing_id = item.get("legacyItemId", "")
+
+                # Extract purchase price early (used in profit calculation below)
+                purchase_price = float(inv_item.get("purchase_price") or 0)
 
                 # Using actual eBay order earnings, not estimated fees
                 # eBay provides actual seller earnings in the fulfillment API
@@ -299,7 +312,6 @@ async def _sync_user_sales(user_id: str) -> dict:
                     await db.edit_item(user_id, item_id, "ebay_listing_id", ebay_listing_id)
 
                 # Send Discord notification
-                purchase_price = float(inv_item.get("purchase_price") or 0)
                 profit_emoji = "📈" if profit > 0 else "📉"
                 roi = (profit / purchase_price * 100) if purchase_price > 0 else 0
 
@@ -319,7 +331,8 @@ async def _sync_user_sales(user_id: str) -> dict:
                 )
 
                 stats["synced"] += 1
-                print(f"[ebay_sync] Synced item {item_id} for user {user_id}")
+                print(f"[ebay_sync] Successfully synced item {item_id} (profit: £{profit}) for user {user_id}")
+                print(f"[ebay_sync] Found inventory match: {inv_item}")
 
         except Exception as e:
             stats["errors"] += 1

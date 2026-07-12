@@ -2357,6 +2357,7 @@ async function renderSales() {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
         <span style="font-size:0.95rem;font-weight:600">Browse by Date</span>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="syncSalesNow()" id="sync-sales-btn">🔄 Sync eBay Sales</button>
           <button class="btn btn-ghost btn-sm" onclick="changeSalesDate(-1)">← Prev</button>
           <input type="date" id="sales-date-picker" class="form-input"
                  style="width:150px"
@@ -2556,6 +2557,21 @@ async function loadSalesByDate(date) {
 
     container.innerHTML = '<div style="overflow-x:auto;width:100%;box-sizing:border-box;position:relative">' + html + '</div>';
     observeThumbs(container);
+}
+
+async function syncSalesNow() {
+  const btn = document.getElementById('sync-sales-btn');
+  if (btn) { btn.textContent = '⏳ Syncing...'; btn.disabled = true; }
+  try {
+    const res = await fetch('/api/ebay/sync-sales', {method:'POST'});
+    const data = await res.json();
+    toast(`✅ Synced: ${data.synced}, Skipped: ${data.skipped}`, 'success', 5000);
+    await loadSalesByDate(document.getElementById('sales-date-picker')?.value || new Date().toISOString().slice(0,10));
+  } catch(e) {
+    toast('❌ Sync failed: ' + extractError(e.message), 'error');
+  } finally {
+    if (btn) { btn.textContent = '🔄 Sync eBay Sales'; btn.disabled = false; }
+  }
 }
 
 /* ── Calculator page ─────────────────────────────────────────────────────── */
