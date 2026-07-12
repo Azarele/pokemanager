@@ -3459,26 +3459,44 @@ async function fetchEbayPolicies() {
       toast('Failed to fetch policies: ' + resp.error, 'error');
       return;
     }
-    const policies = resp.policies || [];
+    const fulfillment = resp.fulfillment || [];
+    const payment = resp.payment || [];
+    const returns = resp.return || [];
     const div = document.getElementById('ebay-policies-list');
-    if (!policies.length) {
-      div.innerHTML = '<p class="text-muted" style="font-size:12px">No fulfillment policies found. Create one at ebay.co.uk → Account → Business policies</p>';
+
+    if (!fulfillment.length && !payment.length && !returns.length) {
+      div.innerHTML = '<p class="text-muted" style="font-size:12px">No policies found. Create them at ebay.co.uk → Account → Business policies</p>';
       return;
     }
-    div.innerHTML = `
-      <div style="background:rgba(76,175,125,0.08);border:1px solid rgba(76,175,125,0.2);border-radius:8px;padding:8px">
-        <p style="font-size:12px;font-weight:600;margin:0 0 8px 0">Available Fulfillment Policies:</p>
-        ${policies.map(p => `
-          <div style="padding:4px;margin:4px 0;cursor:pointer;background:var(--bg-secondary);border-radius:4px;border:1px solid var(--border)"
-               onclick="document.getElementById('s-fulfillment-policy').value='${p.id}';this.parentElement.parentElement.innerHTML=''">
-            <div style="font-weight:600">${p.name}</div>
-            <div style="font-size:11px;color:var(--text-muted)">ID: ${p.id}</div>
-            ${p.description ? `<div style="font-size:11px">${p.description}</div>` : ''}
+
+    const renderPolicies = (policies, fieldId, title) => {
+      if (!policies.length) return '';
+      return `
+        <div style="margin-bottom:16px">
+          <p style="font-size:12px;font-weight:600;margin:0 0 8px 0">${title}:</p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${policies.map(p => `
+              <div style="padding:8px;cursor:pointer;background:var(--bg-secondary);border-radius:4px;border:1px solid var(--border);transition:all 0.2s"
+                   onclick="document.getElementById('${fieldId}').value='${p.id}';this.style.background='rgba(76,175,125,0.2)';this.style.borderColor='rgba(76,175,125,0.5)'"
+                   onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                <div style="font-weight:600;font-size:13px">${p.name}</div>
+                <div style="font-size:11px;color:var(--text-muted)">ID: ${p.id}</div>
+                ${p.description ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${p.description}</div>` : ''}
+              </div>
+            `).join('')}
           </div>
-        `).join('')}
+        </div>
+      `;
+    };
+
+    div.innerHTML = `
+      <div style="background:rgba(76,175,125,0.08);border:1px solid rgba(76,175,125,0.2);border-radius:8px;padding:12px">
+        ${renderPolicies(fulfillment, 's-fulfillment-policy', 'Fulfillment Policies')}
+        ${renderPolicies(payment, 's-payment-policy', 'Payment Policies')}
+        ${renderPolicies(returns, 's-return-policy', 'Return Policies')}
       </div>
     `;
-    toast(`Found ${policies.length} fulfillment policy(ies)`, 'success');
+    toast(`Found ${fulfillment.length} fulfillment, ${payment.length} payment, ${returns.length} return policies`, 'success');
   } catch (e) {
     toast('Error fetching policies: ' + extractError(e.message), 'error');
   } finally {
