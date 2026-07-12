@@ -62,7 +62,7 @@ _REQUEST_HEADERS = {
     "User-Agent":              _UA,
     "Accept":                  "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language":         "en-GB,en-US;q=0.7,en;q=0.3",
-    "Accept-Encoding":         "gzip, deflate, br",
+    # NOTE: Don't set Accept-Encoding manually - requests library handles decompression automatically
     "Connection":              "keep-alive",
     "Upgrade-Insecure-Requests": "1",
     "DNT":                     "1",

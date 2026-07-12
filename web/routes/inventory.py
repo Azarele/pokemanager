@@ -130,14 +130,39 @@ def _resolve_src(src: str) -> Optional[str]:
 
 
 async def _scrape_pc_image(pc_url: str, item_id: int = 0) -> Optional[str]:
-    """Fetch a PriceCharting page via Playwright (bypasses bot detection) and extract the card image."""
-    html = await scraper.fetch_page_html(pc_url)
+    """Fetch a PriceCharting page via HTTP and extract the card image from og:image meta tag."""
+    import requests
+
+    try:
+        # Use HTTP scraper instead of Playwright
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-GB,en;q=0.5',
+        }
+        print(f"[image] Fetching {pc_url} via HTTP for item {item_id}")
+        resp = requests.get(pc_url, headers=headers, timeout=15)
+        resp.raise_for_status()
+        html = resp.text
+    except Exception as e:
+        print(f"[image] HTTP fetch failed for item {item_id}: {e}")
+        return None
+
     if not html:
-        print(f"[image] fetch_page_html returned nothing for item {item_id}")
+        print(f"[image] Empty response for item {item_id}")
         return None
 
     soup = BeautifulSoup(html, "html.parser")
 
+    # First try: og:image meta tag (always in static HTML, most reliable)
+    og_image = soup.find('meta', property='og:image')
+    if og_image:
+        image_url = og_image.get('content')
+        if image_url:
+            print(f"[image] Found og:image for item {item_id}: {image_url[:80]}")
+            return image_url
+
+    # Fallback: look for specific selectors
     for sel in _IMG_CSS_SELECTORS:
         el = soup.select_one(sel)
         if not el:
@@ -161,10 +186,7 @@ async def _scrape_pc_image(pc_url: str, item_id: int = 0) -> Optional[str]:
                 print(f"[image] Fallback image for item {item_id}: {resolved[:80]}")
                 return resolved
 
-    all_srcs = [str(img.get("src", ""))[:80] for img in soup.find_all("img", limit=6) if img.get("src")]
     print(f"[image] No card image found for item {item_id} ({pc_url})")
-    if all_srcs:
-        print(f"[image] Page img srcs: {all_srcs}")
     return None
 
 
