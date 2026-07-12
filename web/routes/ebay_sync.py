@@ -261,13 +261,27 @@ async def _sync_user_sales(user_id: str) -> dict:
                     print(f"[ebay_sync] No inventory item found for SKU: {sku}, listing_id: {ebay_listing_id}")
                     continue
 
+                # Check if item is already sold
                 already_sold = inv_item.get("status") == "Sold"
                 print(f"[ebay_sync] Checking order {order_id}, item {item_id}, listing_id {ebay_listing_id}, status {inv_item.get('status')}")
 
                 if already_sold:
-                    print(f"[ebay_sync] Item already sold: {already_sold}")
-                    stats["skipped"] += 1
-                    continue
+                    stored_order_id = inv_item.get("ebay_order_id")
+                    if stored_order_id and stored_order_id == order_id:
+                        # Same order, already synced
+                        print(f"[ebay_sync] Item {item_id} already synced with order {order_id}")
+                        stats["skipped"] += 1
+                        continue
+                    elif stored_order_id and stored_order_id != order_id:
+                        # Different order = re-sold after cancellation/relist
+                        print(f"[ebay_sync] Item {item_id} re-sold! Previous order: {stored_order_id}, New order: {order_id}")
+                        print(f"[ebay_sync] ⚠️ Manual action needed: Create duplicate inventory item for re-sale with order {order_id}")
+                        stats["skipped"] += 1
+                        continue
+                    else:
+                        # No order_id stored (from before this feature), sync now
+                        print(f"[ebay_sync] Item {item_id} already sold but no order_id stored, syncing now")
+                        # Fall through to process the sale
 
                 # Extract order data - lineItemCost is a dict with value/currency
                 cost_obj = item.get("lineItemCost", {})
@@ -315,6 +329,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                 await db.edit_item(user_id, item_id, "date_sold", order_creation_date)
                 await db.edit_item(user_id, item_id, "sell_price", price_paid)
                 await db.edit_item(user_id, item_id, "profit", profit)
+                await db.edit_item(user_id, item_id, "ebay_order_id", order_id)
                 if ebay_listing_id:
                     await db.edit_item(user_id, item_id, "ebay_listing_id", ebay_listing_id)
 
