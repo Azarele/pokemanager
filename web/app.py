@@ -10,7 +10,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, Request, WebSocket, HTTPException
+from fastapi import FastAPI, Request, WebSocket, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import HTMLResponse
@@ -29,6 +29,24 @@ _landing_html = (_here / "templates" / "landing.html").read_text()
 
 app = FastAPI(title="PokeManager", version="1.0.0")
 
+# Public routes (no auth required)
+public_router = APIRouter()
+
+@public_router.get("/api/analytics/public-stats")
+async def public_stats():
+    try:
+        from web.database import get_supabase
+        sb = get_supabase()
+        sold = sb.table("inventory_items").select("sell_price").eq("status", "Sold").execute()
+        inv = sb.table("inventory_items").select("item_id").eq("status", "Inventory").execute()
+        users = sb.table("user_profiles").select("id").execute()
+        revenue = int(sum(float(r.get("sell_price") or 0) for r in sold.data))
+        print(f"[public-stats] revenue={revenue}, sold={len(sold.data)}, inv={len(inv.data)}, users={len(users.data)}")
+        return {"total_revenue": revenue, "total_sold": len(sold.data), "total_in_stock": len(inv.data), "total_users": len(users.data)}
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return {"total_revenue": 0, "total_sold": 0, "total_in_stock": 0, "total_users": 0}
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
@@ -38,6 +56,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
 
+
+# Include public routes BEFORE middleware
+app.include_router(public_router)
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(

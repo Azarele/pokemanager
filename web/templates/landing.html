@@ -474,40 +474,56 @@
     }
 
     /* VS Section */
-    .vs-section {
-      max-width: 1200px;
+    .vs {
+      max-width: 900px;
       margin: 120px auto;
-      padding: 60px 24px;
-      background: var(--lp-surface);
-      border: 1px solid var(--lp-border);
-      border-radius: 20px;
+      padding: 0 24px;
+      text-align: center;
       position: relative;
       z-index: 2;
     }
 
-    .vs-title {
-      text-align: center;
-      font-size: 32px;
-      font-weight: 800;
-      margin-bottom: 60px;
+    .section-label {
+      display: inline-block;
+      background: rgba(108,99,255,0.1);
+      border: 1px solid rgba(108,99,255,0.3);
+      color: var(--accent);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+
+    .gradient-text {
       background: linear-gradient(135deg, #fff 0%, #a78bfa 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
-    [data-theme="light"] .vs-title {
+    [data-theme="light"] .gradient-text {
       background: linear-gradient(135deg, #1a1d2e 0%, #6c63ff 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
+    .section-sub {
+      font-size: 16px;
+      color: var(--lp-muted);
+      margin-bottom: 48px;
+    }
+
     .vs-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 60px;
+      gap: 20px;
     }
 
     .vs-col {
+      border-radius: 16px;
+      overflow: hidden;
       opacity: 0;
       transform: translateY(30px);
       transition: opacity 0.6s ease, transform 0.6s ease;
@@ -518,32 +534,104 @@
       transform: translateY(0);
     }
 
-    .vs-col h3 {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 32px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--lp-border);
+    .vs-us {
+      background: linear-gradient(135deg, rgba(108,99,255,0.12), rgba(108,99,255,0.06));
+      border: 1px solid rgba(108,99,255,0.4);
+      box-shadow: 0 0 40px rgba(108,99,255,0.1);
     }
 
-    .vs-col h3.us { color: var(--accent); }
+    .vs-them {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
 
-    .vs-list {
+    .vs-col-header {
       display: flex;
-      flex-direction: column;
-      gap: 16px;
+      align-items: center;
+      gap: 10px;
+      padding: 20px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(108,99,255,0.2);
+      background: rgba(108,99,255,0.08);
+    }
+
+    .vs-them-header {
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .vs-badge {
+      margin-left: auto;
+      background: rgba(16,185,129,0.2);
+      color: #10b981;
+      border: 1px solid rgba(16,185,129,0.3);
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .vs-items {
+      padding: 8px 0;
     }
 
     .vs-item {
       display: flex;
-      align-items: center;
-      gap: 12px;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.2s;
+    }
+
+    .vs-item:hover {
+      background: rgba(255,255,255,0.02);
+    }
+
+    .vs-item:last-child {
+      border-bottom: none;
+    }
+
+    .vs-item strong {
       font-size: 14px;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .vs-item p {
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      margin: 0;
     }
 
     .vs-icon {
-      font-size: 18px;
+      color: #10b981;
+      font-size: 16px;
+      font-weight: 700;
       flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .vs-icon-no {
+      color: rgba(255,255,255,0.2);
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .vs-no strong {
+      color: rgba(255,255,255,0.4);
+    }
+
+    .vs-no p {
+      color: rgba(255,255,255,0.2);
+    }
+
+    @media (max-width: 768px) {
+      .vs-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* Pricing */
@@ -881,9 +969,9 @@
   <!-- Hero -->
   <section class="hero">
     <div class="hero-content">
-      <div class="badge">🇬🇧 Built for UK Pokémon TCG resellers</div>
+      <div class="badge">🌍 Built for Pokémon TCG resellers worldwide</div>
       <h1>Track. List. Sell.<br>Know your profit.</h1>
-      <p class="hero-sub">The only inventory tool built specifically for Pokémon card resellers in the UK — with real eBay integration, camera scanning, and Discord alerts.</p>
+      <p class="hero-sub">The only inventory tool built specifically for Pokémon card resellers everywhere — with real eBay integration, camera scanning, and Discord alerts.</p>
       <div class="hero-actions">
         <button class="btn btn-primary" onclick="openAuthModal('signup')">Start free — no card needed</button>
         <button class="btn btn-outline" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">See how it works</button>
@@ -918,7 +1006,7 @@
       <div class="feature-card">
         <div class="feature-icon">🏷️</div>
         <h3>Real eBay integration</h3>
-        <p>List cards directly, auto-detect sales every 30 minutes, get notified of offers with full ROI analysis.</p>
+        <p>Works with eBay UK, US, DE, AU and more. Auto-detect sales every 30 minutes, get notified of offers with full ROI analysis.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">📷</div>
@@ -942,36 +1030,103 @@
       </div>
       <div class="feature-card">
         <div class="feature-icon">🧾</div>
-        <h3>HMRC / Xero / QuickBooks</h3>
-        <p>Export your sales data for UK tax self-assessment or your accounting software.</p>
+        <h3>Tax & accounting exports</h3>
+        <p>Export for HMRC, Xero, QuickBooks and more. Simplified reporting for tax season, wherever you are.</p>
       </div>
     </div>
   </section>
 
   <!-- VS -->
-  <section class="vs-section" id="vs">
-    <h2 class="vs-title">Why PokeManager?</h2>
+  <section class="vs" id="vs">
+    <div class="section-label">Why us</div>
+    <h2 class="section-title gradient-text">We actually ship what we promise</h2>
+    <p class="section-sub">Some tools say "eBay integration coming soon." Ours works today.</p>
+
     <div class="vs-grid">
-      <div class="vs-col">
-        <h3 class="us">✨ PokeManager</h3>
-        <div class="vs-list">
-          <div class="vs-item"><span class="vs-icon">✓</span> eBay listing & sale detection</div>
-          <div class="vs-item"><span class="vs-icon">✓</span> Camera scan & identify</div>
-          <div class="vs-item"><span class="vs-icon">✓</span> Discord offer alerts with ROI</div>
-          <div class="vs-item"><span class="vs-icon">✓</span> GBP pricing</div>
-          <div class="vs-item"><span class="vs-icon">✓</span> HMRC export</div>
-          <div class="vs-item"><span class="vs-icon">✓</span> AI descriptions (no setup)</div>
+      <!-- PokeManager column -->
+      <div class="vs-col vs-us">
+        <div class="vs-col-header">
+          <img src="/static/logo.png" style="width:28px;height:28px;border-radius:6px" onerror="this.style.display='none'">
+          <span>PokeManager</span>
+          <span class="vs-badge">Live today</span>
+        </div>
+        <div class="vs-items">
+          <div class="vs-item vs-yes">
+            <span class="vs-icon">✓</span>
+            <div>
+              <strong>eBay listing & sale detection</strong>
+              <p>Auto-syncs every 30 minutes</p>
+            </div>
+          </div>
+          <div class="vs-item vs-yes">
+            <span class="vs-icon">✓</span>
+            <div>
+              <strong>Camera scan & identify</strong>
+              <p>AI-powered card recognition</p>
+            </div>
+          </div>
+          <div class="vs-item vs-yes">
+            <span class="vs-icon">✓</span>
+            <div>
+              <strong>Discord offer alerts with ROI</strong>
+              <p>Accept / Counter / Decline recommendations</p>
+            </div>
+          </div>
+          <div class="vs-item vs-yes">
+            <span class="vs-icon">✓</span>
+            <div>
+              <strong>Your local currency</strong>
+              <p>GBP, USD, EUR and more</p>
+            </div>
+          </div>
+          <div class="vs-item vs-yes">
+            <span class="vs-icon">✓</span>
+            <div>
+              <strong>Tax & accounting exports</strong>
+              <p>HMRC, Xero, QuickBooks</p>
+            </div>
+          </div>
+          <div class="vs-item vs-yes">
+            <span class="vs-icon">✓</span>
+            <div>
+              <strong>AI descriptions — no setup</strong>
+              <p>We cover the API cost on Champion</p>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="vs-col">
-        <h3>Generic alternatives</h3>
-        <div class="vs-list">
-          <div class="vs-item"><span class="vs-icon">✗</span> eBay integration (coming soon)</div>
-          <div class="vs-item"><span class="vs-icon">✗</span> No camera scanning</div>
-          <div class="vs-item"><span class="vs-icon">✗</span> No Discord alerts</div>
-          <div class="vs-item"><span class="vs-icon">✗</span> USD only</div>
-          <div class="vs-item"><span class="vs-icon">✗</span> No UK tax export</div>
-          <div class="vs-item"><span class="vs-icon">✗</span> Manual descriptions</div>
+
+      <!-- Others column -->
+      <div class="vs-col vs-them">
+        <div class="vs-col-header vs-them-header">
+          <span style="font-size:20px">🤷</span>
+          <span>Generic alternatives</span>
+        </div>
+        <div class="vs-items">
+          <div class="vs-item vs-no">
+            <span class="vs-icon-no">✗</span>
+            <div><strong>eBay integration</strong><p>Coming soon™</p></div>
+          </div>
+          <div class="vs-item vs-no">
+            <span class="vs-icon-no">✗</span>
+            <div><strong>Camera scanning</strong><p>Not available</p></div>
+          </div>
+          <div class="vs-item vs-no">
+            <span class="vs-icon-no">✗</span>
+            <div><strong>Discord alerts</strong><p>Not available</p></div>
+          </div>
+          <div class="vs-item vs-no">
+            <span class="vs-icon-no">✗</span>
+            <div><strong>Multi-currency</strong><p>USD only</p></div>
+          </div>
+          <div class="vs-item vs-no">
+            <span class="vs-icon-no">✗</span>
+            <div><strong>Tax exports</strong><p>Not available</p></div>
+          </div>
+          <div class="vs-item vs-no">
+            <span class="vs-icon-no">✗</span>
+            <div><strong>AI descriptions</strong><p>Manual only</p></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1006,7 +1161,7 @@
           <div class="pricing-feature yes">✓ eBay listing & sync</div>
           <div class="pricing-feature yes">✓ Discord notifications</div>
           <div class="pricing-feature yes">✓ AI descriptions (your key)</div>
-          <div class="pricing-feature yes">✓ HMRC/Xero export</div>
+          <div class="pricing-feature yes">✓ Tax & accounting exports</div>
           <div class="pricing-feature">✗ AI descriptions included</div>
         </div>
         <button class="btn btn-primary" onclick="openAuthModal('signup')">Start free trial</button>

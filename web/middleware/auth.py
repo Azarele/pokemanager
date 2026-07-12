@@ -19,6 +19,7 @@ _UNPROTECTED = {
     "/api/auth/google",
     "/api/auth/callback",
     "/api/auth/google-session",
+    "/api/analytics/public-stats",
     "/api/billing/webhook",
     "/api/status",
     "/static",
