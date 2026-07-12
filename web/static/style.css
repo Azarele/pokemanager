@@ -2063,6 +2063,20 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
     width: 100%;
   }
 
+  /* Stack add row URL and price vertically on mobile */
+  .add-row-url-price {
+    flex-direction: column;
+  }
+
+  .add-row-url {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+
+  .add-row-price {
+    width: 100%;
+  }
+
   /* Add row dropdowns */
   .add-row-dropdowns {
     grid-template-columns: 1fr;

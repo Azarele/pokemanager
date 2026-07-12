@@ -4365,6 +4365,9 @@ window.proceedScanAdd = function(result) {
 
   console.log('[scan] Opening add modal directly (no close first)...');
 
+  // Reset to single clean row
+  _addRowCount = 1;
+
   // Prevent modal auto-close for 500ms while transitioning
   window._preventModalClose = true;
   setTimeout(() => { window._preventModalClose = false; }, 500);
@@ -4378,21 +4381,31 @@ window.proceedScanAdd = function(result) {
     console.log('[scan] Pre-filling form (300ms after add modal)...');
     const urlInput = document.getElementById('pc-url-1');
     const priceInput = document.getElementById('price-1');
+    const sourceInput = document.getElementById('source-1');
 
     console.log('[scan] pc-url-1 element:', urlInput ? 'found' : 'NOT FOUND');
     console.log('[scan] price-1 element:', priceInput ? 'found' : 'NOT FOUND');
 
+    // Pre-fill PC URL
     if (urlInput && result.pc_url) {
       urlInput.value = result.pc_url;
       console.log('[scan] Set PC URL to:', result.pc_url);
     }
 
+    // Clear price (leave empty for user to enter)
     if (priceInput) {
+      priceInput.value = '';
       if (result.market_price) {
         priceInput.placeholder = '£' + result.market_price.toFixed(2) + ' (market)';
       }
       priceInput.focus();
-      console.log('[scan] Set price placeholder and focused');
+      console.log('[scan] Cleared price field, focused for input');
+    }
+
+    // Reset source to default
+    if (sourceInput) {
+      sourceInput.value = '';
+      console.log('[scan] Reset source field to default');
     }
 
     const toastMsg = '📦 ' + (result.card_name || 'Card') + ' — enter your purchase price';
