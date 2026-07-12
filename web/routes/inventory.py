@@ -383,7 +383,7 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
         return {"success": False, "error": "Purchase price must be greater than 0"}
 
     try:
-        print(f"[add] Scraping card from {req.pc_url}")
+        print(f"[add] Scraping card from {req.pc_url} (HTTP with Playwright fallback)")
         card_name, live_price = await scraper.scrape_card(req.pc_url, req.condition, req.region)
         print(f"[add] Scrape result: card_name={card_name}, live_price={live_price}")
 

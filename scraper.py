@@ -806,6 +806,55 @@ async def scrape_card(
     return card_name, live_price_gbp
 
 
+async def scrape_card_http_only(
+    url: str,
+    condition: str = "Near mint or better",
+    region: str = "",
+) -> tuple[str, Optional[float]]:
+    """
+    Scrape a PriceCharting URL using HTTP only (no Playwright fallback).
+    Used by /add endpoint for fast, lightweight scraping.
+
+    Returns (card_name, live_price_gbp) or (card_name_from_url, None) if no price found.
+    Never raises; logs failures and degrades gracefully.
+    """
+    card_name: str             = ""
+    usd_price: Optional[float] = None
+
+    # HTTP-only path: requests + bs4 (no Playwright fallback)
+    try:
+        card_name, usd_price = await asyncio.to_thread(_pc_requests, url, condition)
+        print(f"[scraper/card_http] HTTP scrape: card_name={card_name}, price={usd_price}")
+    except ValueError as exc:
+        print(f"[scraper/card_http] HTTP scrape failed ({exc})")
+
+    # Fallback: derive name from URL if HTTP scraper failed to get name
+    if not card_name:
+        card_name = _name_from_url(url)
+
+    # Return early if no price found (no Playwright fallback)
+    if usd_price is None:
+        print(f"[scraper/card_http] No price found, returning card_name={card_name}")
+        return card_name, None
+
+    # Convert USD to GBP
+    try:
+        fx_rate = await asyncio.to_thread(get_usd_to_gbp)
+        live_price_gbp = round(usd_price * fx_rate, 2)
+    except Exception as exc:
+        print(f"[scraper/card_http] FX conversion failed ({exc}) — returning raw USD price")
+        live_price_gbp = round(usd_price, 2)
+
+    # Apply region multiplier if needed
+    if region == "KR":
+        live_price_gbp = round(live_price_gbp * config.KOREAN_PRICE_MULTIPLIER, 2)
+        print(f"[scraper/card_http] Applied KR multiplier → £{live_price_gbp}")
+
+    _on_pc_success()
+
+    return card_name, live_price_gbp
+
+
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 # Shared Playwright page-fetch helper (used by image scraper and price scraper)
