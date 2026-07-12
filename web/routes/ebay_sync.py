@@ -116,7 +116,7 @@ async def _get_recent_orders(
         # Fetch most recent orders — eBay returns sorted by lastModifiedDate:desc by default
         # Already-sold items are filtered out in the sync logic anyway
         params = {
-            "limit": 50,
+            "limit": 100,
         }
         headers = _get_ebay_headers(access_token)
 
@@ -247,12 +247,21 @@ async def _sync_user_sales(user_id: str) -> dict:
 
                 # Check if item exists and is not already sold
                 inv_item = inventory_by_id.get(item_id)
+                ebay_listing_id = item.get("legacyItemId", "")
+
+                # Fallback: try matching by eBay listing_id if SKU-based lookup failed
+                if not inv_item and ebay_listing_id:
+                    print(f"[ebay_sync] SKU mismatch for {sku}, attempting fallback match by listing_id {ebay_listing_id}")
+                    inv_item = await db.get_item_by_listing_id(user_id, ebay_listing_id)
+                    if inv_item:
+                        print(f"[ebay_sync] ✓ Matched by listing_id {ebay_listing_id} to item {inv_item.get('item_id')}")
+                        item_id = inv_item.get("item_id")
+
                 if not inv_item:
-                    print(f"[ebay_sync] No inventory item found for SKU: {sku}")
+                    print(f"[ebay_sync] No inventory item found for SKU: {sku}, listing_id: {ebay_listing_id}")
                     continue
 
                 already_sold = inv_item.get("status") == "Sold"
-                ebay_listing_id = item.get("legacyItemId", "")
                 print(f"[ebay_sync] Checking order {order_id}, item {item_id}, listing_id {ebay_listing_id}, status {inv_item.get('status')}")
 
                 if already_sold:

@@ -65,6 +65,15 @@ async def get_next_item_id(user_id: str) -> int:
     return 1
 
 
+async def get_item_by_listing_id(user_id: str, listing_id: str):
+    """Get inventory item by eBay listing ID (fallback when SKU doesn't match)."""
+    db = get_db()
+    result = db.table("inventory_items").select("*") \
+        .eq("user_id", user_id).eq("ebay_listing_id", str(listing_id)) \
+        .eq("status", "Inventory").execute()
+    return _row_to_item(result.data[0]) if result.data else None
+
+
 # ── Write operations ──────────────────────────────────────────────────────────
 
 async def add_item(user_id: str, **kwargs) -> int:
