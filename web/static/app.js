@@ -4251,29 +4251,54 @@ function handleScanImage(event, mode) {
 }
 
 async function identifyCard() {
-  if (!_scannedCardData) return;
+  if (!_scannedCardData) {
+    console.log('[scan] ERROR: No scanned card data');
+    return;
+  }
   const btn = document.getElementById('identify-btn');
   btn.disabled = true;
   btn.textContent = '⏳ Analyzing…';
 
+  console.log('[scan] Starting card identification...');
+  console.log('[scan] Scan mode:', _scanMode);
+
   try {
     const base64 = _scannedCardData.image.split(',')[1];
+    console.log('[scan] Sending to /scan/identify...');
     const resp = await api.post('/scan/identify', {
       image: base64,
       mime_type: _scannedCardData.file.type || 'image/jpeg'
     });
 
+    console.log('[scan] Got response:', JSON.stringify(resp, null, 2));
+
     if (resp.error) {
+      console.log('[scan] ERROR returned:', resp.error);
       toast(resp.error === 'not a pokemon card' ? '❌ Not a Pokémon card' : `❌ ${resp.error}`, 'error');
       btn.disabled = false;
       btn.textContent = '🤖 Identify Card';
       return;
     }
 
-    _scannedCardData = { ...resp };
+    console.log('[scan] Response contains card data:');
+    console.log('  - card_name:', resp.card_name);
+    console.log('  - card_number:', resp.card_number);
+    console.log('  - set_name:', resp.set_name);
+    console.log('  - confidence:', resp.confidence);
+    console.log('  - pc_url:', resp.pc_url);
+    console.log('  - market_price:', resp.market_price);
+
+    _scannedCardData = { ..._scannedCardData, ...resp };
+    console.log('[scan] Updated _scannedCardData:', JSON.stringify(_scannedCardData, null, 2));
+
+    console.log('[scan] Calling showCardConfirmation()...');
     showCardConfirmation();
+
+    console.log('[scan] Closing current modal...');
     closeModal();
+    console.log('[scan] Identification complete');
   } catch (e) {
+    console.error('[scan] Exception caught:', e);
     toast('Identification failed: ' + extractError(e.message), 'error');
     btn.disabled = false;
     btn.textContent = '🤖 Identify Card';
@@ -4281,9 +4306,22 @@ async function identifyCard() {
 }
 
 function showCardConfirmation() {
+  console.log('[scan] === showCardConfirmation() called ===');
+  console.log('[scan] _scanMode:', _scanMode);
+  console.log('[scan] _scannedCardData:', JSON.stringify(_scannedCardData, null, 2));
+
   const card = _scannedCardData;
+  if (!card) {
+    console.error('[scan] ERROR: _scannedCardData is empty!');
+    toast('❌ Card data not found', 'error');
+    return;
+  }
+
   const title = _scanMode === 'add' ? '📦 Confirm Card' : '💰 Confirm Card';
   const marketPrice = card.market_price ? `£${card.market_price.toFixed(2)}` : 'Not found';
+
+  console.log('[scan] Showing modal with title:', title);
+  console.log('[scan] Market price:', marketPrice);
 
   showModal(`
     <h2 style="margin-bottom:16px">${title}</h2>
@@ -4310,10 +4348,15 @@ function showCardConfirmation() {
 }
 
 async function proceedScanAdd() {
+  console.log('[scan] === proceedScanAdd() called ===');
+  console.log('[scan] _scannedCardData:', JSON.stringify(_scannedCardData, null, 2));
+
   closeModal();
+  console.log('[scan] Closed confirmation modal');
 
   try {
     // Open the add modal with pre-filled data from scan
+    console.log('[scan] Opening add modal...');
     showModal(`
       <h2 style="margin-bottom:16px">Add Cards</h2>
       <div id="add-rows-container">
@@ -4327,21 +4370,28 @@ async function proceedScanAdd() {
 
     // Pre-fill form fields after modal renders
     setTimeout(() => {
+      console.log('[scan] Pre-filling form (100ms after modal)...');
       const card = _scannedCardData;
 
       // Pre-fill PriceCharting URL
       if (card.pc_url) {
         const pcUrlInput = document.getElementById('pc-url-1');
+        console.log('[scan] pc-url-1 element:', pcUrlInput ? 'found' : 'NOT FOUND');
         if (pcUrlInput) {
           pcUrlInput.value = card.pc_url;
+          console.log('[scan] Set PC URL to:', card.pc_url);
         }
+      } else {
+        console.log('[scan] No pc_url in card data');
       }
 
       // Show market price as hint
       if (card.market_price) {
         const priceInput = document.getElementById('price-1');
+        console.log('[scan] price-1 element:', priceInput ? 'found' : 'NOT FOUND');
         if (priceInput) {
           priceInput.placeholder = `Market: £${card.market_price.toFixed(2)} (enter purchase price)`;
+          console.log('[scan] Set price placeholder to market price');
         }
       }
 
@@ -4349,13 +4399,17 @@ async function proceedScanAdd() {
       const priceInput = document.getElementById('price-1');
       if (priceInput) {
         priceInput.focus();
+        console.log('[scan] Focused on price input');
       }
 
       // Show toast with card details
-      toast(`📦 ${esc(card.card_name)} #${esc(card.card_number || '?')} from ${esc(card.set_name)}. Enter purchase price.`, 'info', 5000);
+      const toastMsg = `📦 ${esc(card.card_name)} #${esc(card.card_number || '?')} from ${esc(card.set_name)}. Enter purchase price.`;
+      console.log('[scan] Showing toast:', toastMsg);
+      toast(toastMsg, 'info', 5000);
     }, 100);
 
   } catch (e) {
+    console.error('[scan] Exception in proceedScanAdd:', e);
     toast('Error: ' + extractError(e.message), 'error');
   }
 }
