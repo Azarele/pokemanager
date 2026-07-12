@@ -4283,6 +4283,8 @@ async function identifyCard() {
 function showCardConfirmation() {
   const card = _scannedCardData;
   const title = _scanMode === 'add' ? '📦 Confirm Card' : '💰 Confirm Card';
+  const marketPrice = card.market_price ? `£${card.market_price.toFixed(2)}` : 'Not found';
+
   showModal(`
     <h2 style="margin-bottom:16px">${title}</h2>
     <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
@@ -4291,6 +4293,14 @@ function showCardConfirmation() {
         ${card.card_number ? `#${esc(card.card_number)} · ` : ''}${esc(card.set_name || 'Unknown Set')}
       </div>
       ${card.confidence ? `<div style="color:var(--accent);font-size:13px;margin-top:8px">Confidence: ${card.confidence}</div>` : ''}
+      ${card.market_price ? `<div style="color:var(--success);font-size:13px;margin-top:8px">Market Price: ${marketPrice}</div>` : ''}
+    </div>
+    <div style="background:rgba(76,175,125,0.08);border-left:3px solid rgba(76,175,125,0.3);padding:12px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">
+      Found: <strong>${esc(card.card_name || 'Unknown')}</strong><br>
+      ${card.card_number ? `Card #${esc(card.card_number)}<br>` : ''}
+      Set: ${esc(card.set_name || 'Unknown')}<br>
+      Market Price: <strong>${marketPrice}</strong><br>
+      Is this correct?
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeScanFlow()">Rescan</button>
@@ -4301,10 +4311,9 @@ function showCardConfirmation() {
 
 async function proceedScanAdd() {
   closeModal();
-  toast('Searching for card price…', 'info', 2000);
 
   try {
-    // For now, just open the add modal with pre-filled data
+    // Open the add modal with pre-filled data from scan
     showModal(`
       <h2 style="margin-bottom:16px">Add Cards</h2>
       <div id="add-rows-container">
@@ -4316,14 +4325,34 @@ async function proceedScanAdd() {
       </div>
     `);
 
-    // Pre-fill the card name
+    // Pre-fill form fields after modal renders
     setTimeout(() => {
-      const nameInput = document.getElementById('pc-url-1');
-      if (nameInput) {
-        // For now just pre-fill card name in a comment; user fills in PC URL
-        console.log('Card identified:', _scannedCardData);
-        toast(`Card: ${_scannedCardData.card_name}. Enter PriceCharting URL and purchase price.`, 'info', 6000);
+      const card = _scannedCardData;
+
+      // Pre-fill PriceCharting URL
+      if (card.pc_url) {
+        const pcUrlInput = document.getElementById('pc-url-1');
+        if (pcUrlInput) {
+          pcUrlInput.value = card.pc_url;
+        }
       }
+
+      // Show market price as hint
+      if (card.market_price) {
+        const priceInput = document.getElementById('price-1');
+        if (priceInput) {
+          priceInput.placeholder = `Market: £${card.market_price.toFixed(2)} (enter purchase price)`;
+        }
+      }
+
+      // Focus on purchase price for user to enter
+      const priceInput = document.getElementById('price-1');
+      if (priceInput) {
+        priceInput.focus();
+      }
+
+      // Show toast with card details
+      toast(`📦 ${esc(card.card_name)} #${esc(card.card_number || '?')} from ${esc(card.set_name)}. Enter purchase price.`, 'info', 5000);
     }, 100);
 
   } catch (e) {
