@@ -565,3 +565,43 @@ async def set_listing(
     except Exception as e:
         print(f"[web] Set listing error for {item_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to set listing: {e}")
+
+
+# ── DEBUG: Test HTTP scraper on Railway ──────────────────────────────────
+@router.get("/scrape-test")
+async def scrape_test():
+    """
+    Debug endpoint to test if HTTP requests work for PriceCharting.
+    GET /api/inventory/scrape-test
+    """
+    import requests
+
+    url = "https://www.pricecharting.com/game/pokemon-go/radiant-blastoise-18"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+    }
+
+    try:
+        print(f"[debug] Testing HTTP request to {url}")
+        resp = requests.get(url, headers=headers, timeout=15)
+        html_sample = resp.text[:500]
+
+        print(f"[debug] Response status: {resp.status_code}")
+        print(f"[debug] Content length: {len(resp.text)}")
+
+        return {
+            "status": resp.status_code,
+            "success": resp.status_code == 200,
+            "content_length": len(resp.text),
+            "first_500_chars": html_sample,
+            "has_price": "price" in resp.text.lower(),
+            "has_pokemon_go": "pokemon-go" in resp.text.lower(),
+            "has_completed_auctions": "completed_auctions" in resp.text,
+        }
+    except Exception as e:
+        print(f"[debug] HTTP request failed: {e}")
+        return {"error": str(e), "error_type": type(e).__name__}
