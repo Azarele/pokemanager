@@ -113,16 +113,14 @@ async def _get_recent_orders(
         List of order dicts with orderId, orderLineItems[], etc.
     """
     try:
-        # Filter to orders from last N days
-        cutoff_date = (datetime.utcnow() - timedelta(days=days_back)).isoformat()
+        # Fetch most recent orders — eBay returns sorted by lastModifiedDate:desc by default
+        # Already-sold items are filtered out in the sync logic anyway
         params = {
-            "sort": "lastModifiedDate:desc",
-            "limit": 100,
-            "filter": f"lastModifiedDate:[{cutoff_date}Z TO ]",
+            "limit": 50,
         }
         headers = _get_ebay_headers(access_token)
 
-        print(f"[ebay_sync] Querying orders from last {days_back} days (since {cutoff_date})")
+        print(f"[ebay_sync] Querying most recent {params['limit']} orders for user {user_id}")
 
         resp = requests.get(
             "https://api.ebay.com/sell/fulfillment/v1/order",
