@@ -37,6 +37,26 @@
       transition: background 0.3s, color 0.3s;
     }
 
+    @keyframes gradientShift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(-5deg); }
+      50% { transform: translateY(-20px) rotate(5deg); }
+    }
+
+    /* Particles canvas */
+    #particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.5;
+    }
+
     /* Nav */
     .nav {
       display: flex;
@@ -136,10 +156,58 @@
 
     /* Hero */
     .hero {
+      position: relative;
       text-align: center;
       padding: 80px 24px;
       max-width: 900px;
       margin: 0 auto;
+      background: linear-gradient(135deg, #0a0a12 0%, #1a0a2e 50%, #0a0a12 100%);
+      background-size: 400% 400%;
+      animation: gradientShift 8s ease infinite;
+      z-index: 2;
+    }
+
+    [data-theme="light"] .hero {
+      background: linear-gradient(135deg, #f4f6fb 0%, #ede9fe 50%, #f4f6fb 100%);
+      background-size: 400% 400%;
+      animation: gradientShift 8s ease infinite;
+    }
+
+    .floating-cards {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .float-card {
+      position: absolute;
+      width: 60px;
+      height: 84px;
+      background: rgba(108,99,255,0.1);
+      border: 1px solid rgba(108,99,255,0.2);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .fc1 { top: 20%; right: 10%; animation-delay: 0s; }
+    .fc2 { top: 60%; right: 5%; animation-delay: 2s; }
+    .fc3 { top: 40%; left: 5%; animation-delay: 4s; }
+
+    [data-theme="light"] .float-card {
+      background: rgba(108,99,255,0.08);
+      border-color: rgba(108,99,255,0.15);
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
     }
 
     .badge {
@@ -160,6 +228,14 @@
       margin-bottom: 16px;
       line-height: 1.2;
       letter-spacing: -1px;
+      text-shadow: 0 0 80px rgba(108,99,255,0.3);
+    }
+
+    [data-theme="light"] h1 {
+      background: linear-gradient(135deg, #1a1d2e 0%, #6c63ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: none;
     }
 
     .hero-sub {
@@ -218,6 +294,8 @@
       max-width: 900px;
       margin: 60px auto;
       padding: 0 24px;
+      position: relative;
+      z-index: 2;
     }
 
     .stat {
@@ -243,6 +321,8 @@
       max-width: 1200px;
       margin: 100px auto;
       padding: 0 24px;
+      position: relative;
+      z-index: 2;
     }
 
     .section-title {
@@ -250,6 +330,15 @@
       font-size: 32px;
       font-weight: 800;
       margin-bottom: 60px;
+      background: linear-gradient(135deg, #fff 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    [data-theme="light"] .section-title {
+      background: linear-gradient(135deg, #1a1d2e 0%, #6c63ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .features-grid {
@@ -259,13 +348,14 @@
     }
 
     .feature-card {
-      background: var(--lp-surface);
-      border: 1px solid var(--lp-border);
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.08);
       border-radius: 16px;
       padding: 32px;
-      transition: all 0.3s;
+      transition: all 0.3s ease;
       opacity: 0;
-      transform: translateY(20px);
+      transform: translateY(30px);
     }
 
     .feature-card.visible {
@@ -275,8 +365,19 @@
 
     .feature-card:hover {
       transform: translateY(-4px);
-      border-color: var(--accent);
-      background: rgba(108, 99, 255, 0.05);
+      border-color: rgba(108,99,255,0.5);
+      background: rgba(108,99,255,0.08);
+      box-shadow: 0 20px 40px rgba(108,99,255,0.15);
+    }
+
+    [data-theme="light"] .feature-card {
+      background: rgba(255,255,255,0.8);
+      border-color: rgba(108,99,255,0.15);
+    }
+
+    [data-theme="light"] .feature-card:hover {
+      background: rgba(108,99,255,0.05);
+      border-color: rgba(108,99,255,0.4);
     }
 
     .feature-icon {
@@ -304,6 +405,8 @@
       background: var(--lp-surface);
       border: 1px solid var(--lp-border);
       border-radius: 20px;
+      position: relative;
+      z-index: 2;
     }
 
     .vs-title {
@@ -311,12 +414,32 @@
       font-size: 32px;
       font-weight: 800;
       margin-bottom: 60px;
+      background: linear-gradient(135deg, #fff 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    [data-theme="light"] .vs-title {
+      background: linear-gradient(135deg, #1a1d2e 0%, #6c63ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .vs-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 60px;
+    }
+
+    .vs-col {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .vs-col.visible {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     .vs-col h3 {
@@ -352,6 +475,8 @@
       max-width: 1200px;
       margin: 120px auto;
       padding: 0 24px;
+      position: relative;
+      z-index: 2;
     }
 
     .pricing-grid {
@@ -369,12 +494,23 @@
       text-align: center;
       transition: all 0.3s;
       position: relative;
+      opacity: 0;
+      transform: translateY(30px);
+    }
+
+    .pricing-card.visible {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     .pricing-card.featured {
       border-color: var(--accent);
-      box-shadow: 0 0 40px rgba(108, 99, 255, 0.2);
-      transform: scale(1.05);
+      box-shadow: 0 0 40px rgba(108, 99, 255, 0.2), 0 0 80px rgba(108, 99, 255, 0.1);
+      transform: scale(1.03);
+    }
+
+    .pricing-card.featured.visible {
+      transform: scale(1.03);
     }
 
     .pricing-badge {
@@ -438,6 +574,14 @@
       margin: 100px auto;
       padding: 60px 24px;
       text-align: center;
+      background: linear-gradient(135deg, rgba(108,99,255,0.2), rgba(139,92,246,0.1), rgba(108,99,255,0.2));
+      background-size: 200% 200%;
+      animation: gradientShift 6s ease infinite;
+      border-top: 1px solid rgba(108,99,255,0.2);
+      border-bottom: 1px solid rgba(108,99,255,0.2);
+      border-radius: 16px;
+      position: relative;
+      z-index: 2;
     }
 
     .cta-section h2 {
@@ -460,6 +604,8 @@
       text-align: center;
       color: var(--lp-muted);
       font-size: 13px;
+      position: relative;
+      z-index: 2;
     }
 
     .footer-links {
@@ -536,22 +682,6 @@
       box-shadow: none;
     }
 
-    /* Animations */
-    @keyframes gradientShift {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-10px); }
-    }
-
-    .nav-brand img {
-      animation: float 3s ease-in-out infinite;
-    }
-
     /* Mobile */
     @media (max-width: 768px) {
       .hamburger { display: block; }
@@ -559,19 +689,77 @@
       .nav-links.mobile-open { display: flex; position: absolute; top: 52px; left: 0; right: 0; flex-direction: column; background: var(--lp-surface); border-bottom: 1px solid var(--lp-border); }
 
       h1 { font-size: 36px; }
+      .hero { padding: 60px 24px; }
       .hero-sub { font-size: 16px; }
       .stats-bar { grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 40px auto; }
       .features-grid { grid-template-columns: 1fr; }
+      .floating-cards { display: none; }
       .vs-grid { grid-template-columns: 1fr; gap: 40px; }
       .pricing-grid { grid-template-columns: 1fr; }
       .pricing-card.featured { transform: scale(1); }
+      .pricing-card.featured.visible { transform: scale(1); }
       .cta-section h2 { font-size: 28px; }
       .nav-actions { gap: 8px; }
       .btn-nav { padding: 6px 12px; font-size: 12px; }
+      .section-title { font-size: 24px; }
+    }
+
+    .btn-google {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--lp-surface);
+      border: 1px solid var(--lp-border);
+      border-radius: 8px;
+      color: var(--lp-text);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-google:hover {
+      background: rgba(108,99,255,0.1);
+      border-color: var(--accent);
+    }
+
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      background: var(--lp-bg);
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+
+    .auth-tab {
+      padding: 8px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--lp-muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .auth-tab.active {
+      background: var(--lp-surface);
+      color: var(--lp-text);
     }
   </style>
 </head>
 <body>
+  <!-- Particle background -->
+  <canvas id="particles"></canvas>
+
   <!-- Nav -->
   <nav class="nav">
     <a href="/" class="nav-brand">
@@ -593,12 +781,19 @@
 
   <!-- Hero -->
   <section class="hero">
-    <div class="badge">🇬🇧 Built for UK Pokémon TCG resellers</div>
-    <h1>Track. List. Sell.<br>Know your profit.</h1>
-    <p class="hero-sub">The only inventory tool built specifically for Pokémon card resellers in the UK — with real eBay integration, camera scanning, and Discord alerts.</p>
-    <div class="hero-actions">
-      <button class="btn btn-primary" onclick="openAuthModal('signup')">Start free — no card needed</button>
-      <button class="btn btn-outline" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">See how it works</button>
+    <div class="floating-cards">
+      <div class="float-card fc1">🃏</div>
+      <div class="float-card fc2">✨</div>
+      <div class="float-card fc3">⚡</div>
+    </div>
+    <div class="hero-content">
+      <div class="badge">🇬🇧 Built for UK Pokémon TCG resellers</div>
+      <h1>Track. List. Sell.<br>Know your profit.</h1>
+      <p class="hero-sub">The only inventory tool built specifically for Pokémon card resellers in the UK — with real eBay integration, camera scanning, and Discord alerts.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" onclick="openAuthModal('signup')">Start free — no card needed</button>
+        <button class="btn btn-outline" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">See how it works</button>
+      </div>
     </div>
   </section>
 
@@ -823,59 +1018,6 @@
     </div>
   </div>
 
-  <style>
-    .btn-google {
-      width: 100%;
-      padding: 11px 14px;
-      background: var(--lp-surface);
-      border: 1px solid var(--lp-border);
-      border-radius: 8px;
-      color: var(--lp-text);
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 16px;
-      transition: all 0.2s;
-      font-family: inherit;
-    }
-
-    .btn-google:hover {
-      background: rgba(108,99,255,0.1);
-      border-color: var(--accent);
-    }
-
-    .auth-tabs {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px;
-      background: var(--lp-bg);
-      border-radius: 10px;
-      padding: 4px;
-      margin-bottom: 20px;
-    }
-
-    .auth-tab {
-      padding: 8px;
-      border: none;
-      border-radius: 8px;
-      background: transparent;
-      color: var(--lp-muted);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .auth-tab.active {
-      background: var(--lp-surface);
-      color: var(--lp-text);
-    }
-  </style>
-
   <script>
     // Theme
     function initTheme() {
@@ -898,6 +1040,61 @@
       icon.textContent = current === 'dark' ? '☀️' : '🌙';
     }
 
+    // Particles
+    function initParticles() {
+      const canvas = document.getElementById('particles');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = Array.from({length: 80}, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 1.5 + 0.3,
+        speedX: (Math.random() - 0.5) * 0.4,
+        speedY: (Math.random() - 0.5) * 0.4,
+        opacity: Math.random() * 0.6 + 0.1
+      }));
+
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+          p.x += p.speedX;
+          p.y += p.speedY;
+          if (p.x < 0) p.x = canvas.width;
+          if (p.x > canvas.width) p.x = 0;
+          if (p.y < 0) p.y = canvas.height;
+          if (p.y > canvas.height) p.y = 0;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(108, 99, 255, ${p.opacity})`;
+          ctx.fill();
+        });
+        requestAnimationFrame(animate);
+      }
+      animate();
+
+      window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      });
+    }
+
+    // Animate counter
+    function animateCounter(el, target, prefix='', suffix='') {
+      const duration = 2000;
+      const start = Date.now();
+      function update() {
+        const elapsed = Date.now() - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.floor(eased * target);
+        el.textContent = prefix + current.toLocaleString() + suffix;
+        if (progress < 1) requestAnimationFrame(update);
+      }
+      requestAnimationFrame(update);
+    }
+
     // Mobile menu
     function toggleMobileMenu() {
       const links = document.getElementById('nav-links');
@@ -909,12 +1106,25 @@
       try {
         const r = await fetch('/api/analytics/public-stats');
         const d = await r.json();
-        document.getElementById('stat-revenue').textContent = '£' + d.total_revenue.toLocaleString();
-        document.getElementById('stat-sold').textContent = d.total_sold.toLocaleString() + '+';
-        document.getElementById('stat-stock').textContent = d.total_in_stock.toLocaleString() + '+';
-        document.getElementById('stat-users').textContent = d.total_users.toLocaleString() + '+';
+        animateCounter(document.getElementById('stat-revenue'), d.total_revenue, '£');
+        animateCounter(document.getElementById('stat-sold'), d.total_sold, '', '+');
+        animateCounter(document.getElementById('stat-stock'), d.total_in_stock, '', '+');
+        animateCounter(document.getElementById('stat-users'), d.total_users, '', '+');
       } catch(e) {}
     }
+
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(el => {
+        if (el.isIntersecting) {
+          el.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.feature-card, .pricing-card, .vs-col').forEach(el => {
+      observer.observe(el);
+    });
 
     // Auth modal
     function openAuthModal(tab = 'login') {
@@ -1014,19 +1224,9 @@
       } catch(e) {}
     }
 
-    // Intersection observer for feature cards
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.classList.add('visible');
-        }
-      });
-    }, { threshold: 0.1 });
-
-    document.querySelectorAll('.feature-card').forEach(el => observer.observe(el));
-
     // Init
     initTheme();
+    initParticles();
     loadStats();
     document.getElementById('login-form').addEventListener('submit', handleLogin);
     document.getElementById('register-form').addEventListener('submit', handleRegister);
