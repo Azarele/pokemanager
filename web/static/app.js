@@ -156,32 +156,52 @@ function confirmDialog(title, message) {
 /* ── Modal helpers ───────────────────────────────────────────────────────── */
 function openModal(id)  { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) {
+  const stack = new Error().stack.split('\n').slice(0, 4).join('\n');
+  console.log('[modal] closeModal() called with id:', id);
+  console.log('[modal] Call stack:', stack);
   if (id) {
     document.getElementById(id)?.classList.add('hidden');
   } else {
     const ov = document.getElementById('modal-overlay');
     if (ov) {
+      console.log('[modal] Removing visible class from modal-overlay');
       ov.classList.remove('visible');
-      setTimeout(() => { ov.style.display = 'none'; ov.innerHTML = ''; }, 200);
+      setTimeout(() => {
+        console.log('[modal] Hiding modal-overlay (in 200ms timeout)');
+        ov.style.display = 'none';
+        ov.innerHTML = '';
+      }, 200);
     }
   }
 }
 
 function showModal(html) {
+  console.log('[modal] showModal() called');
   let ov = document.getElementById('modal-overlay');
   if (!ov) {
+    console.log('[modal] Creating new modal-overlay element');
     ov = document.createElement('div');
     ov.id = 'modal-overlay';
     ov.className = 'modal-overlay hidden';
     ov.addEventListener('click', e => {
-      if (e.target === ov && !window._preventModalClose) closeModal();
+      if (e.target === ov && !window._preventModalClose) {
+        console.log('[modal] Overlay click detected, closing modal');
+        closeModal();
+      } else if (e.target === ov && window._preventModalClose) {
+        console.log('[modal] Overlay click detected but _preventModalClose is true, not closing');
+      }
     });
     document.body.appendChild(ov);
   }
+  console.log('[modal] Setting modal innerHTML');
   ov.innerHTML = `<div class="modal-box">${html}</div>`;
   ov.classList.remove('hidden');
   ov.style.display = 'flex';
-  requestAnimationFrame(() => ov.classList.add('visible'));
+  console.log('[modal] Modal visible, adding visible class in RAF');
+  requestAnimationFrame(() => {
+    ov.classList.add('visible');
+    console.log('[modal] Added visible class');
+  });
 }
 
 /* ── Drawer ──────────────────────────────────────────────────────────────── */
@@ -4343,11 +4363,19 @@ function showCardConfirmation() {
   window._scanResult = card;
   console.log('[scan] Stored result in window._scanResult');
 
+  // Check if modal overlay exists
+  const existingOverlay = document.getElementById('modal-overlay');
+  console.log('[scan] modal-overlay exists before showModal:', existingOverlay !== null);
+  if (existingOverlay) {
+    console.log('[scan] modal-overlay is visible:', !existingOverlay.classList.contains('hidden'));
+  }
+
   const title = _scanMode === 'add' ? '📦 Confirm Card' : '💰 Confirm Card';
   const marketPrice = card.market_price ? `£${card.market_price.toFixed(2)}` : 'Not found';
 
   console.log('[scan] Showing modal with title:', title);
   console.log('[scan] Market price:', marketPrice);
+  console.log('[scan] About to call showModal()...');
 
   showModal(`
     <h2 style="margin-bottom:16px">${title}</h2>
@@ -4371,6 +4399,14 @@ function showCardConfirmation() {
       <button class="btn btn-accent" onclick="${_scanMode === 'add' ? 'proceedScanAdd(window._scanResult)' : 'proceedScanSell()'}">${_scanMode === 'add' ? 'Confirm & Add' : 'Confirm & Sell'}</button>
     </div>
   `);
+
+  console.log('[scan] showModal() returned, modal should be visible now');
+  const modalAfter = document.getElementById('modal-overlay');
+  console.log('[scan] modal-overlay exists after showModal:', modalAfter !== null);
+  if (modalAfter) {
+    console.log('[scan] modal-overlay hidden class:', modalAfter.classList.contains('hidden'));
+    console.log('[scan] modal-overlay display:', modalAfter.style.display);
+  }
 }
 
 window.proceedScanAdd = function(result) {
