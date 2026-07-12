@@ -2,7 +2,6 @@
 Gemini Vision-powered card identification for Scan & Add and Scan & Sell flows.
 """
 import asyncio
-import base64
 import json
 import os
 import re
@@ -129,7 +128,6 @@ async def identify_card(req: IdentifyRequest, user: dict = Depends(get_current_u
     """
     try:
         from google import genai
-        from google.genai import types
     except ImportError:
         raise HTTPException(status_code=500, detail="Gemini SDK not installed")
 
@@ -138,12 +136,9 @@ async def identify_card(req: IdentifyRequest, user: dict = Depends(get_current_u
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
 
     client = genai.Client(api_key=api_key)
-    model_name = "gemini-1.5-flash"
+    model_name = "gemini-1.5-flash-latest"
 
     try:
-        # Decode base64 image
-        image_data = base64.b64decode(req.image)
-
         prompt = """Identify this Pokémon card. Return ONLY valid JSON with no markdown, no explanations, no code blocks:
 {"card_name": "full card name", "card_number": "number/total", "set_name": "set name", "confidence": "high/medium/low"}
 If not a Pokémon card, return: {"error": "not a pokemon card"}"""
@@ -151,11 +146,12 @@ If not a Pokémon card, return: {"error": "not a pokemon card"}"""
         response = client.models.generate_content(
             model=model_name,
             contents=[
-                types.Part.from_bytes(
-                    data=image_data,
-                    mime_type=req.mime_type
-                ),
-                prompt
+                {
+                    "parts": [
+                        {"inline_data": {"mime_type": req.mime_type, "data": req.image}},
+                        {"text": prompt}
+                    ]
+                }
             ]
         )
 
