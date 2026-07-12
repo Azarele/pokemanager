@@ -768,23 +768,17 @@ async def scrape_card(
     # Fast path: requests + bs4 (URL passed through so _soup_extract can use it)
     try:
         card_name, usd_price = await asyncio.to_thread(_pc_requests, url, condition)
+        print(f"[scraper/card] HTTP scrape successful: card_name={card_name}, price=${usd_price}")
     except ValueError as exc:
-        print(f"[scraper/card] requests failed ({exc}) — trying Playwright")
+        print(f"[scraper/card] HTTP scrape failed: {exc}")
 
-    # Playwright fallback for the price
-    if usd_price is None:
-        try:
-            _name, usd_price = await _pw_pricecharting(url, condition)
-            if not card_name:
-                card_name = _name
-        except ValueError:
-            pass  # genuinely no price listed
-
-    # Final safety net: derive name from URL slug if both paths returned nothing
+    # No Playwright fallback - if HTTP fails, derive name from URL and return None price
     if not card_name:
         card_name = _name_from_url(url)
+        print(f"[scraper/card] Derived card_name from URL: {card_name}")
 
     if usd_price is None:
+        print(f"[scraper/card] No price found (HTTP only, no Playwright fallback)")
         return card_name, None
 
     try:
