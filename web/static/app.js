@@ -226,6 +226,7 @@ function updateNotifBadge() {
     badge.style.display = unread > 0 ? 'flex' : 'none';
   }
 }
+window.updateNotifBadge = updateNotifBadge;
 
 /* ── Custom confirm dialog ───────────────────────────────────────────────── */
 function confirmDialog(title, message) {
@@ -362,6 +363,7 @@ function toggleMobileMenu() {
   const overlay = document.getElementById('mobile-menu-overlay');
   if (overlay) overlay.classList.toggle('open');
 }
+window.toggleMobileMenu = toggleMobileMenu;
 
 /* ── Loading / empty state helpers ──────────────────────────────────────── */
 function showPageLoader(message = 'Loading…') {
@@ -412,6 +414,7 @@ function navigate(path) {
   history.pushState(null, '', path);
   routeWithTransition();
 }
+window.navigate = navigate;
 
 function routeWithTransition() {
   const app = document.getElementById('app');
@@ -3782,6 +3785,7 @@ async function confirmLogout() {
   await api.post('/auth/logout', {});
   window.location.href = '/login';
 }
+window.confirmLogout = confirmLogout;
 
 async function updateNavUser() {
   const data = await api.get('/auth/me').catch(() => null);
