@@ -610,6 +610,7 @@ const FILTERS = [
   { key: 'all',        label: 'All' },
   { key: 'in_stock',   label: 'In Stock' },
   { key: 'sold',       label: 'Sold' },
+  { key: 'traded',     label: '🔄 Traded' },
   { key: 'ebay',       label: 'eBay Listed' },
   { key: 'not_listed', label: 'Not Listed' },
   { key: 'underwater', label: '⚠️ Underwater' },
@@ -621,6 +622,7 @@ function applyFiltersAndSort() {
   switch (S.filter) {
     case 'in_stock':   items = items.filter(i => i.status === 'Inventory'); break;
     case 'sold':       items = items.filter(i => i.status === 'Sold'); break;
+    case 'traded':     items = items.filter(i => i.status === 'Traded'); break;
     case 'ebay':       items = items.filter(i => i.ebay_listed === 'Yes'); break;
     case 'not_listed': items = items.filter(i => i.status === 'Inventory' && i.ebay_listed !== 'Yes'); break;
     case 'underwater': items = items.filter(i => i.status === 'Inventory' && (i.live_price || 0) < (i.purchase_price || 0)); break;
@@ -697,12 +699,16 @@ function renderInventoryCard(item) {
   const isLE   = item.status === 'Inventory' && buyP > 0 && ((item.potential_profit ?? 0) / buyP) < 0.1;
   const isListed = item.ebay_listed === 'Yes';
   const isSold   = item.status === 'Sold';
+  const isTraded = item.status === 'Traded';
+  const isTradeIn = item.acquisition_type === 'trade';
 
   const badges = [
     isListed  ? `<span class="badge badge-ebay">eBay</span>`   : '',
+    isTradeIn  ? `<span class="badge badge-warning" title="${esc(item.traded_item_names || 'Trade-in')}">🔄 Trade</span>` : '',
     isUW      ? `<span class="badge badge-danger">⚠️</span>`   : '',
     isLE && !isUW ? `<span class="badge badge-warn">⚡</span>` : '',
     isSold    ? `<span class="badge badge-sold">Sold</span>`   : '',
+    isTraded  ? `<span class="badge badge-traded">Traded</span>` : '',
   ].filter(Boolean).join('');
 
   const canList = canAccess('ebay_listing');
@@ -759,6 +765,7 @@ function renderInventoryCard(item) {
           </div>
 
           <div class="inv-card-cond" style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${esc(item.condition || '—')} · ${esc(item.region || 'EN')}</div>
+          ${isTradeIn ? `<div style="font-size:10px;color:var(--warning);padding:4px 6px;background:rgba(245,158,11,0.1);border-radius:4px;border-left:2px solid var(--warning);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Traded: ${esc(item.traded_item_names || 'items')}</div>` : ''}
 
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;max-width:100%;box-sizing:border-box">
             <div><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase">Bought</span><br><strong style="font-size:13px;font-weight:600">${fmt(buyP)}</strong></div>
@@ -1369,11 +1376,38 @@ function renderAddRow(index) {
         <button onclick="removeAddRow(${index})" class="add-row-remove" title="Remove">✕</button>
       ` : ''}
       <div class="add-row-label">Card ${index}</div>
-      <div class="add-row-url-price">
-        <input type="url" id="pc-url-${index}" class="form-input add-row-url"
-               placeholder="PriceCharting URL (optional)">
-        <input type="number" id="price-${index}" class="form-input add-row-price"
-               placeholder="£0.00" step="0.01" min="0">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button type="button" class="btn btn-sm acq-btn active" id="acq-purchase-${index}" onclick="setAcqType(${index},'purchase')" style="flex:1;background-color:var(--accent);color:white">💰 Purchase</button>
+        <button type="button" class="btn btn-sm acq-btn" id="acq-trade-${index}" onclick="setAcqType(${index},'trade')" style="flex:1">🔄 Trade-in</button>
+      </div>
+      <div id="purchase-fields-${index}">
+        <div class="add-row-url-price">
+          <input type="url" id="pc-url-${index}" class="form-input add-row-url"
+                 placeholder="PriceCharting URL (optional)">
+          <input type="number" id="price-${index}" class="form-input add-row-price"
+                 placeholder="£0.00" step="0.01" min="0">
+        </div>
+      </div>
+      <div id="trade-fields-${index}" style="display:none">
+        <div style="margin-bottom:8px">
+          <input type="text" id="trade-search-${index}" placeholder="Search inventory to trade away..."
+            oninput="searchTradeItems(${index}, this.value)"
+            style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+          <div id="trade-results-${index}" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:160px;overflow-y:auto;display:none;margin-top:4px"></div>
+        </div>
+        <div id="selected-trades-${index}" style="margin-bottom:8px"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <label style="font-size:12px;color:var(--text-muted);white-space:nowrap">Cash difference (+ you pay, − you receive):</label>
+          <input type="number" id="trade-cash-${index}" placeholder="0.00" step="0.01"
+            oninput="updateTradeValue(${index})"
+            style="width:100px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+        </div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px;font-size:13px">
+          Trade value: <strong id="trade-value-${index}">£0.00</strong> &nbsp;|&nbsp;
+          Effective cost: <strong id="effective-cost-${index}">£0.00</strong>
+        </div>
+        <input type="hidden" id="traded-ids-${index}" value="">
+        <input type="hidden" id="traded-names-${index}" value="">
       </div>
       <div class="add-row-dropdowns">
         <select id="condition-${index}" class="form-input">
@@ -1418,6 +1452,86 @@ function removeAddRow(index) {
   document.getElementById(`add-row-${index}`)?.remove();
 }
 
+/* ── Trade-in acquisition type ─────────────────────────────────────────────── */
+window._tradeSelections = {};
+
+window.setAcqType = function(rowId, type) {
+  document.getElementById('purchase-fields-' + rowId).style.display = type === 'purchase' ? '' : 'none';
+  document.getElementById('trade-fields-' + rowId).style.display = type === 'trade' ? '' : 'none';
+  const purchaseBtn = document.getElementById('acq-purchase-' + rowId);
+  const tradeBtn = document.getElementById('acq-trade-' + rowId);
+  if (type === 'purchase') {
+    purchaseBtn.style.backgroundColor = 'var(--accent)';
+    purchaseBtn.style.color = 'white';
+    tradeBtn.style.backgroundColor = '';
+    tradeBtn.style.color = '';
+  } else {
+    purchaseBtn.style.backgroundColor = '';
+    purchaseBtn.style.color = '';
+    tradeBtn.style.backgroundColor = 'var(--accent)';
+    tradeBtn.style.color = 'white';
+  }
+  window._tradeSelections[rowId] = window._tradeSelections[rowId] || [];
+};
+
+window.searchTradeItems = function(rowId, query) {
+  const results = document.getElementById('trade-results-' + rowId);
+  if (!query || query.length < 2) { results.style.display = 'none'; return; }
+  const matches = (S.inventory || []).filter(i =>
+    i.status === 'Inventory' &&
+    i.card_name.toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 8);
+  if (!matches.length) { results.style.display = 'none'; return; }
+  results.innerHTML = matches.map(i =>
+    '<div onclick="selectTradeItem(' + rowId + ',' + i.item_id + ',\'' +
+      (i.card_name || '').replace(/'/g, "\\'") + '\',' + (i.live_price || 0) + ')" ' +
+      'style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px" ' +
+      'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
+      '<strong>' + esc(i.card_name) + '</strong> ' +
+      '<span style="color:var(--text-muted)">#' + i.item_id + ' · £' + (i.live_price || 0).toFixed(2) + '</span>' +
+    '</div>'
+  ).join('');
+  results.style.display = 'block';
+};
+
+window.selectTradeItem = function(rowId, itemId, cardName, marketPrice) {
+  if (!window._tradeSelections[rowId]) window._tradeSelections[rowId] = [];
+  if (window._tradeSelections[rowId].find(i => i.id === itemId)) return;
+  window._tradeSelections[rowId].push({id: itemId, name: cardName, price: marketPrice});
+  document.getElementById('trade-search-' + rowId).value = '';
+  document.getElementById('trade-results-' + rowId).style.display = 'none';
+  renderTradeSelections(rowId);
+  updateTradeValue(rowId);
+};
+
+window.removeTradeItem = function(rowId, itemId) {
+  window._tradeSelections[rowId] = (window._tradeSelections[rowId] || []).filter(i => i.id !== itemId);
+  renderTradeSelections(rowId);
+  updateTradeValue(rowId);
+};
+
+function renderTradeSelections(rowId) {
+  const items = window._tradeSelections[rowId] || [];
+  const container = document.getElementById('selected-trades-' + rowId);
+  container.innerHTML = items.map(i =>
+    '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface2);border-radius:6px;margin-bottom:4px;font-size:13px">' +
+      '<span style="flex:1">' + esc(i.name) + ' <span style="color:var(--text-muted)">£' + i.price.toFixed(2) + '</span></span>' +
+      '<button type="button" onclick="removeTradeItem(' + rowId + ',' + i.id + ')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px">×</button>' +
+    '</div>'
+  ).join('');
+  document.getElementById('traded-ids-' + rowId).value = items.map(i => i.id).join(',');
+  document.getElementById('traded-names-' + rowId).value = items.map(i => i.name).join(', ');
+}
+
+window.updateTradeValue = function(rowId) {
+  const items = window._tradeSelections[rowId] || [];
+  const tradeValue = items.reduce((sum, i) => sum + i.price, 0);
+  const cashDiff = parseFloat(document.getElementById('trade-cash-' + rowId).value) || 0;
+  const effectiveCost = tradeValue + cashDiff;
+  document.getElementById('trade-value-' + rowId).textContent = '£' + tradeValue.toFixed(2);
+  document.getElementById('effective-cost-' + rowId).textContent = '£' + effectiveCost.toFixed(2);
+};
+
 async function submitBulkAdd() {
   console.log('[add] === submitBulkAdd() called ===');
   const btn = document.querySelector('.modal-actions .btn-accent');
@@ -1429,19 +1543,42 @@ async function submitBulkAdd() {
 
   for (const row of rows) {
     const id    = row.id.replace('add-row-', '');
-    const url   = document.getElementById(`pc-url-${id}`)?.value.trim();
-    const price = parseFloat(document.getElementById(`price-${id}`)?.value);
     const cond  = document.getElementById(`condition-${id}`)?.value;
     const src   = document.getElementById(`source-${id}`)?.value.trim();
 
-    console.log(`[add] Row ${id}: url="${url}", price=${price}, cond="${cond}", src="${src}"`);
+    // Determine acquisition type
+    const acqType = document.getElementById(`acq-purchase-${id}`).style.backgroundColor === 'var(--accent)' ? 'purchase' : 'trade';
+    console.log(`[add] Row ${id}: acquisition_type="${acqType}"`);
 
-    if (!url && !price) { console.log(`[add] Row ${id}: Empty, skipping`); continue; }
-    if (!url) { console.log(`[add] Row ${id}: Missing URL`); toast(`Row ${id}: PriceCharting URL is required`, 'error'); return; }
-    if (!price || price <= 0) { console.log(`[add] Row ${id}: Invalid price=${price}`); toast(`Row ${id}: Enter a valid price`, 'error'); return; }
+    let purchasePrice, url;
+    if (acqType === 'purchase') {
+      url = document.getElementById(`pc-url-${id}`)?.value.trim();
+      purchasePrice = parseFloat(document.getElementById(`price-${id}`)?.value);
+      console.log(`[add] Row ${id}: url="${url}", purchase_price=${purchasePrice}, cond="${cond}", src="${src}"`);
 
-    console.log(`[add] Row ${id}: Valid, adding to cards`);
-    cards.push({ pc_url: url, purchase_price: price, condition: cond, source: src });
+      if (!url && !purchasePrice) { console.log(`[add] Row ${id}: Empty, skipping`); continue; }
+      if (!url) { console.log(`[add] Row ${id}: Missing URL`); toast(`Row ${id}: PriceCharting URL is required`, 'error'); return; }
+      if (!purchasePrice || purchasePrice <= 0) { console.log(`[add] Row ${id}: Invalid price=${purchasePrice}`); toast(`Row ${id}: Enter a valid price`, 'error'); return; }
+
+      console.log(`[add] Row ${id}: Valid purchase, adding to cards`);
+      cards.push({ pc_url: url, purchase_price: purchasePrice, condition: cond, source: src, acquisition_type: 'purchase' });
+    } else {
+      const tradeIds = document.getElementById(`traded-ids-${id}`)?.value || '';
+      const tradeNames = document.getElementById(`traded-names-${id}`)?.value || '';
+      const tradeCash = parseFloat(document.getElementById(`trade-cash-${id}`)?.value) || 0;
+      const tradeItems = window._tradeSelections[id] || [];
+
+      if (!tradeItems.length) { console.log(`[add] Row ${id}: No items selected for trade`); toast(`Row ${id}: Select at least one item to trade`, 'error'); return; }
+
+      const effectiveCost = tradeItems.reduce((sum, i) => sum + i.price, 0) + tradeCash;
+      console.log(`[add] Row ${id}: Valid trade, effective_cost=${effectiveCost}`);
+      cards.push({
+        pc_url: '', purchase_price: effectiveCost, condition: cond, source: src, acquisition_type: 'trade',
+        traded_item_ids: tradeIds.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)),
+        traded_item_names: tradeNames,
+        trade_cash_difference: tradeCash
+      });
+    }
   }
 
   if (!cards.length) { console.log('[add] No valid cards to add'); toast('Add at least one card', 'error'); return; }

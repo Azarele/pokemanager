@@ -387,33 +387,52 @@ async def sell_item_web(item_id: int, req: SellItemRequest, user: dict = Depends
 
 
 class AddItemWebRequest(BaseModel):
-    pc_url: str
+    pc_url: str = ""
     purchase_price: float
     condition: str = "Near mint or better"
     region: str = ""
     source: str = ""
+    acquisition_type: str = "purchase"
+    traded_item_ids: list[int] = []
+    traded_item_names: str = ""
+    trade_cash_difference: float = 0.0
 
 
 @router.post("/add")
 async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_user)):
+    from datetime import date
     print(f"[add] === Received POST /inventory/add ===")
-    print(f"[add] pc_url={req.pc_url}, purchase_price={req.purchase_price}, condition={req.condition}, source={req.source}, region={req.region}")
+    print(f"[add] acquisition_type={req.acquisition_type}, pc_url={req.pc_url}, purchase_price={req.purchase_price}")
 
-    if not req.pc_url.strip():
-        return {"success": False, "error": "PriceCharting URL is required"}
     if req.purchase_price <= 0:
         return {"success": False, "error": "Purchase price must be greater than 0"}
 
+    if req.acquisition_type == "purchase":
+        if not req.pc_url.strip():
+            return {"success": False, "error": "PriceCharting URL is required"}
+    else:
+        if not req.traded_item_ids:
+            return {"success": False, "error": "Trade-in requires at least one item to trade"}
+
     try:
-        print(f"[add] Scraping card from {req.pc_url} (HTTP only, no Playwright fallback)")
-        card_name, live_price = await scraper.scrape_card(req.pc_url, req.condition, req.region)
-        print(f"[add] Scrape result: card_name={card_name}, live_price={live_price}")
+        card_name = None
+        live_price = None
 
-        if not card_name:
-            print(f"[add] ERROR: Could not derive card name from URL or HTML")
-            return {"success": False, "error": "Could not extract card name from PriceCharting URL"}
+        # Scrape card info if URL provided
+        if req.pc_url.strip():
+            print(f"[add] Scraping card from {req.pc_url}")
+            card_name, live_price = await scraper.scrape_card(req.pc_url, req.condition, req.region)
+            print(f"[add] Scrape result: card_name={card_name}, live_price={live_price}")
 
-        print(f"[add] Adding item to database: user_id={user['id']}, card_name={card_name}, live_price={live_price}")
+            if not card_name:
+                print(f"[add] ERROR: Could not derive card name from URL")
+                return {"success": False, "error": "Could not extract card name from PriceCharting URL"}
+        else:
+            # For trade-ins without URL, use a placeholder name for now
+            card_name = f"Trade-in ({req.traded_item_names or 'items'})"
+            live_price = req.purchase_price
+
+        print(f"[add] Adding item: card_name={card_name}, live_price={live_price}, acquisition_type={req.acquisition_type}")
         item_id = await db.add_item(
             user["id"],
             card_name=card_name,
@@ -425,10 +444,34 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
             potential_profit=round((live_price or 0) - req.purchase_price, 2) if live_price is not None else None,
             source=req.source,
             status="Inventory",
+            acquisition_type=req.acquisition_type,
+            traded_item_ids=req.traded_item_ids if req.traded_item_ids else None,
+            traded_item_names=req.traded_item_names,
+            trade_cash_difference=req.trade_cash_difference,
         )
-        print(f"[add] Item added successfully: item_id={item_id}")
+        print(f"[add] Item added: item_id={item_id}")
 
-        # Fetch and cache the card image in background (don't block add response)
+        # Mark traded items as 'Traded' if this is a trade-in
+        if req.acquisition_type == "trade" and req.traded_item_ids:
+            from web.database import get_db as _get_db
+            database = _get_db()
+            today = date.today().isoformat()
+            for traded_id in req.traded_item_ids:
+                try:
+                    traded_item = await db.get_item(user["id"], traded_id)
+                    if traded_item:
+                        database.table("inventory_items").update({
+                            "status": "Traded",
+                            "sell_price": traded_item.get("live_price", 0),
+                            "profit": 0,
+                            "date_sold": today,
+                            "acquisition_type": "traded_away"
+                        }).eq("item_id", traded_id).eq("user_id", user["id"]).execute()
+                        print(f"[add] Marked item {traded_id} as Traded")
+                except Exception as e:
+                    print(f"[add] Warning: Could not mark item {traded_id} as traded: {e}")
+
+        # Fetch and cache the card image in background
         try:
             cache_key = f"{item_id}_{user['id']}"
             image_url = await _scrape_pc_image(req.pc_url, item_id) if req.pc_url else None
@@ -440,9 +483,9 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
 
         audit.log_mutation("web_add", item_id, "added", {
             "card_name": card_name, "purchase_price": req.purchase_price,
-            "live_price": live_price, "source": "web_dashboard", "user_id": user["id"],
+            "live_price": live_price, "acquisition_type": req.acquisition_type, "user_id": user["id"],
         })
-        print(f"[add] SUCCESS: item_id={item_id}, card_name={card_name}, live_price={live_price}")
+        print(f"[add] SUCCESS: item_id={item_id}, card_name={card_name}")
 
         return {
             "success":    True,

@@ -283,18 +283,12 @@ async def _sync_user_sales(user_id: str) -> dict:
                             price_paid = float(cost_obj or 0)
 
                         # Calculate fees and profit for re-sale
+                        # eBay fulfillment API doesn't include ad fees, so estimate based on promotion settings
                         ebay_fee = 0.0
-                        ebay_charges = order.get("ebayCollectedCharges", {})
-                        if isinstance(ebay_charges, dict):
-                            for charge in ebay_charges.get("charges", []):
-                                if isinstance(charge, dict):
-                                    amount_obj = charge.get("amount", {})
-                                    if isinstance(amount_obj, dict):
-                                        ebay_fee += float(amount_obj.get("value", 0))
-
-                        if ebay_fee == 0 and price_paid > 0:
+                        if price_paid > 0:
                             if inv_item.get("promoted_listing_pct"):
-                                ebay_fee = round(price_paid * (float(inv_item.get("promoted_listing_pct")) / 100), 2)
+                                promo_pct = float(inv_item.get("promoted_listing_pct"))
+                                ebay_fee = round(price_paid * (promo_pct / 100), 2)
                             else:
                                 ebay_fee = round(price_paid * ebay_fee_rate, 2)
 
@@ -325,28 +319,22 @@ async def _sync_user_sales(user_id: str) -> dict:
                 # Extract purchase price early (used in profit calculation below)
                 purchase_price = float(inv_item.get("purchase_price") or 0)
 
-                # Using actual eBay order earnings, not estimated fees
-                # eBay provides actual seller earnings in the fulfillment API
-                # If promotions were applied, the lineItemCost reflects the final price after discounts
-                # Extract actual fees from order-level charges
-                ebay_fee = 0.0
-                ebay_charges = order.get("ebayCollectedCharges", {})
-                if isinstance(ebay_charges, dict):
-                    for charge in ebay_charges.get("charges", []):
-                        if isinstance(charge, dict):
-                            amount_obj = charge.get("amount", {})
-                            if isinstance(amount_obj, dict):
-                                ebay_fee += float(amount_obj.get("value", 0))
+                # ⚠️  Fee extraction note: eBay's fulfillment API (orders endpoint) does NOT include ad fees
+                # Ad fees come from the billing API as separate transactions, not in order data
+                # So we estimate fees based on the item's promotion settings or default rate
+                # These estimates will be verified against the monthly billing statement later
 
-                # If no fee data available, estimate based on item's promotion settings or flat rate
-                if ebay_fee == 0 and price_paid > 0:
-                    # Check if item has promoted listing percentage set
+                ebay_fee = 0.0
+                if price_paid > 0:
+                    # Prefer item's configured promotion percentage if available
                     if inv_item.get("promoted_listing_pct"):
-                        ebay_fee = round(price_paid * (float(inv_item.get("promoted_listing_pct")) / 100), 2)
+                        promo_pct = float(inv_item.get("promoted_listing_pct"))
+                        ebay_fee = round(price_paid * (promo_pct / 100), 2)
+                        print(f"[ebay_sync] Item {item_id}: Using item promotion {promo_pct}% = £{ebay_fee:.2f}")
                     else:
+                        # Fall back to default rate
                         ebay_fee = round(price_paid * ebay_fee_rate, 2)
-                else:
-                    ebay_fee = round(ebay_fee / max(len(line_items), 1), 2) if ebay_charges else 0
+                        print(f"[ebay_sync] Item {item_id}: Using default rate {ebay_fee_rate*100:.2f}% = £{ebay_fee:.2f}")
 
                 # Calculate profit: sale price - purchase price - actual ebay fees
                 # Buyer pays postage via eBay Simple Delivery (we don't deduct postage)
