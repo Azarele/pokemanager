@@ -195,15 +195,36 @@ function toast(msg, type = 'info', duration = 4000) {
   container.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
 
+  // Store notification in history
+  const notifications = JSON.parse(localStorage.getItem('pm_notifications') || '[]');
+  notifications.unshift({
+    id: Date.now(),
+    message: msg,
+    type: type,
+    time: new Date().toISOString(),
+    read: false
+  });
+  if (notifications.length > 100) notifications.pop();
+  localStorage.setItem('pm_notifications', JSON.stringify(notifications));
+  updateNotifBadge();
+
   const dismiss = () => {
     clearTimeout(timerId);
-    el.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
-    el.style.transform  = 'translateX(calc(100% + 24px))';
-    el.style.opacity    = '0';
+    el.classList.add('hiding');
     setTimeout(() => el.remove(), 260);
   };
   el.querySelector('.toast-close').addEventListener('click', dismiss);
   const timerId = setTimeout(dismiss, duration);
+}
+
+function updateNotifBadge() {
+  const notifications = JSON.parse(localStorage.getItem('pm_notifications') || '[]');
+  const unread = notifications.filter(n => !n.read).length;
+  const badge = document.getElementById('notif-badge');
+  if (badge) {
+    badge.textContent = unread > 0 ? (unread > 99 ? '99+' : unread) : '';
+    badge.style.display = unread > 0 ? 'flex' : 'none';
+  }
 }
 
 /* ── Custom confirm dialog ───────────────────────────────────────────────── */
@@ -5100,17 +5121,56 @@ function showOnboardingModal() {
 }
 
 /* ── Routes ──────────────────────────────────────────────────────────────── */
+function renderNotifications() {
+  const notifications = JSON.parse(localStorage.getItem('pm_notifications') || '[]');
+
+  // Mark all as read
+  notifications.forEach(n => n.read = true);
+  localStorage.setItem('pm_notifications', JSON.stringify(notifications));
+  updateNotifBadge();
+
+  if (notifications.length === 0) {
+    return '<div style="padding:40px;text-align:center;color:var(--text-muted)"><p>No notifications yet</p></div>';
+  }
+
+  return '<div style="max-width:600px;margin:0 auto;padding:20px 24px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">' +
+      '<h2 style="margin:0;font-size:24px;font-weight:700">Notifications</h2>' +
+      '<button class="btn btn-ghost btn-sm" onclick="clearNotifications()">Clear all</button>' +
+    '</div>' +
+    notifications.map(n => {
+      const time = new Date(n.time);
+      const timeStr = time.toLocaleDateString('en-GB') + ' ' + time.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+      const icon = n.type === 'success' ? '✅' : n.type === 'error' ? '❌' : n.type === 'warning' ? '⚠️' : 'ℹ️';
+      return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start">' +
+        '<span style="font-size:18px">' + icon + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:14px;margin-bottom:4px">' + n.message + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted)">' + timeStr + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+window.clearNotifications = function() {
+  localStorage.removeItem('pm_notifications');
+  updateNotifBadge();
+  navigate('/notifications');
+}
+
 const ROUTES = {
-  '/':           renderInventory,
-  '/analytics':  renderAnalytics,
-  '/listings':   renderListings,
-  '/watchlist':  renderWatchlist,
-  '/sales':      renderSales,
-  '/calculator': renderCalculator,
-  '/guide':      renderGuide,
-  '/settings':   renderSettings,
-  '/upgrade':    renderUpgrade,
-  '/admin':      renderAdmin,
+  '/':              renderInventory,
+  '/analytics':     renderAnalytics,
+  '/listings':      renderListings,
+  '/watchlist':     renderWatchlist,
+  '/sales':         renderSales,
+  '/calculator':    renderCalculator,
+  '/guide':         renderGuide,
+  '/settings':      renderSettings,
+  '/upgrade':       renderUpgrade,
+  '/admin':         renderAdmin,
+  '/notifications': renderNotifications,
 };
 
 document.querySelectorAll('.nav-link').forEach(a => {

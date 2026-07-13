@@ -37,6 +37,10 @@
       <button onclick="toggleTheme()" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px 8px;border-radius:4px;transition:0.15s ease;color:var(--text-muted)" title="Toggle theme" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
         <span id="theme-icon">🌙</span>
       </button>
+      <button onclick="navigate('/notifications')" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px 8px;border-radius:4px;transition:0.15s ease;color:var(--text-muted);position:relative;margin-right:4px" title="Notifications" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+        🔔
+        <span id="notif-badge" style="position:absolute;top:-2px;right:0;background:var(--danger);color:white;border-radius:10px;font-size:10px;padding:1px 5px;display:none;align-items:center;justify-content:center;min-width:20px;text-align:center;font-weight:700"></span>
+      </button>
       <span id="nav-user" class="nav-user"></span>
     </div>
   </nav>
