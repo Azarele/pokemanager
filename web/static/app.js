@@ -346,6 +346,7 @@ function initMobileNav() {
       <a onclick="navigate('/upgrade');toggleMobileMenu()" class="mobile-nav-link">⭐ Upgrade</a>
       <a onclick="navigate('/guide');toggleMobileMenu()" class="mobile-nav-link">📖 Guide</a>
       <a onclick="navigate('/settings');toggleMobileMenu()" class="mobile-nav-link">⚙️ Settings</a>
+      <a onclick="navigate('/notifications');toggleMobileMenu()" class="mobile-nav-link">🔔 Notifications</a>
     </nav>
     <div style="margin-top:auto;padding-top:20px;border-top:1px solid var(--border)">
       <a onclick="confirmLogout();toggleMobileMenu()" class="mobile-nav-link" style="color:var(--accent2)">🚪 Sign Out</a>
@@ -5184,6 +5185,7 @@ window.addEventListener('popstate', routeCurrentPath);
   startGlobalEventStream();
   updateStatus();
   await updateNavUser();
+  updateNotifBadge();
   showOnboardingIfNeeded();
   initMobileNav();
   initScanFAB();
