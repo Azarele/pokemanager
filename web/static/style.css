@@ -164,6 +164,7 @@ tbody td { padding: 8px 12px; vertical-align: middle; max-width: 220px; }
 .badge-inventory  { background: rgba(108,99,255,0.15); color: var(--accent); }
 .badge-sold       { background: rgba(76,175,125,0.15); color: var(--success); }
 .badge-traded     { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+.badge-info       { background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); }
 .badge-yes        { background: rgba(76,175,125,0.15); color: var(--success); }
 .badge-no         { background: var(--surface3); color: var(--text-muted); }
 .badge-warn       { background: rgba(255,169,77,0.15); color: var(--warning); }

@@ -398,6 +398,14 @@ class AddItemWebRequest(BaseModel):
     trade_cash_difference: float = 0.0
 
 
+class BundleSellRequest(BaseModel):
+    item_ids: list[int]
+    sell_price: float
+    ebay_fee: float = 0.0
+    ebay_order_id: str = ""
+    date_sold: str
+
+
 @router.post("/add")
 async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_user)):
     from datetime import date
@@ -498,6 +506,108 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
         import traceback
         print(f"[add] EXCEPTION: {type(e).__name__}: {e}")
         print(f"[add] Traceback:\n{traceback.format_exc()}")
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/bundle-sell")
+async def bundle_sell(req: BundleSellRequest, user: dict = Depends(get_current_user)):
+    """Sell multiple items as a bundle."""
+    from web.database import get_db as _get_db
+    import uuid
+
+    print(f"[bundle] === Received POST /inventory/bundle-sell ===")
+
+    item_ids = req.item_ids
+    sell_price = req.sell_price
+    ebay_fee = req.ebay_fee
+    ebay_order_id = req.ebay_order_id
+    date_sold = req.date_sold
+
+    if not item_ids or len(item_ids) < 2:
+        return {"success": False, "error": "Bundle requires at least 2 items"}
+    if sell_price <= 0:
+        return {"success": False, "error": "Sale price must be greater than 0"}
+
+    try:
+        database = _get_db()
+        user_id = user["id"]
+
+        # Get all items
+        items_result = database.table("inventory_items")\
+            .select("*")\
+            .in_("item_id", item_ids)\
+            .eq("user_id", user_id)\
+            .execute()
+
+        items = items_result.data if items_result.data else []
+
+        if not items:
+            return {"success": False, "error": "Items not found"}
+
+        print(f"[bundle] Found {len(items)} items")
+
+        # Calculate totals
+        total_cost = sum(float(i.get("purchase_price") or 0) for i in items)
+        profit = round(sell_price - ebay_fee - total_cost, 2)
+        net_received = round(sell_price - ebay_fee, 2)
+
+        # Create bundle ID and item names
+        bundle_id = str(uuid.uuid4())
+        item_names = ", ".join(i.get("card_name", "") for i in items)
+
+        print(f"[bundle] Total cost: £{total_cost}, sell price: £{sell_price}, fee: £{ebay_fee}, profit: £{profit}")
+
+        # Distribute sale values equally across items
+        sell_price_per_item = round(sell_price / len(items), 2)
+        fee_per_item = round(ebay_fee / len(items), 2)
+
+        # Update each item as sold
+        for item in items:
+            item_cost = float(item.get("purchase_price") or 0)
+            item_profit = round(sell_price_per_item - fee_per_item - item_cost, 2)
+
+            database.table("inventory_items").update({
+                "status": "Sold",
+                "sell_price": sell_price_per_item,
+                "ebay_fee": fee_per_item,
+                "profit": item_profit,
+                "date_sold": date_sold,
+                "ebay_order_id": ebay_order_id,
+                "bundle_id": bundle_id,
+                "postage_cost": 0,
+                "fees_verified": False
+            }).eq("item_id", item["item_id"]).eq("user_id", user_id).execute()
+
+            print(f"[bundle] Updated item {item['item_id']}: profit £{item_profit}")
+
+        # Save bundle record
+        database.table("bundles").insert({
+            "user_id": user_id,
+            "bundle_name": f"Bundle - {date_sold}",
+            "sell_price": sell_price,
+            "ebay_fee": ebay_fee,
+            "profit": profit,
+            "date_sold": date_sold,
+            "ebay_order_id": ebay_order_id,
+            "item_ids": item_ids,
+            "item_names": item_names
+        }).execute()
+
+        print(f"[bundle] SUCCESS: Created bundle {bundle_id} with {len(items)} items, profit: £{profit}")
+        audit.log_mutation("web_bundle_sell", bundle_id, "bundle_sold", {
+            "item_count": len(items), "sell_price": sell_price, "profit": profit, "user_id": user_id
+        })
+
+        return {
+            "success": True,
+            "bundle_id": bundle_id,
+            "items_sold": len(items),
+            "profit": profit
+        }
+    except Exception as e:
+        import traceback
+        print(f"[bundle] EXCEPTION: {type(e).__name__}: {e}")
+        print(f"[bundle] Traceback:\n{traceback.format_exc()}")
         return {"success": False, "error": str(e)}
 
 

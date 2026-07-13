@@ -701,10 +701,12 @@ function renderInventoryCard(item) {
   const isSold   = item.status === 'Sold';
   const isTraded = item.status === 'Traded';
   const isTradeIn = item.acquisition_type === 'trade';
+  const isBundle = item.bundle_id ? true : false;
 
   const badges = [
     isListed  ? `<span class="badge badge-ebay">eBay</span>`   : '',
     isTradeIn  ? `<span class="badge badge-warning" title="${esc(item.traded_item_names || 'Trade-in')}">🔄 Trade</span>` : '',
+    isBundle  ? `<span class="badge badge-info" title="Bundle ${item.bundle_id}">📦 Bundle</span>` : '',
     isUW      ? `<span class="badge badge-danger">⚠️</span>`   : '',
     isLE && !isUW ? `<span class="badge badge-warn">⚡</span>` : '',
     isSold    ? `<span class="badge badge-sold">Sold</span>`   : '',
@@ -945,6 +947,7 @@ async function renderInventory() {
       <span class="bulk-count">0 selected</span>
       <button class="btn btn-sm btn-ghost" onclick="bulkUpdatePrices()">🔄 Update Prices</button>
       <button class="btn btn-sm btn-ghost" onclick="bulkExport()">📥 Export CSV</button>
+      <button class="btn btn-sm btn-success" onclick="openBundleSellModal()">💰 Bundle Sell</button>
       <button class="btn btn-sm btn-danger" onclick="bulkRemove()">🗑️ Remove</button>
       <button class="btn btn-sm btn-ghost" onclick="clearSelection()">✕ Clear</button>
     </div>
@@ -3170,6 +3173,133 @@ async function bulkRemove() {
   refreshInventoryGrid();
   toast(`Removed ${removed} item(s)`, 'success');
 }
+
+/* ── Bundle Sell (Feature - Phase 2) ─────────────────────────────────────── */
+function openBundleSellModal() {
+  const selectedIds = Array.from(S.selection);
+  if (!selectedIds.length) { toast('Select items to bundle', 'error'); return; }
+  if (selectedIds.length < 2) { toast('Select at least 2 items to bundle', 'error'); return; }
+
+  const selectedItems = S.inventory.filter(i => selectedIds.includes(i.item_id));
+  const totalCost = selectedItems.reduce((s, i) => s + (i.purchase_price || 0), 0);
+  const totalMarket = selectedItems.reduce((s, i) => s + (i.live_price || 0), 0);
+
+  const itemsList = selectedItems.map(i =>
+    '<div style="display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px solid var(--border);align-items:center">' +
+      '<span><strong>' + esc(i.card_name) + '</strong> <span style="color:var(--text-muted)">#' + i.item_id + '</span></span>' +
+      '<span style="color:var(--text-muted);white-space:nowrap">£' + (i.purchase_price || 0).toFixed(2) + ' · £' + (i.live_price || 0).toFixed(2) + '</span>' +
+    '</div>'
+  ).join('');
+
+  const html = `
+    <div style="max-width:600px">
+      <h3 style="margin-bottom:16px">💰 Bundle Sell (${selectedItems.length} items)</h3>
+
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:16px;max-height:300px;overflow-y:auto">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text-muted);text-transform:uppercase">Items:</div>
+        ${itemsList}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div>
+          <label style="font-size:12px;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:6px">Total Cost</label>
+          <div style="font-size:20px;font-weight:700">£${totalCost.toFixed(2)}</div>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:6px">Total Market Value</label>
+          <div style="font-size:20px;font-weight:700">£${totalMarket.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Bundle sale price (£)</label>
+        <input type="number" id="bundle-sell-price" step="0.01" placeholder="0.00"
+          oninput="updateBundleCalc(${JSON.stringify(selectedItems.map(i => ({cost: i.purchase_price||0})))})"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">eBay fee (£)</label>
+        <input type="number" id="bundle-ebay-fee" step="0.01" placeholder="0.00"
+          oninput="updateBundleCalc(${JSON.stringify(selectedItems.map(i => ({cost: i.purchase_price||0})))})"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">eBay Order ID (optional)</label>
+        <input type="text" id="bundle-order-id" placeholder="e.g. 12-34567-89012"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+      </div>
+
+      <div id="bundle-calc" style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;text-align:center;color:var(--text-muted)">
+        Enter sale price to see profit calculation
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button onclick="closeModal()" class="btn btn-ghost" style="flex:1">Cancel</button>
+        <button onclick="submitBundleSell(${JSON.stringify(selectedIds)})" class="btn btn-success" style="flex:1">💰 Confirm Bundle Sale</button>
+      </div>
+    </div>
+  `;
+
+  showModal(html);
+}
+
+window.updateBundleCalc = function(items) {
+  const sellPrice = parseFloat(document.getElementById('bundle-sell-price')?.value) || 0;
+  const fee = parseFloat(document.getElementById('bundle-ebay-fee')?.value) || 0;
+  const totalCost = (items || []).reduce((s, i) => s + (i.cost || 0), 0);
+  const profit = sellPrice - fee - totalCost;
+  const roi = totalCost > 0 ? (profit / totalCost * 100) : 0;
+
+  const calc = document.getElementById('bundle-calc');
+  if (!calc) return;
+  const color = profit >= 0 ? 'var(--success)' : 'var(--danger)';
+  calc.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">' +
+      '<div><div style="color:var(--text-muted);font-size:11px;text-transform:uppercase;margin-bottom:4px">Net</div><div style="font-weight:700;font-size:16px">£' + (sellPrice - fee).toFixed(2) + '</div></div>' +
+      '<div><div style="color:var(--text-muted);font-size:11px;text-transform:uppercase;margin-bottom:4px">Profit</div><div style="font-weight:700;font-size:16px;color:' + color + '">' + (profit >= 0 ? '+' : '') + '£' + profit.toFixed(2) + '</div></div>' +
+      '<div><div style="color:var(--text-muted);font-size:11px;text-transform:uppercase;margin-bottom:4px">ROI</div><div style="font-weight:700;font-size:16px;color:' + color + '">' + roi.toFixed(1) + '%</div></div>' +
+    '</div>';
+};
+
+window.submitBundleSell = async function(itemIds) {
+  const sellPrice = parseFloat(document.getElementById('bundle-sell-price')?.value);
+  const fee = parseFloat(document.getElementById('bundle-ebay-fee')?.value) || 0;
+  const orderId = document.getElementById('bundle-order-id')?.value.trim() || '';
+
+  if (!sellPrice || sellPrice <= 0) { toast('❌ Enter a valid sale price', 'error'); return; }
+
+  toast('⏳ Processing bundle sale…', 'info');
+
+  try {
+    const res = await fetch('/api/inventory/bundle-sell', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        item_ids: itemIds,
+        sell_price: sellPrice,
+        ebay_fee: fee,
+        ebay_order_id: orderId,
+        date_sold: new Date().toISOString().split('T')[0]
+      })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      closeModal();
+      toast('✅ Bundle sale recorded! ' + itemIds.length + ' items sold for £' + sellPrice.toFixed(2), 'success');
+      clearSelection();
+      const invData = await api.get('/inventory');
+      S.inventory = invData.items;
+      refreshInventoryGrid();
+    } else {
+      toast('❌ Failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch (e) {
+    toast('❌ Error: ' + extractError(e.message), 'error');
+  }
+};
 
 /* ── Single-item reprice modal (Feature 4) ───────────────────────────────── */
 function openRepriceModal(itemId) {
