@@ -5127,6 +5127,7 @@ function showOnboardingModal() {
 
 /* ── Routes ──────────────────────────────────────────────────────────────── */
 function renderNotifications() {
+  const app = document.getElementById('app');
   const notifications = JSON.parse(localStorage.getItem('pm_notifications') || '[]');
 
   // Mark all as read
@@ -5134,12 +5135,11 @@ function renderNotifications() {
   localStorage.setItem('pm_notifications', JSON.stringify(notifications));
   updateNotifBadge();
 
+  let content = '';
   if (notifications.length === 0) {
-    return '<div style="padding:40px;text-align:center;color:var(--text-muted)"><p>No notifications yet</p></div>';
-  }
-
-  return '<div style="max-width:600px;margin:0 auto;padding:20px 24px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">' +
+    content = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><p>No notifications yet</p></div>';
+  } else {
+    content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">' +
       '<h2 style="margin:0;font-size:24px;font-weight:700">Notifications</h2>' +
       '<button class="btn btn-ghost btn-sm" onclick="clearNotifications()">Clear all</button>' +
     '</div>' +
@@ -5155,7 +5155,17 @@ function renderNotifications() {
         '</div>' +
       '</div>';
     }).join('') +
-  '</div>';
+    '</div>';
+  }
+
+  app.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">Notifications</h1>
+    </div>
+    <div style="max-width:600px;margin:0 auto;padding:20px 24px">
+      ${content}
+    </div>
+  `;
 }
 
 window.clearNotifications = function() {
