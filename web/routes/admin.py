@@ -81,7 +81,7 @@ async def list_users(
 ):
     db = get_db()
 
-    # Fetch from user_profiles; email should always be set from auth
+    # Fetch ALL users from user_profiles using service key (bypasses RLS)
     query = db.table("user_profiles").select(
         "id, email, display_name, plan, role, created_at, subscription_status, subscription_period_end, stripe_customer_id"
     )
@@ -89,7 +89,8 @@ async def list_users(
     if plan and plan != "":
         query = query.eq("plan", plan)
 
-    result = query.order("created_at", desc=True).execute()
+    # Apply pagination
+    result = query.order("created_at", desc=True).limit(limit).execute()
     users = result.data or []
 
     # Add item counts and verify email is present

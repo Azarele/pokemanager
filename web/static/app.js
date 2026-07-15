@@ -5441,6 +5441,160 @@ window.clearNotifications = function() {
   navigate('/notifications');
 }
 
+/* ── Staff Management (Phase 3) ──────────────────────────────────────────── */
+async function renderStaff() {
+  if (S.user?.plan !== 'champion') {
+    showModal(`
+      <div style="text-align:center;padding:40px">
+        <h3 style="margin-bottom:16px">👥 Staff Accounts</h3>
+        <p style="color:var(--text-muted);margin-bottom:24px">Staff accounts are available on the <strong>Champion plan</strong>.</p>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-ghost" onclick="closeModal()">Back</button>
+          <button class="btn btn-accent" onclick="navigate('/upgrade')">Upgrade to Champion</button>
+        </div>
+      </div>
+    `);
+    return;
+  }
+
+  document.getElementById('app').innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">👥 Staff Accounts</h1>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-accent btn-sm" onclick="openInviteStaffModal()">+ Invite Staff</button>
+      </div>
+    </div>
+    <div id="staff-content">
+      <div class="page-loader"><div class="spinner"></div></div>
+    </div>
+  `;
+
+  try {
+    const res = await fetch('/api/staff/members').then(r => r.json());
+    const staff = res.staff || [];
+
+    const html = !staff.length
+      ? '<div style="padding:40px;text-align:center;color:var(--text-muted)"><p>No staff members yet. Invite someone to get started!</p></div>'
+      : `<div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);color:var(--text-muted)">
+              <th style="text-align:left;padding:10px 12px">Name/Email</th>
+              <th style="text-align:left;padding:10px 12px">Role</th>
+              <th style="text-align:left;padding:10px 12px">Status</th>
+              <th style="text-align:left;padding:10px 12px">Permissions</th>
+              <th style="text-align:left;padding:10px 12px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${staff.map(s => `
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:10px 12px">
+                  <div style="font-weight:500">${esc(s.invited_email || '—')}</div>
+                  <div style="color:var(--text-muted);font-size:11px">${s.staff_user_id ? 'Linked' : 'Pending invite'}</div>
+                </td>
+                <td style="padding:10px 12px"><span style="text-transform:capitalize">${esc(s.role)}</span></td>
+                <td style="padding:10px 12px">
+                  <span style="padding:3px 8px;border-radius:10px;font-size:11px;${s.invite_status === 'accepted' ? 'background:rgba(76,175,125,0.15);color:var(--success)' : 'background:rgba(255,169,77,0.15);color:#ffa94d'}">
+                    ${esc(s.invite_status)}
+                  </span>
+                </td>
+                <td style="padding:10px 12px"><span style="color:var(--text-muted);font-size:11px">${Object.values(s.permissions || {}).filter(v => v === true).length} active</span></td>
+                <td style="padding:10px 12px">
+                  <button class="btn btn-ghost btn-sm" onclick="openEditStaffModal('${esc(s.id)}')">Edit</button>
+                  <button class="btn btn-danger btn-sm" onclick="removeStaffMember('${esc(s.id)}')">Remove</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    document.getElementById('staff-content').innerHTML = html;
+  } catch (e) {
+    document.getElementById('staff-content').innerHTML = `<p class="text-danger" style="padding:20px">Error loading staff members: ${extractError(e.message)}</p>`;
+  }
+}
+
+window.openInviteStaffModal = function() {
+  showModal(`
+    <div style="max-width:500px">
+      <h3 style="margin-bottom:16px">Invite Staff Member</h3>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Email address</label>
+        <input type="email" id="staff-invite-email" placeholder="team@example.com"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+      </div>
+
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Role</label>
+        <select id="staff-invite-role" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+          <option value="staff">Staff — Add items, record sales, view inventory</option>
+          <option value="viewer">Viewer — View inventory & sales only</option>
+          <option value="manager">Manager — Everything except delete items & financials</option>
+        </select>
+      </div>
+
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--text-muted)">
+        <div style="font-weight:600;margin-bottom:8px">Permissions will include:</div>
+        <div id="staff-role-perms">View inventory, Add items, Record sales</div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="closeModal()" style="flex:1">Cancel</button>
+        <button class="btn btn-accent" onclick="submitInviteStaff()" style="flex:1">Send Invite</button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('staff-invite-role').addEventListener('change', (e) => {
+    const rolePerms = {
+      'staff': 'View inventory, Add items, Record sales',
+      'viewer': 'View inventory and sales',
+      'manager': 'View inventory, Add items, Edit items, Record sales, View analytics, Manage listings'
+    };
+    document.getElementById('staff-role-perms').textContent = rolePerms[e.target.value] || '';
+  });
+};
+
+window.submitInviteStaff = async function() {
+  const email = document.getElementById('staff-invite-email').value.trim();
+  const role = document.getElementById('staff-invite-role').value;
+
+  if (!email) { toast('Enter an email address', 'error'); return; }
+
+  const res = await fetch('/api/staff/invite', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ email, role })
+  }).then(r => r.json()).catch(e => ({ success: false, error: e.message }));
+
+  if (res.success) {
+    toast('✅ Invite sent to ' + email, 'success');
+    closeModal();
+    renderStaff();
+  } else {
+    toast('❌ ' + (res.error || 'Failed to send invite'), 'error');
+  }
+};
+
+window.removeStaffMember = async function(staffId) {
+  const ok = await confirmDialog('Remove Staff', 'Are you sure? They will lose access to your account.');
+  if (!ok) return;
+
+  const res = await fetch(`/api/staff/members/${staffId}`, {
+    method: 'DELETE'
+  }).then(r => r.json()).catch(e => ({ success: false, error: e.message }));
+
+  if (res.success) {
+    toast('✅ Staff member removed', 'success');
+    renderStaff();
+  } else {
+    toast('❌ ' + (res.error || 'Failed to remove staff'), 'error');
+  }
+};
+
 const ROUTES = {
   '/':              renderInventory,
   '/analytics':     renderAnalytics,
@@ -5452,6 +5606,7 @@ const ROUTES = {
   '/settings':      renderSettings,
   '/upgrade':       renderUpgrade,
   '/admin':         renderAdmin,
+  '/staff':         renderStaff,
   '/notifications': renderNotifications,
 };
 
@@ -5496,6 +5651,17 @@ window.addEventListener('popstate', routeCurrentPath);
           e.preventDefault();
           navigate('/admin');
         });
+
+        // Add Staff link for Champion users
+        if (S.user?.plan === 'champion') {
+          const staffLi = document.createElement('li');
+          staffLi.innerHTML = '<a href="#" data-route="/staff" class="nav-link">👥 Staff</a>';
+          adminLi.after(staffLi);
+          staffLi.querySelector('a').addEventListener('click', e => {
+            e.preventDefault();
+            navigate('/staff');
+          });
+        }
       }
     }
   }
