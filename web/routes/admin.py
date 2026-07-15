@@ -7,6 +7,7 @@ import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from web.auth import get_current_user
 from web.database import get_db
+from supabase import create_client
 
 router = APIRouter()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
@@ -79,26 +80,29 @@ async def list_users(
     offset: int = 0,
     plan: str = None,
 ):
-    db = get_db()
+    # Create service key client to bypass RLS
+    sb_service = create_client(
+        os.getenv("SUPABASE_URL"),
+        os.getenv("SUPABASE_SERVICE_KEY")
+    )
 
-    # Fetch ALL users from user_profiles using service key (bypasses RLS)
-    query = db.table("user_profiles").select(
+    # Fetch ALL users from user_profiles using service key
+    query = sb_service.table("user_profiles").select(
         "id, email, display_name, plan, role, created_at, subscription_status, subscription_period_end, stripe_customer_id"
     )
 
     if plan and plan != "":
         query = query.eq("plan", plan)
 
-    # Apply pagination
+    # Apply pagination and order
     result = query.order("created_at", desc=True).limit(limit).execute()
     users = result.data or []
 
     # Add item counts and verify email is present
     for u in users:
-        items = db.table("inventory_items").select("id", count="exact")\
+        items = sb_service.table("inventory_items").select("id", count="exact")\
             .eq("user_id", u["id"]).execute()
         u["item_count"] = items.count or 0
-        # Fallback: if email is somehow missing (shouldn't happen), use display_name
         if not u.get("email"):
             u["email"] = u.get("display_name", "Unknown") + "@unknown"
 
