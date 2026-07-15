@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from web.auth import get_current_user
 from web.database import get_db as _get_db
 
-router = APIRouter(prefix="/api/staff")
+router = APIRouter()
 
 
 class InviteStaffRequest(BaseModel):
