@@ -738,7 +738,6 @@ async def bundle_list_on_ebay(req: BundleListRequest, user: dict = Depends(get_c
         # Create eBay listing using existing lister
         async with user_config.apply(user):
             result = await lister_ebay_api.list_item_on_ebay(
-                user_id=user_id,
                 item_name=title,
                 price_gbp=price,
                 image_paths=image_paths,
