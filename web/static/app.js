@@ -744,14 +744,10 @@ function renderInventoryCard(item) {
   const selected = S.selection?.has(item.item_id);
 
   return `
-    <div class="inv-card${isUW ? ' is-underwater' : ''}${selected ? ' is-selected' : ''}" data-id="${item.item_id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;margin-bottom:12px;width:100%;box-sizing:border-box;position:relative">
+    <div class="inv-card${isUW ? ' is-underwater' : ''}${selected ? ' is-selected' : ''}" data-id="${item.item_id}" data-inv-item="${item.item_id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;margin-bottom:12px;width:100%;box-sizing:border-box;position:relative${selected ? ';outline:2px solid var(--accent);outline-offset:-2px' : ''}">
       <div style="position:absolute;top:6px;right:6px;z-index:10">
-        <label class="select-checkbox-label" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:${selected ? 'var(--accent)' : 'var(--surface)'};border:2px solid ${selected ? 'var(--accent)' : 'var(--border)'};border-radius:6px;cursor:pointer;transition:all 0.15s">
-          <input type="checkbox" class="bulk-cb inv-card-checkbox" data-id="${item.item_id}"
-                 ${selected ? 'checked' : ''}
-                 onchange="toggleSelectItem(${item.item_id})"
-                 style="display:none">
-          <span class="check-indicator" style="font-size:14px;color:var(--accent);font-weight:700;line-height:1">${selected ? '✓' : ''}</span>
+        <label data-select-id="${item.item_id}" onclick="toggleSelect(${item.item_id})" style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;background:${selected ? 'var(--accent)' : 'var(--surface)'};border:2px solid ${selected ? 'var(--accent)' : 'var(--border)'};border-radius:6px;cursor:pointer;transition:all 0.15s;font-size:14px;font-weight:700;color:white">
+          ${selected ? '✓' : ''}
         </label>
       </div>
 
@@ -946,14 +942,14 @@ async function renderInventory() {
       </div>
     </div>
     ${S.plan === 'free' ? `<div id="tier-limit-banner" class="tier-limit-banner" style="display:none"></div>` : ''}
-    <div class="bulk-toolbar hidden" id="bulk-toolbar">
-      <span class="bulk-count">0 selected</span>
-      <button class="btn btn-sm btn-ghost" onclick="bulkUpdatePrices()">🔄 Update Prices</button>
-      <button class="btn btn-sm btn-ghost" onclick="bulkExport()">📥 Export CSV</button>
-      <button class="btn btn-sm btn-accent" onclick="openBundleListModal()">🏷️ Bundle List</button>
-      <button class="btn btn-sm btn-success" onclick="openBundleSellModal()">💰 Bundle Sell</button>
-      <button class="btn btn-sm btn-danger" onclick="bulkRemove()">🗑️ Remove</button>
-      <button class="btn btn-sm btn-ghost" onclick="clearSelection()">✕ Clear</button>
+    <div class="bulk-toolbar hidden" id="bulk-toolbar" style="display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;align-items:center">
+      <span class="bulk-count" style="font-weight:600;font-size:13px;margin-right:auto;white-space:nowrap">0 selected</span>
+      <button class="btn btn-sm btn-ghost" onclick="bulkUpdatePrices()" style="flex:1;min-width:100px;white-space:nowrap">🔄 Update Prices</button>
+      <button class="btn btn-sm btn-ghost" onclick="bulkExport()" style="flex:1;min-width:100px;white-space:nowrap">📥 Export CSV</button>
+      <button class="btn btn-sm btn-accent" onclick="openBundleListModal()" style="flex:1;min-width:100px;white-space:nowrap">🏷️ Bundle List</button>
+      <button class="btn btn-sm btn-success" onclick="openBundleSellModal()" style="flex:1;min-width:100px;white-space:nowrap">💰 Bundle Sell</button>
+      <button class="btn btn-sm btn-danger" onclick="bulkRemove()" style="flex:1;min-width:100px;white-space:nowrap">🗑️ Remove</button>
+      <button class="btn btn-sm btn-ghost" onclick="clearSelection()" style="flex:1;min-width:100px;white-space:nowrap">✕ Clear</button>
     </div>
     <div id="inventory-grid" class="inventory-grid" style="margin-top:12px">${skeletonCards(12)}</div>
     <p id="row-count" class="text-muted" style="font-size:0.82rem;margin-top:12px">Loading…</p>`;
@@ -3308,32 +3304,39 @@ async function renderRestockPanel() {
 /* ── Bulk selection (Feature 3) ──────────────────────────────────────────── */
 S.selection = new Set();
 
-function toggleSelectItem(itemId) {
-  // Called from onchange — read the checkbox state directly to avoid any desync
-  const cb = document.querySelector(`.inv-card[data-id="${itemId}"] .bulk-cb`);
-  const checked = cb ? cb.checked : !S.selection.has(itemId);
-  if (checked) S.selection.add(itemId);
-  else S.selection.delete(itemId);
+window.toggleSelect = function(itemId) {
+  if (!S.selection) S.selection = new Set();
 
-  const card = document.querySelector(`.inv-card[data-id="${itemId}"]`);
-  if (card) {
-    card.classList.toggle('is-selected', checked);
-
-    // Update visual checkbox without re-rendering
-    const indicator = card.querySelector('.check-indicator');
-    const checkboxLabel = card.querySelector('.select-checkbox-label');
-
-    if (indicator) {
-      indicator.textContent = checked ? '✓' : '';
-    }
-    if (checkboxLabel) {
-      checkboxLabel.style.background = checked ? 'var(--accent)' : 'var(--surface)';
-      checkboxLabel.style.borderColor = checked ? 'var(--accent)' : 'var(--border)';
-    }
-    card.style.outline = checked ? '2px solid var(--accent)' : 'none';
+  if (S.selection.has(itemId)) {
+    S.selection.delete(itemId);
+  } else {
+    S.selection.add(itemId);
   }
 
+  const isSelected = S.selection.has(itemId);
+
+  // Find ALL possible checkbox indicators for this item
+  const indicators = document.querySelectorAll('[data-select-id="' + itemId + '"]');
+  indicators.forEach(el => {
+    el.textContent = isSelected ? '✓' : '';
+    el.style.background = isSelected ? 'var(--accent)' : 'var(--surface)';
+    el.style.borderColor = isSelected ? 'var(--accent)' : 'var(--border)';
+    el.style.color = 'white';
+  });
+
+  // Find card container and add outline
+  const cards = document.querySelectorAll('[data-inv-item="' + itemId + '"]');
+  cards.forEach(card => {
+    card.style.outline = isSelected ? '2px solid var(--accent)' : 'none';
+    card.style.outlineOffset = '-2px';
+  });
+
   updateBulkToolbar();
+};
+
+function toggleSelectItem(itemId) {
+  // Legacy function - redirects to new toggleSelect
+  toggleSelect(itemId);
 }
 
 function toggleSelectAll() {
@@ -3341,44 +3344,42 @@ function toggleSelectAll() {
   const allSelected = allVisible.every(id => S.selection.has(id));
   if (allSelected) allVisible.forEach(id => S.selection.delete(id));
   else             allVisible.forEach(id => S.selection.add(id));
-  document.querySelectorAll('.inv-card[data-id]').forEach(card => {
-    const id = parseInt(card.dataset.id);
+
+  document.querySelectorAll('[data-inv-item]').forEach(card => {
+    const id = parseInt(card.dataset.invItem);
     const isSelected = S.selection.has(id);
     card.classList.toggle('is-selected', isSelected);
 
-    // Update visual checkbox
-    const indicator = card.querySelector('.check-indicator');
-    const checkboxLabel = card.querySelector('.select-checkbox-label');
-    const cb = card.querySelector('.bulk-cb');
-
-    if (cb) cb.checked = isSelected;
-    if (indicator) indicator.textContent = isSelected ? '✓' : '';
-    if (checkboxLabel) {
-      checkboxLabel.style.background = isSelected ? 'var(--accent)' : 'var(--surface)';
-      checkboxLabel.style.borderColor = isSelected ? 'var(--accent)' : 'var(--border)';
+    // Update visual checkbox using data attributes
+    const label = document.querySelector('[data-select-id="' + id + '"]');
+    if (label) {
+      label.textContent = isSelected ? '✓' : '';
+      label.style.background = isSelected ? 'var(--accent)' : 'var(--surface)';
+      label.style.borderColor = isSelected ? 'var(--accent)' : 'var(--border)';
     }
+
     card.style.outline = isSelected ? '2px solid var(--accent)' : 'none';
+    card.style.outlineOffset = isSelected ? '-2px' : '0';
   });
   updateBulkToolbar();
 }
 
 function clearSelection() {
   S.selection.clear();
-  document.querySelectorAll('.inv-card.is-selected').forEach(c => {
-    c.classList.remove('is-selected');
+  document.querySelectorAll('[data-inv-item]').forEach(card => {
+    card.classList.remove('is-selected');
 
-    // Update visual checkbox
-    const indicator = c.querySelector('.check-indicator');
-    const checkboxLabel = c.querySelector('.select-checkbox-label');
-    const cb = c.querySelector('.bulk-cb');
-
-    if (cb) cb.checked = false;
-    if (indicator) indicator.textContent = '';
-    if (checkboxLabel) {
-      checkboxLabel.style.background = 'var(--surface)';
-      checkboxLabel.style.borderColor = 'var(--border)';
+    // Update visual checkbox using data attributes
+    const id = parseInt(card.dataset.invItem);
+    const label = document.querySelector('[data-select-id="' + id + '"]');
+    if (label) {
+      label.textContent = '';
+      label.style.background = 'var(--surface)';
+      label.style.borderColor = 'var(--border)';
     }
-    c.style.outline = 'none';
+
+    card.style.outline = 'none';
+    card.style.outlineOffset = '0';
   });
   updateBulkToolbar();
 }
