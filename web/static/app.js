@@ -3046,7 +3046,12 @@ async function syncSalesNow() {
   const btn = document.getElementById('sync-sales-btn');
   if (btn) { btn.textContent = '⏳ Syncing...'; btn.disabled = true; }
   try {
-    const res = await fetch('/api/ebay/sync-sales', {method:'POST'});
+    const res = await fetch('/api/ebay/sync-sales', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     toast(`✅ Synced: ${data.synced}, Skipped: ${data.skipped}`, 'success', 5000);
     await loadSalesByDate(document.getElementById('sales-date-picker')?.value || new Date().toISOString().slice(0,10));

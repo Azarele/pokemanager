@@ -136,6 +136,8 @@ async def _get_recent_orders(
         data = resp.json()
         orders = data.get("orders", [])
         print(f"[ebay_sync] Found {len(orders)} orders for user {user_id}")
+        if orders:
+            print(f"[ebay_sync] Raw API response (first order): {orders[0] if orders else 'None'}")
         return orders
     except Exception as e:
         print(f"[ebay_sync] Error fetching orders: {e}")
@@ -219,6 +221,7 @@ async def _sync_user_sales(user_id: str) -> dict:
 
     # Fetch orders and sync them
     orders = await _get_recent_orders(user_id, access_token)
+    print(f"[ebay_sync] === SYNC START === Processing {len(orders)} orders for user {user_id}")
     for order in orders:
         try:
             order_id = order.get("orderId")
@@ -264,9 +267,11 @@ async def _sync_user_sales(user_id: str) -> dict:
                 # Check for bundle listing (multiple items share same listing_id)
                 if ebay_listing_id:
                     all_bundle_items = [i for i in inventory if i.get("ebay_listing_id") == ebay_listing_id and i.get("status") == "Inventory"]
+                    print(f"[ebay_sync] Listing {ebay_listing_id}: Found {len(all_bundle_items)} unsold items with this listing")
                     if len(all_bundle_items) > 1:
                         # Bundle sale - split proceeds proportionally by market value
-                        print(f"[ebay_sync] Bundle listing detected: {len(all_bundle_items)} items share listing {ebay_listing_id}")
+                        print(f"[ebay_sync] ✓ BUNDLE DETECTED: {len(all_bundle_items)} items share listing {ebay_listing_id}")
+                        print(f"[ebay_sync] Bundle item IDs: {[i['item_id'] for i in all_bundle_items]}")
 
                         # Extract price paid for entire bundle
                         cost_obj = item.get("lineItemCost", {})
@@ -447,6 +452,7 @@ async def _sync_user_sales(user_id: str) -> dict:
     offers = await _get_pending_offers(user_id, access_token)
     stats["offers_found"] = len(offers)
 
+    print(f"[ebay_sync] === SYNC END === Results for {user_id}: synced={stats['synced']}, skipped={stats['skipped']}, errors={stats['errors']}, offers={stats['offers_found']}")
     return stats
 
 
