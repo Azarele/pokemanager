@@ -66,11 +66,14 @@ async def get_next_item_id(user_id: str) -> int:
 
 
 async def get_item_by_listing_id(user_id: str, listing_id: str):
-    """Get inventory item by eBay listing ID (fallback when SKU doesn't match)."""
+    """Get oldest unsold inventory item by eBay listing ID (for quantity listings, takes oldest first)."""
     db = get_db()
     result = db.table("inventory_items").select("*") \
         .eq("user_id", user_id).eq("ebay_listing_id", str(listing_id)) \
-        .eq("status", "Inventory").execute()
+        .eq("status", "Inventory") \
+        .order("item_id", desc=False) \
+        .limit(1) \
+        .execute()
     return _row_to_item(result.data[0]) if result.data else None
 
 
