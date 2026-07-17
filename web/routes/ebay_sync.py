@@ -261,6 +261,69 @@ async def _sync_user_sales(user_id: str) -> dict:
                     print(f"[ebay_sync] No inventory item found for SKU: {sku}, listing_id: {ebay_listing_id}")
                     continue
 
+                # Check for bundle listing (multiple items share same listing_id)
+                if ebay_listing_id:
+                    all_bundle_items = [i for i in inventory if i.get("ebay_listing_id") == ebay_listing_id and i.get("status") == "Inventory"]
+                    if len(all_bundle_items) > 1:
+                        # Bundle sale - split proceeds proportionally by market value
+                        print(f"[ebay_sync] Bundle listing detected: {len(all_bundle_items)} items share listing {ebay_listing_id}")
+
+                        # Extract price paid for entire bundle
+                        cost_obj = item.get("lineItemCost", {})
+                        if isinstance(cost_obj, dict):
+                            total_price_paid = float(cost_obj.get("value", 0))
+                        else:
+                            total_price_paid = float(cost_obj or 0)
+
+                        # Calculate total market value across bundle
+                        total_market = sum(float(i.get("live_price") or 0) for i in all_bundle_items)
+
+                        # Calculate eBay fee (apply to bundle price)
+                        ebay_fee_total = 0.0
+                        if total_price_paid > 0:
+                            # Use first item's promotion setting or default
+                            first_bundle_item = all_bundle_items[0]
+                            if first_bundle_item.get("promoted_listing_pct"):
+                                promo_pct = float(first_bundle_item.get("promoted_listing_pct"))
+                                ebay_fee_total = round(total_price_paid * (promo_pct / 100), 2)
+                            else:
+                                ebay_fee_total = round(total_price_paid * ebay_fee_rate, 2)
+
+                        print(f"[ebay_sync] Bundle: total_price={total_price_paid}, total_market={total_market}, total_fee={ebay_fee_total}")
+
+                        # Process each item in bundle with proportional split
+                        for bundle_item in all_bundle_items:
+                            item_id_b = bundle_item["item_id"]
+                            item_market = float(bundle_item.get("live_price") or 0)
+
+                            # Calculate proportional share
+                            if total_market > 0:
+                                proportion = item_market / total_market
+                            else:
+                                proportion = 1.0 / len(all_bundle_items)
+
+                            item_price_share = round(total_price_paid * proportion, 2)
+                            item_fee_share = round(ebay_fee_total * proportion, 2)
+                            item_purchase_price = float(bundle_item.get("purchase_price") or 0)
+                            item_profit = round(item_price_share - item_fee_share - item_purchase_price, 2)
+
+                            print(f"[ebay_sync] Bundle item {item_id_b}: market={item_market}, share={item_price_share}, fee_share={item_fee_share}, profit={item_profit}")
+
+                            # Mark item as sold with proportional split
+                            await db.edit_item(user_id, item_id_b, "status", "Sold")
+                            await db.edit_item(user_id, item_id_b, "date_sold", order_creation_date)
+                            await db.edit_item(user_id, item_id_b, "sell_price", item_price_share)
+                            await db.edit_item(user_id, item_id_b, "ebay_fee", item_fee_share)
+                            await db.edit_item(user_id, item_id_b, "profit", item_profit)
+                            await db.edit_item(user_id, item_id_b, "ebay_order_id", order_id)
+                            if ebay_listing_id:
+                                await db.edit_item(user_id, item_id_b, "ebay_listing_id", ebay_listing_id)
+
+                            stats["synced"] += 1
+
+                        print(f"[ebay_sync] ✓ Bundle sale synced: {len(all_bundle_items)} items from order {order_id}")
+                        continue
+
                 # Check if item is already sold
                 already_sold = inv_item.get("status") == "Sold"
                 print(f"[ebay_sync] Checking order {order_id}, item {item_id}, listing_id {ebay_listing_id}, status {inv_item.get('status')}")

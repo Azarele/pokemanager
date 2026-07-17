@@ -673,3 +673,99 @@ async def reprice_all_listings_v2(body: dict, user: dict = Depends(get_current_u
             await asyncio.sleep(0.3)
 
     return results
+
+
+# ── Bundle List on eBay ───────────────────────────────────────────────────
+
+class BundleListRequest(BaseModel):
+    item_ids: list[int]
+    title: str
+    price: float
+    promoted_listing_pct: float = 0
+    description: str = ""
+
+
+@router.post("/bundle-list")
+async def bundle_list_on_ebay(req: BundleListRequest, user: dict = Depends(get_current_user)):
+    """List multiple inventory items as a single eBay bundle listing."""
+    user_id = user["id"]
+    item_ids = req.item_ids
+    title = req.title[:80]
+    price = req.price
+    promo_pct = req.promoted_listing_pct
+    description = req.description
+
+    try:
+        # Get all items
+        all_items = await db.get_all_items(user_id, status_filter="Inventory")
+        items = [i for i in all_items if i["item_id"] in item_ids]
+
+        if not items:
+            return {"success": False, "error": "Items not found"}
+
+        if len(items) < 2:
+            return {"success": False, "error": "Need at least 2 items to bundle"}
+
+        # Generate bundle ID
+        import uuid
+        bundle_id = str(uuid.uuid4())
+
+        # Use first item's data as base for listing
+        first_item = items[0]
+
+        # Create eBay listing using existing lister
+        async with user_config.apply(user):
+            result = await lister_ebay_api.list_item_on_ebay(
+                user_id=user_id,
+                item_name=title,
+                price_gbp=price,
+                image_paths=[],
+                condition="Near Mint",
+                description=description,
+                card_name=title,
+                pc_url=first_item.get("pc_url", ""),
+                item_id=item_ids[0],
+                sku=f"pokemaz-bundle-{bundle_id[:8]}"
+            )
+
+        if not result or not result.get("success"):
+            error_msg = result.get("error") if result else "Unknown error"
+            return {"success": False, "error": f"Failed to create eBay listing: {error_msg}"}
+
+        listing_url = result.get("listing_url", "")
+        listing_id = listing_url.rstrip("/").split("/")[-1].split("?")[0] if listing_url else ""
+
+        if not listing_id:
+            return {"success": False, "error": "Could not extract listing ID"}
+
+        # Update all items with bundle listing info in database
+        for item in items:
+            await db.update_item_field(
+                user_id,
+                item["item_id"],
+                "ebay_listing_id",
+                listing_id
+            )
+            await db.update_item_field(user_id, item["item_id"], "ebay_listed", "Yes")
+            await db.update_item_field(user_id, item["item_id"], "bundle_id", bundle_id)
+            await db.update_item_field(user_id, item["item_id"], "promoted_listing_pct", promo_pct)
+
+        audit.log_mutation("bundle_list", user_id, "bundle_listed", {
+            "item_ids": item_ids,
+            "listing_id": listing_id,
+            "bundle_id": bundle_id,
+            "price": price
+        })
+
+        return {
+            "success": True,
+            "listing_id": listing_id,
+            "bundle_id": bundle_id,
+            "listing_url": listing_url
+        }
+
+    except Exception as e:
+        print(f"[bundle-list] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}

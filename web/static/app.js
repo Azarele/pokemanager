@@ -746,12 +746,12 @@ function renderInventoryCard(item) {
   return `
     <div class="inv-card${isUW ? ' is-underwater' : ''}${selected ? ' is-selected' : ''}" data-id="${item.item_id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;margin-bottom:12px;width:100%;box-sizing:border-box;position:relative">
       <div style="position:absolute;top:6px;right:6px;z-index:10">
-        <label style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--surface);border:2px solid var(--border);border-radius:6px;cursor:pointer;transition:all 0.2s">
+        <label class="select-checkbox-label" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:${selected ? 'var(--accent)' : 'var(--surface)'};border:2px solid ${selected ? 'var(--accent)' : 'var(--border)'};border-radius:6px;cursor:pointer;transition:all 0.15s">
           <input type="checkbox" class="bulk-cb inv-card-checkbox" data-id="${item.item_id}"
                  ${selected ? 'checked' : ''}
                  onchange="toggleSelectItem(${item.item_id})"
                  style="display:none">
-          <span class="check-indicator" style="font-size:14px;color:var(--accent);font-weight:700">${selected ? '✓' : ''}</span>
+          <span class="check-indicator" style="font-size:14px;color:var(--accent);font-weight:700;line-height:1">${selected ? '✓' : ''}</span>
         </label>
       </div>
 
@@ -950,6 +950,7 @@ async function renderInventory() {
       <span class="bulk-count">0 selected</span>
       <button class="btn btn-sm btn-ghost" onclick="bulkUpdatePrices()">🔄 Update Prices</button>
       <button class="btn btn-sm btn-ghost" onclick="bulkExport()">📥 Export CSV</button>
+      <button class="btn btn-sm btn-accent" onclick="openBundleListModal()">🏷️ Bundle List</button>
       <button class="btn btn-sm btn-success" onclick="openBundleSellModal()">💰 Bundle Sell</button>
       <button class="btn btn-sm btn-danger" onclick="bulkRemove()">🗑️ Remove</button>
       <button class="btn btn-sm btn-ghost" onclick="clearSelection()">✕ Clear</button>
@@ -3313,8 +3314,25 @@ function toggleSelectItem(itemId) {
   const checked = cb ? cb.checked : !S.selection.has(itemId);
   if (checked) S.selection.add(itemId);
   else S.selection.delete(itemId);
+
   const card = document.querySelector(`.inv-card[data-id="${itemId}"]`);
-  if (card) card.classList.toggle('is-selected', checked);
+  if (card) {
+    card.classList.toggle('is-selected', checked);
+
+    // Update visual checkbox without re-rendering
+    const indicator = card.querySelector('.check-indicator');
+    const checkboxLabel = card.querySelector('.select-checkbox-label');
+
+    if (indicator) {
+      indicator.textContent = checked ? '✓' : '';
+    }
+    if (checkboxLabel) {
+      checkboxLabel.style.background = checked ? 'var(--accent)' : 'var(--surface)';
+      checkboxLabel.style.borderColor = checked ? 'var(--accent)' : 'var(--border)';
+    }
+    card.style.outline = checked ? '2px solid var(--accent)' : 'none';
+  }
+
   updateBulkToolbar();
 }
 
@@ -3325,14 +3343,43 @@ function toggleSelectAll() {
   else             allVisible.forEach(id => S.selection.add(id));
   document.querySelectorAll('.inv-card[data-id]').forEach(card => {
     const id = parseInt(card.dataset.id);
-    card.classList.toggle('is-selected', S.selection.has(id));
+    const isSelected = S.selection.has(id);
+    card.classList.toggle('is-selected', isSelected);
+
+    // Update visual checkbox
+    const indicator = card.querySelector('.check-indicator');
+    const checkboxLabel = card.querySelector('.select-checkbox-label');
+    const cb = card.querySelector('.bulk-cb');
+
+    if (cb) cb.checked = isSelected;
+    if (indicator) indicator.textContent = isSelected ? '✓' : '';
+    if (checkboxLabel) {
+      checkboxLabel.style.background = isSelected ? 'var(--accent)' : 'var(--surface)';
+      checkboxLabel.style.borderColor = isSelected ? 'var(--accent)' : 'var(--border)';
+    }
+    card.style.outline = isSelected ? '2px solid var(--accent)' : 'none';
   });
   updateBulkToolbar();
 }
 
 function clearSelection() {
   S.selection.clear();
-  document.querySelectorAll('.inv-card.is-selected').forEach(c => c.classList.remove('is-selected'));
+  document.querySelectorAll('.inv-card.is-selected').forEach(c => {
+    c.classList.remove('is-selected');
+
+    // Update visual checkbox
+    const indicator = c.querySelector('.check-indicator');
+    const checkboxLabel = c.querySelector('.select-checkbox-label');
+    const cb = c.querySelector('.bulk-cb');
+
+    if (cb) cb.checked = false;
+    if (indicator) indicator.textContent = '';
+    if (checkboxLabel) {
+      checkboxLabel.style.background = 'var(--surface)';
+      checkboxLabel.style.borderColor = 'var(--border)';
+    }
+    c.style.outline = 'none';
+  });
   updateBulkToolbar();
 }
 
@@ -3535,6 +3582,127 @@ window.submitBundleSell = async function(itemIds) {
       refreshInventoryGrid();
     } else {
       toast('❌ Failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch (e) {
+    toast('❌ Error: ' + extractError(e.message), 'error');
+  }
+};
+
+/* ── Bundle List ─────────────────────────────────────────────────────────── */
+window.openBundleListModal = async function() {
+  const selectedIds = Array.from(S.selection);
+  if (selectedIds.length < 2) {
+    toast('❌ Select at least 2 items to bundle list', 'error');
+    return;
+  }
+
+  const selectedItems = S.inventory.filter(i => selectedIds.includes(i.item_id) && i.status === 'Inventory');
+  if (!selectedItems.length) {
+    toast('❌ No valid inventory items selected', 'error');
+    return;
+  }
+
+  const totalMarket = selectedItems.reduce((s, i) => s + (i.live_price || 0), 0);
+
+  const names = selectedItems.map(i => i.card_name.replace(/\(.*?\)/g, '').trim());
+  let autoTitle = names.join(' & ');
+  if (autoTitle.length > 80) {
+    autoTitle = names.slice(0, 2).join(' & ') + ' + ' + (selectedItems.length - 2) + ' more Pokemon Cards';
+  }
+  autoTitle = autoTitle.slice(0, 80);
+
+  const html = `
+    <div style="max-width:560px">
+      <h3 style="margin-bottom:16px">🏷️ Bundle List on eBay</h3>
+
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:16px;max-height:250px;overflow-y:auto">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px">Items in bundle (${selectedItems.length})</div>
+        ${selectedItems.map(i =>
+          '<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">' +
+            '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + esc(i.card_name) + ' <span style="color:var(--text-muted)">#' + i.item_id + '</span></span>' +
+            '<span style="flex-shrink:0;margin-left:8px">£' + (i.live_price || 0).toFixed(2) + ' market</span>' +
+          '</div>'
+        ).join('')}
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:13px;font-weight:600">
+          <span>Total market value</span><span>£${totalMarket.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">eBay listing title <span style="color:var(--text-muted);font-weight:400">(max 80 chars)</span></label>
+        <input type="text" id="bundle-list-title" value="${esc(autoTitle)}" maxlength="80"
+          oninput="document.getElementById('bundle-title-count').textContent=this.value.length"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px"><span id="bundle-title-count">${autoTitle.length}</span>/80 characters</div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Bundle listing price (£)</label>
+        <input type="number" id="bundle-list-price" step="0.01" placeholder="0.00"
+          value="${totalMarket.toFixed(2)}"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Promoted listing % (optional)</label>
+        <input type="number" id="bundle-list-promo" step="0.1" placeholder="e.g. 5" min="0" max="100"
+          value="${S.user && S.user.promoted_listing_pct ? S.user.promoted_listing_pct : 0}"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+      </div>
+
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Description (optional)</label>
+        <textarea id="bundle-list-desc" rows="3" placeholder="Bundle lot of ${selectedItems.length} Pokemon TCG cards..."
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);resize:vertical;font-family:inherit">Bundle lot of ${selectedItems.length} Pokemon TCG cards in Near Mint condition. All cards pictured. Fast dispatch.</textarea>
+      </div>
+
+      <div style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:var(--text-muted)">
+        ℹ️ When sold, proceeds will be split proportionally by market value. Each card's profit will be tracked individually.
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button onclick="closeModal()" class="btn btn-ghost" style="flex:1">Cancel</button>
+        <button onclick="submitBundleList(${JSON.stringify(selectedIds)})" class="btn btn-accent" style="flex:1">🏷️ List on eBay</button>
+      </div>
+    </div>
+  `;
+
+  showModal(html);
+};
+
+window.submitBundleList = async function(itemIds) {
+  const title = document.getElementById('bundle-list-title').value.trim();
+  const price = parseFloat(document.getElementById('bundle-list-price').value);
+  const promo = parseFloat(document.getElementById('bundle-list-promo').value) || 0;
+  const desc = document.getElementById('bundle-list-desc').value.trim();
+
+  if (!title) {
+    toast('❌ Enter a listing title', 'error');
+    return;
+  }
+  if (!price || price <= 0) {
+    toast('❌ Enter a listing price', 'error');
+    return;
+  }
+
+  toast('⏳ Creating bundle listing on eBay...');
+  closeModal();
+
+  try {
+    const data = await api.post('/listings/bundle-list', {
+      item_ids: itemIds,
+      title: title,
+      price: price,
+      promoted_listing_pct: promo,
+      description: desc
+    });
+
+    if (data.success) {
+      toast('✅ Bundle listed on eBay! Listing #' + data.listing_id, 'success');
+      clearSelection();
+      await loadInventory();
+    } else {
+      toast('❌ ' + (data.error || 'Failed to list bundle'), 'error');
     }
   } catch (e) {
     toast('❌ Error: ' + extractError(e.message), 'error');
