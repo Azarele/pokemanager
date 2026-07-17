@@ -1679,7 +1679,7 @@ function renderBundleModal() {
               <div style="text-align:right;min-width:80px">
                 ${totalPaid > 0 ? `
                   <div style="font-size:11px;color:var(--text-muted)">Your cost</div>
-                  <div style="font-weight:600">£${((item.market_price / totalMarket) * totalPaid).toFixed(2)}</div>
+                  <div id="bundle-item-cost-${idx}" style="font-weight:600">£${(totalMarket > 0 ? (item.market_price / totalMarket) * totalPaid : totalPaid / items.length).toFixed(2)}</div>
                 ` : ''}
               </div>
               <button onclick="removeBundleItem(${idx})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px">×</button>
@@ -1693,7 +1693,7 @@ function renderBundleModal() {
       <div style="margin-bottom:16px">
         <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Total paid for entire bundle (£)</label>
         <input type="number" id="bundle-total-paid" step="0.01" placeholder="0.00"
-          oninput="refreshBundleModal()"
+          oninput="updateBundleCosts()"
           style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">
         <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Cost will be split proportionally based on each card's market value</div>
       </div>
@@ -1721,17 +1721,15 @@ function renderBundleModal() {
         </div>
       </div>
 
-      ${items.length > 0 && totalPaid > 0 ? `
-        <div style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:8px;padding:12px;margin-bottom:16px">
-          <div style="font-size:13px;font-weight:600;margin-bottom:8px">📊 Bundle Summary</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:13px;text-align:center">
-            <div><div style="color:var(--text-muted);font-size:11px">TOTAL MARKET</div><div style="font-weight:700">£${totalMarket.toFixed(2)}</div></div>
-            <div><div style="color:var(--text-muted);font-size:11px">TOTAL COST</div><div style="font-weight:700">£${totalPaid.toFixed(2)}</div></div>
-            <div><div style="color:var(--text-muted);font-size:11px">POTENTIAL PROFIT</div>
-              <div style="font-weight:700;color:${(totalMarket - totalPaid >= 0) ? 'var(--success)' : 'var(--danger)'}">${(totalMarket - totalPaid >= 0) ? '+' : ''}£${(totalMarket - totalPaid).toFixed(2)}</div></div>
-          </div>
+      <div id="bundle-summary" style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:8px;padding:12px;margin-bottom:16px;display:${items.length > 0 && totalPaid > 0 ? 'block' : 'none'}">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px">📊 Bundle Summary</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:13px;text-align:center">
+          <div><div style="color:var(--text-muted);font-size:11px">TOTAL MARKET</div><div style="font-weight:700">£${totalMarket.toFixed(2)}</div></div>
+          <div><div style="color:var(--text-muted);font-size:11px">TOTAL COST</div><div style="font-weight:700">£${totalPaid.toFixed(2)}</div></div>
+          <div><div style="color:var(--text-muted);font-size:11px">POTENTIAL PROFIT</div>
+            <div style="font-weight:700;color:${(totalMarket - totalPaid >= 0) ? 'var(--success)' : 'var(--danger)'}">${(totalMarket - totalPaid >= 0) ? '+' : ''}£${(totalMarket - totalPaid).toFixed(2)}</div></div>
         </div>
-      ` : ''}
+      </div>
 
       <div style="display:flex;gap:8px">
         <button onclick="closeModal()" class="btn btn-ghost" style="flex:1">Cancel</button>
@@ -1747,6 +1745,39 @@ function renderBundleModal() {
 
 window.refreshBundleModal = function() {
   renderBundleModal();
+};
+
+window.updateBundleCosts = function() {
+  const totalPaid = parseFloat(document.getElementById('bundle-total-paid').value) || 0;
+  const items = window._bundleItems || [];
+  const totalMarket = items.reduce((s, i) => s + (i.market_price || 0), 0);
+
+  items.forEach((item, idx) => {
+    const costEl = document.getElementById('bundle-item-cost-' + idx);
+    if (costEl) {
+      const cost = totalMarket > 0 ? (item.market_price / totalMarket) * totalPaid : totalPaid / items.length;
+      costEl.textContent = '£' + cost.toFixed(2);
+    }
+  });
+
+  const summaryEl = document.getElementById('bundle-summary');
+  if (summaryEl && items.length > 0) {
+    if (totalPaid > 0) {
+      const profit = totalMarket - totalPaid;
+      summaryEl.innerHTML =
+        '<div style="font-size:13px;font-weight:600;margin-bottom:8px">📊 Bundle Summary</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:13px;text-align:center">' +
+          '<div><div style="color:var(--text-muted);font-size:11px">TOTAL MARKET</div><div style="font-weight:700">£' + totalMarket.toFixed(2) + '</div></div>' +
+          '<div><div style="color:var(--text-muted);font-size:11px">TOTAL COST</div><div style="font-weight:700">£' + totalPaid.toFixed(2) + '</div></div>' +
+          '<div><div style="color:var(--text-muted);font-size:11px">POTENTIAL PROFIT</div>' +
+            '<div style="font-weight:700;color:' + (profit >= 0 ? 'var(--success)' : 'var(--danger)') + '">' +
+              (profit >= 0 ? '+' : '') + '£' + profit.toFixed(2) + '</div></div>' +
+        '</div>';
+      summaryEl.style.display = 'block';
+    } else {
+      summaryEl.style.display = 'none';
+    }
+  }
 };
 
 window.addCardToBundle = async function() {
