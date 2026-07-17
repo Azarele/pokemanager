@@ -683,28 +683,29 @@ class BundleListRequest(BaseModel):
     price: float
     promoted_listing_pct: float = 0
     description: str = ""
+    photos: list[str] = []  # base64 encoded images
 
 
 @router.post("/bundle-list")
 async def bundle_list_on_ebay(req: BundleListRequest, user: dict = Depends(get_current_user)):
-    """List multiple inventory items as a single eBay bundle listing."""
+    """List inventory items as a single eBay bundle listing."""
     user_id = user["id"]
-    item_ids = req.item_ids
+    item_ids = [int(i) if isinstance(i, str) else i for i in (req.item_ids or [])]
     title = req.title[:80]
     price = req.price
     promo_pct = req.promoted_listing_pct
     description = req.description
 
     try:
+        if not item_ids:
+            return {"success": False, "error": "No items selected"}
+
         # Get all items
         all_items = await db.get_all_items(user_id, status_filter="Inventory")
         items = [i for i in all_items if i["item_id"] in item_ids]
 
         if not items:
             return {"success": False, "error": "Items not found"}
-
-        if len(items) < 2:
-            return {"success": False, "error": "Need at least 2 items to bundle"}
 
         # Generate bundle ID
         import uuid
@@ -713,13 +714,34 @@ async def bundle_list_on_ebay(req: BundleListRequest, user: dict = Depends(get_c
         # Use first item's data as base for listing
         first_item = items[0]
 
+        # Convert base64 photos to temporary files
+        image_paths = []
+        photos = req.photos or []
+        for idx, photo_b64 in enumerate(photos):
+            try:
+                if photo_b64.startswith('data:image'):
+                    # Remove data URI prefix
+                    photo_b64 = photo_b64.split(',', 1)[1]
+
+                import base64
+                image_data = base64.b64decode(photo_b64)
+
+                # Save to temp directory
+                safe_name = f"bundle_{bundle_id[:8]}_photo_{idx}.jpg"
+                dest = Path(config.TEMP_IMAGES_DIR) / safe_name
+                dest.write_bytes(image_data)
+                image_paths.append(dest)
+                print(f"[bundle-list] Saved photo {idx+1}: {dest}")
+            except Exception as e:
+                print(f"[bundle-list] Error converting photo {idx}: {e}")
+
         # Create eBay listing using existing lister
         async with user_config.apply(user):
             result = await lister_ebay_api.list_item_on_ebay(
                 user_id=user_id,
                 item_name=title,
                 price_gbp=price,
-                image_paths=[],
+                image_paths=image_paths,
                 condition="Near Mint",
                 description=description,
                 card_name=title,

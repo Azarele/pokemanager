@@ -3592,8 +3592,8 @@ window.submitBundleSell = async function(itemIds) {
 /* ── Bundle List ─────────────────────────────────────────────────────────── */
 window.openBundleListModal = async function() {
   const selectedIds = Array.from(S.selection);
-  if (selectedIds.length < 2) {
-    toast('❌ Select at least 2 items to bundle list', 'error');
+  if (selectedIds.length < 1) {
+    toast('❌ Select at least 1 item to list', 'error');
     return;
   }
 
@@ -3661,6 +3661,15 @@ window.openBundleListModal = async function() {
         ℹ️ When sold, proceeds will be split proportionally by market value. Each card's profit will be tracked individually.
       </div>
 
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Photos</label>
+        <div id="bundle-photo-preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
+        <label style="display:block;width:100%;padding:12px;background:var(--surface2);border:2px dashed var(--border);border-radius:8px;text-align:center;cursor:pointer;font-size:13px;color:var(--text-muted)">
+          📷 Click to add photos
+          <input type="file" accept="image/*" multiple style="display:none" onchange="handleBundlePhotos(event)">
+        </label>
+      </div>
+
       <div style="display:flex;gap:8px">
         <button onclick="closeModal()" class="btn btn-ghost" style="flex:1">Cancel</button>
         <button onclick="submitBundleList(${JSON.stringify(selectedIds)})" class="btn btn-accent" style="flex:1">🏷️ List on eBay</button>
@@ -3669,6 +3678,46 @@ window.openBundleListModal = async function() {
   `;
 
   showModal(html);
+  window._bundlePhotos = [];
+};
+
+window.handleBundlePhotos = function(event) {
+  const files = Array.from(event.target.files);
+  const preview = document.getElementById('bundle-photo-preview');
+  window._bundlePhotos = window._bundlePhotos || [];
+
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const photoIdx = window._bundlePhotos.length;
+      window._bundlePhotos.push(e.target.result); // base64
+
+      const img = document.createElement('div');
+      img.style.cssText = 'position:relative;width:72px;height:72px';
+      img.innerHTML = '<img src="' + e.target.result + '" style="width:72px;height:72px;object-fit:cover;border-radius:6px">' +
+        '<button onclick="removeBundlePhoto(' + photoIdx + ')" style="position:absolute;top:-6px;right:-6px;background:var(--danger);color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;padding:0">×</button>';
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Clear input so same file can be selected again
+  event.target.value = '';
+};
+
+window.removeBundlePhoto = function(idx) {
+  window._bundlePhotos.splice(idx, 1);
+  const preview = document.getElementById('bundle-photo-preview');
+  if (preview) {
+    preview.innerHTML = '';
+    window._bundlePhotos.forEach((photo, i) => {
+      const img = document.createElement('div');
+      img.style.cssText = 'position:relative;width:72px;height:72px';
+      img.innerHTML = '<img src="' + photo + '" style="width:72px;height:72px;object-fit:cover;border-radius:6px">' +
+        '<button onclick="removeBundlePhoto(' + i + ')" style="position:absolute;top:-6px;right:-6px;background:var(--danger);color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;padding:0">×</button>';
+      preview.appendChild(img);
+    });
+  }
 };
 
 window.submitBundleList = async function(itemIds) {
@@ -3695,7 +3744,8 @@ window.submitBundleList = async function(itemIds) {
       title: title,
       price: price,
       promoted_listing_pct: promo,
-      description: desc
+      description: desc,
+      photos: window._bundlePhotos || []
     });
 
     if (data.success) {
