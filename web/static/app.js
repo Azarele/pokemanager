@@ -1761,8 +1761,8 @@ window.addCardToBundle = async function() {
   try {
     const isPcUrl = input.includes('pricecharting.com');
     const data = await api.post('/pricing/lookup', {
-      pc_url: isPcUrl ? input : null,
-      card_name: isPcUrl ? null : input
+      pc_url: isPcUrl ? input : '',
+      card_name: isPcUrl ? '' : input
     });
 
     if (data.card_name) {
