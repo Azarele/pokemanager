@@ -749,12 +749,12 @@ async def bundle_list_on_ebay(req: BundleListRequest, user: dict = Depends(get_c
                 sku=f"pokemaz-bundle-{bundle_id[:8]}"
             )
 
-        if not result or not result.get("success"):
-            error_msg = result.get("error") if result else "Unknown error"
+        if not result or not result.success:
+            error_msg = result.error if result else "Unknown error"
             return {"success": False, "error": f"Failed to create eBay listing: {error_msg}"}
 
-        listing_url = result.get("listing_url", "")
-        listing_id = listing_url.rstrip("/").split("/")[-1].split("?")[0] if listing_url else ""
+        listing_url = result.listing_url if result.listing_url else None
+        listing_id = listing_url.rstrip("/").split("/")[-1].split("?")[0] if listing_url else None
 
         if not listing_id:
             return {"success": False, "error": "Could not extract listing ID"}
