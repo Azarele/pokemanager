@@ -266,7 +266,7 @@ async def _sync_user_sales(user_id: str) -> dict:
 
                 # Check for bundle listing (multiple items share same listing_id)
                 if ebay_listing_id:
-                    all_bundle_items = [i for i in inventory if i.get("ebay_listing_id") == ebay_listing_id and i.get("status") == "Inventory"]
+                    all_bundle_items = [i for i in inventory_items if i.get("ebay_listing_id") == ebay_listing_id and i.get("status") == "Inventory"]
                     print(f"[ebay_sync] Listing {ebay_listing_id}: Found {len(all_bundle_items)} unsold items with this listing")
                     if len(all_bundle_items) > 1:
                         # Bundle sale - split proceeds proportionally by market value
