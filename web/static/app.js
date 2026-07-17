@@ -348,6 +348,8 @@ function initMobileNav() {
       <a onclick="navigate('/guide');toggleMobileMenu()" class="mobile-nav-link">📖 Guide</a>
       <a onclick="navigate('/settings');toggleMobileMenu()" class="mobile-nav-link">⚙️ Settings</a>
       <a onclick="navigate('/notifications');toggleMobileMenu()" class="mobile-nav-link">🔔 Notifications</a>
+      ${S.user && (S.user.role === 'admin' || S.user.plan === 'admin') ? '<a onclick="navigate(\'/admin\');toggleMobileMenu()" class="mobile-nav-link">⚡ Admin</a>' : ''}
+      ${S.user && (S.user.plan === 'champion' || S.user.role === 'admin') ? '<a onclick="navigate(\'/staff\');toggleMobileMenu()" class="mobile-nav-link">👥 Staff</a>' : ''}
     </nav>
     <div style="margin-top:auto;padding-top:20px;border-top:1px solid var(--border)">
       <a onclick="confirmLogout();toggleMobileMenu()" class="mobile-nav-link" style="color:var(--accent2)">🚪 Sign Out</a>
