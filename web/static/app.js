@@ -908,6 +908,7 @@ async function renderInventory() {
       <div style="display:flex;gap:8px">
         <button class="btn btn-ghost" id="refresh-all-prices-btn" onclick="refreshAllPrices()">🔄 Refresh All Prices</button>
         <button class="btn btn-ghost" onclick="openCsvImportModal()">📥 Import CSV</button>
+        <button class="btn btn-ghost" onclick="openBundleAddModal()">📦 Bundle Add</button>
         <button class="btn btn-accent" onclick="openAddItemModal()">+ Add Item</button>
       </div>
     </div>
@@ -1638,6 +1639,212 @@ async function submitBulkAdd() {
 
   _addRowCount = 1;
 }
+
+/* ── Bundle Add ──────────────────────────────────────────────────────────── */
+window._bundleItems = [];
+
+window.openBundleAddModal = function() {
+  window._bundleItems = [];
+  renderBundleModal();
+};
+
+function renderBundleModal() {
+  const items = window._bundleItems;
+  const totalMarket = items.reduce((s, i) => s + (i.market_price || 0), 0);
+  const totalPaid = parseFloat(document.getElementById('bundle-total-paid')?.value) || 0;
+
+  const html = `
+    <div style="max-width:680px;max-height:85vh;overflow-y:auto">
+      <h3 style="margin-bottom:16px;font-size:18px;font-weight:600">📦 Bundle Add</h3>
+
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Add cards to bundle</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="bundle-search" placeholder="Paste PriceCharting URL or search card name..."
+            style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+          <button onclick="addCardToBundle()" class="btn btn-accent btn-sm">+ Add</button>
+        </div>
+      </div>
+
+      ${items.length > 0 ? `
+        <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">Cards in bundle (${items.length}) · Total market: £${totalMarket.toFixed(2)}</div>
+          ${items.map((item, idx) => `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+              ${item.image_url ? `<img src="${item.image_url}" style="width:32px;height:44px;object-fit:contain;border-radius:4px;background:var(--surface)">` : `<div style="width:32px;height:44px;background:var(--surface);border-radius:4px"></div>`}
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.card_name)}</div>
+                <div style="color:var(--text-muted);font-size:11px">Market: £${(item.market_price || 0).toFixed(2)}</div>
+              </div>
+              <div style="text-align:right;min-width:80px">
+                ${totalPaid > 0 ? `
+                  <div style="font-size:11px;color:var(--text-muted)">Your cost</div>
+                  <div style="font-weight:600">£${((item.market_price / totalMarket) * totalPaid).toFixed(2)}</div>
+                ` : ''}
+              </div>
+              <button onclick="removeBundleItem(${idx})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px">×</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : `
+        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;background:var(--surface2);border-radius:8px;margin-bottom:16px">Add cards above to get started</div>
+      `}
+
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Total paid for entire bundle (£)</label>
+        <input type="number" id="bundle-total-paid" step="0.01" placeholder="0.00"
+          oninput="refreshBundleModal()"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Cost will be split proportionally based on each card's market value</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div>
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Condition (all cards)</label>
+          <select id="bundle-condition" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+            <option>Near mint or better</option>
+            <option>Lightly played</option>
+            <option>Moderately played</option>
+            <option>Heavily played</option>
+            <option>Damaged</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Region (all cards)</label>
+          <select id="bundle-region" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+            <option value="EN">EN</option>
+            <option value="JP">JP</option>
+            <option value="KR">KR</option>
+            <option value="DE">DE</option>
+            <option value="FR">FR</option>
+          </select>
+        </div>
+      </div>
+
+      ${items.length > 0 && totalPaid > 0 ? `
+        <div style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:8px;padding:12px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">📊 Bundle Summary</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:13px;text-align:center">
+            <div><div style="color:var(--text-muted);font-size:11px">TOTAL MARKET</div><div style="font-weight:700">£${totalMarket.toFixed(2)}</div></div>
+            <div><div style="color:var(--text-muted);font-size:11px">TOTAL COST</div><div style="font-weight:700">£${totalPaid.toFixed(2)}</div></div>
+            <div><div style="color:var(--text-muted);font-size:11px">POTENTIAL PROFIT</div>
+              <div style="font-weight:700;color:${(totalMarket - totalPaid >= 0) ? 'var(--success)' : 'var(--danger)'}">${(totalMarket - totalPaid >= 0) ? '+' : ''}£${(totalMarket - totalPaid).toFixed(2)}</div></div>
+          </div>
+        </div>
+      ` : ''}
+
+      <div style="display:flex;gap:8px">
+        <button onclick="closeModal()" class="btn btn-ghost" style="flex:1">Cancel</button>
+        <button onclick="submitBundleAdd()" class="btn btn-accent" style="flex:1" ${items.length === 0 ? 'disabled' : ''}>
+          📦 Add ${items.length} Card${items.length !== 1 ? 's' : ''}
+        </button>
+      </div>
+    </div>
+  `;
+
+  showModal(html);
+}
+
+window.refreshBundleModal = function() {
+  renderBundleModal();
+};
+
+window.addCardToBundle = async function() {
+  const input = document.getElementById('bundle-search')?.value.trim();
+  if (!input) {
+    toast('Enter a PriceCharting URL or card name', 'warning');
+    return;
+  }
+
+  toast('⏳ Looking up card...');
+
+  try {
+    const isPcUrl = input.includes('pricecharting.com');
+    const data = await api.post('/pricing/lookup', {
+      pc_url: isPcUrl ? input : null,
+      card_name: isPcUrl ? null : input
+    });
+
+    if (data.card_name) {
+      window._bundleItems.push({
+        card_name: data.card_name,
+        pc_url: data.pc_url || input,
+        market_price: data.market_price || 0,
+        image_url: data.image_url || ''
+      });
+      document.getElementById('bundle-search').value = '';
+      toast(`✅ Added: ${data.card_name}`, 'success');
+      renderBundleModal();
+    } else {
+      toast('❌ Card not found', 'error');
+    }
+  } catch(e) {
+    console.error('[bundle] lookup error:', e);
+    toast('❌ Error looking up card', 'error');
+  }
+};
+
+window.removeBundleItem = function(idx) {
+  window._bundleItems.splice(idx, 1);
+  renderBundleModal();
+};
+
+window.submitBundleAdd = async function() {
+  const items = window._bundleItems;
+  if (!items.length) return;
+
+  const totalPaid = parseFloat(document.getElementById('bundle-total-paid')?.value) || 0;
+  const condition = document.getElementById('bundle-condition')?.value || 'Near mint or better';
+  const region = document.getElementById('bundle-region')?.value || '';
+  const totalMarket = items.reduce((s, i) => s + (i.market_price || 0), 0);
+
+  if (!totalPaid || totalPaid <= 0) {
+    toast('❌ Enter total amount paid', 'error');
+    return;
+  }
+
+  toast(`⏳ Adding ${items.length} card${items.length !== 1 ? 's' : ''}...`);
+
+  let added = 0;
+  let failed = 0;
+
+  for (const item of items) {
+    const costShare = totalMarket > 0
+      ? Math.round((item.market_price / totalMarket) * totalPaid * 100) / 100
+      : Math.round((totalPaid / items.length) * 100) / 100;
+
+    try {
+      const resp = await api.post('/inventory/add', {
+        pc_url: item.pc_url,
+        purchase_price: costShare,
+        condition: condition,
+        region: region,
+        acquisition_type: 'purchase'
+      });
+
+      if (resp && resp.item_id) {
+        added++;
+      } else {
+        failed++;
+      }
+    } catch(e) {
+      console.error('[bundle] add error:', e);
+      failed++;
+    }
+  }
+
+  closeModal();
+
+  if (added > 0) {
+    toast(`✅ Added ${added} card${added !== 1 ? 's' : ''}${failed ? ` (${failed} failed)` : ''}`, 'success', 5000);
+    window._bundleItems = [];
+    const data = await api.get('/inventory');
+    S.inventory = data.items;
+    refreshInventoryGrid();
+  } else {
+    toast('❌ Failed to add cards', 'error');
+  }
+};
 
 /* ── CSV Import ──────────────────────────────────────────────────────────── */
 function openCsvImportModal() {

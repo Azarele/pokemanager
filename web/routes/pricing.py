@@ -1,6 +1,7 @@
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 import lister_ebay_api
 import scraper
@@ -9,6 +10,46 @@ from web import user_config
 from web.auth import get_current_user
 
 router = APIRouter()
+
+
+class PricingLookupRequest(BaseModel):
+    pc_url: str = None
+    card_name: str = None
+
+
+@router.post("/lookup")
+async def lookup_card(req: PricingLookupRequest, user: dict = Depends(get_current_user)):
+    """
+    Look up a card's market price by PriceCharting URL or card name.
+    Returns: {card_name, pc_url, market_price, image_url}
+    """
+    if not req.pc_url and not req.card_name:
+        raise HTTPException(status_code=400, detail="pc_url or card_name required")
+
+    card_name = None
+    market_price = None
+    pc_url = req.pc_url or ""
+
+    if req.pc_url:
+        try:
+            card_name, market_price = await scraper.scrape_card(req.pc_url, "Near mint or better", "")
+        except Exception as e:
+            print(f"[pricing/lookup] Error scraping PC URL: {e}")
+            return {"card_name": None, "error": str(e)}
+    else:
+        # For name-based searches, we don't have a direct lookup
+        # Return None so frontend can show the search didn't find anything
+        card_name = None
+
+    if not card_name:
+        return {"card_name": None, "error": "Card not found"}
+
+    return {
+        "card_name": card_name,
+        "pc_url": pc_url or req.pc_url,
+        "market_price": market_price,
+        "image_url": ""
+    }
 
 
 @router.get("/competitors/{item_id}")
