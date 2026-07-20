@@ -195,23 +195,47 @@ async def save_instagram_settings(body: dict, user: dict = Depends(get_current_u
     if not access_token or not business_account_id:
         return {"success": False, "error": "Both access token and business account ID are required"}
 
-    # Validate token by hitting Facebook Graph API (Instagram API v21.0)
+    # Validate token using Instagram Graph API (new Instagram Login)
+    # Try graph.instagram.com first (IGAA token), fall back to graph.facebook.com
+    validation_success = False
+    last_error = None
+
+    # First attempt: graph.instagram.com (new Instagram API with Instagram Login)
     try:
-        validate_url = f"https://graph.facebook.com/v21.0/{business_account_id}?fields=id,name&access_token={access_token}"
-        response = requests.get(validate_url, timeout=10)
+        ig_validate_url = f"https://graph.instagram.com/v21.0/me?fields=id,username&access_token={access_token}"
+        logger.info(f"Attempting Instagram token validation: {ig_validate_url}")
+        response = requests.get(ig_validate_url, timeout=10)
         data = response.json()
+        logger.info(f"Instagram Graph API response (status {response.status_code}): {data}")
 
-        if "error" in data:
-            error_msg = data.get("error", {}).get("message", "Unknown error")
-            logger.error(f"Instagram token validation failed. Status: {response.status_code}, Response: {data}")
-            return {"success": False, "error": f"Token validation failed: {error_msg}"}
-
-        if response.status_code != 200:
-            logger.error(f"Instagram token validation returned {response.status_code}. Response: {data}")
-            return {"success": False, "error": "Invalid access token or business account ID"}
+        if response.status_code == 200 and "error" not in data:
+            validation_success = True
+        elif "error" in data:
+            last_error = data.get("error", {}).get("message", "Unknown error")
     except Exception as e:
-        logger.error(f"Instagram token validation exception: {str(e)}")
-        return {"success": False, "error": f"Failed to validate token: {str(e)}"}
+        logger.warning(f"Instagram Graph API exception: {str(e)}")
+        last_error = str(e)
+
+    # Fall back: graph.facebook.com if Instagram Graph API failed
+    if not validation_success:
+        try:
+            fb_validate_url = f"https://graph.facebook.com/v21.0/me?access_token={access_token}"
+            logger.info(f"Falling back to Facebook Graph API: {fb_validate_url}")
+            response = requests.get(fb_validate_url, timeout=10)
+            data = response.json()
+            logger.info(f"Facebook Graph API response (status {response.status_code}): {data}")
+
+            if response.status_code == 200 and "error" not in data:
+                validation_success = True
+            elif "error" in data:
+                last_error = data.get("error", {}).get("message", "Unknown error")
+                logger.error(f"Facebook Graph API validation failed: {data}")
+        except Exception as e:
+            logger.error(f"Facebook Graph API exception: {str(e)}")
+            last_error = str(e)
+
+    if not validation_success:
+        return {"success": False, "error": f"Token validation failed: {last_error or 'Unknown error'}"}
 
     # Save to user_profiles
     db = get_db()
