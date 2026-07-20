@@ -26,3 +26,6 @@ pydantic[email]>=2.0.0
 # Email + payments
 resend>=0.7.0
 stripe>=10.0.0
+
+# Image generation (Instagram stories)
+pillow>=10.0.0

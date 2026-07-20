@@ -2,8 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from web.auth import get_current_user
 from web.database import get_db
 from web.notifications import send_discord_notification
+import requests
 
 router = APIRouter()
+
+
+def _mask_account_id(account_id: str) -> str:
+    """Mask Instagram account ID, showing only first 6 and last 4 digits."""
+    if not account_id:
+        return None
+    if len(account_id) <= 10:
+        return account_id[-4:]
+    return account_id[:6] + '...' + account_id[-4:]
 
 
 @router.get("")
@@ -16,6 +26,7 @@ async def get_settings(user: dict = Depends(get_current_user)):
         "has_ebay":          bool(user.get("ebay_app_id")),
         "has_gemini":        bool(user.get("gemini_api_key")),
         "has_discord":       bool(user.get("discord_webhook_url")),
+        "has_instagram":     bool(user.get("instagram_access_token")),
         "ebay_fee_rate":     user.get("ebay_fee_rate", 0.1235),
         "postage_cost":      user.get("postage_cost", 1.50),
         "promoted_listing_pct": float(user.get("promoted_listing_pct") or 0),
@@ -26,6 +37,7 @@ async def get_settings(user: dict = Depends(get_current_user)):
         "ebay_fulfillment_policy_id": user.get("ebay_fulfillment_policy_id", ""),
         "ebay_payment_policy_id":     user.get("ebay_payment_policy_id", ""),
         "ebay_return_policy_id":      user.get("ebay_return_policy_id", ""),
+        "instagram_business_account_id_masked": _mask_account_id(user.get("instagram_business_account_id")),
         "onboarding_dismissed": user.get("onboarding_dismissed", False),
     }
 
@@ -158,3 +170,63 @@ async def test_discord_webhook(user: dict = Depends(get_current_user)):
         5763719,
     )
     return {"success": True, "message": "Test notification sent"}
+
+
+@router.get("/instagram")
+async def get_instagram_settings(user: dict = Depends(get_current_user)):
+    """Get Instagram connection status and masked account ID."""
+    return {
+        "connected": bool(user.get("instagram_access_token")),
+        "account_id": _mask_account_id(user.get("instagram_business_account_id")),
+    }
+
+
+@router.post("/instagram")
+async def save_instagram_settings(body: dict, user: dict = Depends(get_current_user)):
+    """
+    Save Instagram credentials after validating the access token.
+    Expects: { access_token, business_account_id }
+    """
+    access_token = body.get("access_token", "").strip()
+    business_account_id = body.get("business_account_id", "").strip()
+
+    if not access_token or not business_account_id:
+        return {"success": False, "error": "Both access token and business account ID are required"}
+
+    # Validate token by hitting Facebook Graph API
+    try:
+        validate_url = f"https://graph.facebook.com/v19.0/me?access_token={access_token}"
+        response = requests.get(validate_url, timeout=10)
+        if response.status_code != 200:
+            return {"success": False, "error": "Invalid access token"}
+        data = response.json()
+        if "error" in data:
+            error_msg = data.get("error", {}).get("message", "Unknown error")
+            return {"success": False, "error": f"Token validation failed: {error_msg}"}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to validate token: {str(e)}"}
+
+    # Save to user_profiles
+    db = get_db()
+    try:
+        db.table("user_profiles").update({
+            "instagram_access_token": access_token,
+            "instagram_business_account_id": business_account_id,
+        }).eq("id", user["id"]).execute()
+        return {"success": True, "message": "Instagram account connected"}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to save credentials: {str(e)}"}
+
+
+@router.delete("/instagram")
+async def disconnect_instagram(user: dict = Depends(get_current_user)):
+    """Clear Instagram credentials for the current user."""
+    db = get_db()
+    try:
+        db.table("user_profiles").update({
+            "instagram_access_token": None,
+            "instagram_business_account_id": None,
+        }).eq("id", user["id"]).execute()
+        return {"success": True, "message": "Instagram account disconnected"}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to disconnect: {str(e)}"}

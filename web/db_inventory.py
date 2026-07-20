@@ -33,6 +33,10 @@ def _row_to_item(row: dict) -> dict:
         "date_sold":         str(row.get("date_sold") or ""),
         "price_verified":    bool(row.get("price_verified")),
         "source":            row.get("source", ""),
+        "ig_story_posted":   bool(row.get("ig_story_posted", False)),
+        "ig_payment_link":   row.get("ig_payment_link"),
+        "ig_posted_at":      row.get("ig_posted_at"),
+        "ig_media_id":       row.get("ig_media_id"),
     }
 
 

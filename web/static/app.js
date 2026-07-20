@@ -709,6 +709,7 @@ function renderInventoryCard(item) {
     isListed  ? `<span class="badge badge-ebay">eBay</span>`   : '',
     isTradeIn  ? `<span class="badge badge-warning" title="${esc(item.traded_item_names || 'Trade-in')}">🔄 Trade</span>` : '',
     isBundle  ? `<span class="badge badge-info" title="Bundle ${item.bundle_id}">📦 Bundle</span>` : '',
+    item.ig_story_posted ? `<span class="badge badge-accent" title="Posted on Instagram">📸 IG</span>` : '',
     isUW      ? `<span class="badge badge-danger">⚠️</span>`   : '',
     isLE && !isUW ? `<span class="badge badge-warn">⚡</span>` : '',
     isSold    ? `<span class="badge badge-sold">Sold</span>`   : '',
@@ -721,6 +722,7 @@ function renderInventoryCard(item) {
     ? `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">💰 Check</button>`
     : `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">💰 Check</button>
        <button onclick="refreshSinglePrice(${item.item_id})" class="btn btn-ghost btn-sm refresh-price-btn" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🔄 Refresh</button>
+       <button onclick="postToInstagram(${item.item_id})" id="ig-btn-${item.item_id}" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">${item.ig_story_posted ? '✓ Posted' : '📸 IG'}</button>
        <button onclick="openEditModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">✏️ Edit</button>
        <button onclick="confirmRemove(${item.item_id})" class="btn btn-danger btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🗑️ Delete</button>
        ${isListed
@@ -1349,6 +1351,70 @@ async function syncExistingListing(itemId) {
   } catch (e) {
     toast('Error: ' + extractError(e.message), 'error');
   }
+}
+
+/* ── Instagram posting ───────────────────────────────────────────────────── */
+async function postToInstagram(itemId) {
+  const item = S.inventory.find(i => i.item_id === itemId);
+  if (!item) return;
+
+  if (!item.sale_price && !item.quick_price && !item.live_price) {
+    toast('Set a price before posting to Instagram', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById(`ig-btn-${itemId}`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
+
+  try {
+    const res = await fetch('/api/instagram/post-story', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_id: itemId })
+    }).then(r => r.json()).catch(e => ({ success: false, error: e.message }));
+
+    if (res.success) {
+      item.ig_story_posted = true;
+      item.ig_payment_link = res.payment_link;
+      item.ig_media_id = res.ig_media_id;
+      toast('✅ Posted to Instagram!', 'success');
+
+      // Update button
+      if (btn) { btn.textContent = '✓ Posted'; btn.disabled = false; }
+
+      // Show payment link modal
+      showModal(`
+        <h2 style="margin-bottom:6px">📸 Posted to Instagram</h2>
+        <p class="text-muted" style="margin-bottom:16px">${esc(item.card_name || '')}</p>
+        <div class="form-section">
+          <label class="form-label">Payment Link</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="ig-link-${itemId}" class="form-input"
+                   value="${res.payment_link}" readonly style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis" />
+            <button class="btn btn-accent btn-sm" onclick="copyToClipboard('ig-link-${itemId}')">📋 Copy</button>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Share this link in DMs or post as a comment on your story</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-accent" onclick="closeModal()">Done</button>
+        </div>`);
+      refreshInventoryGrid();
+    } else {
+      toast(`❌ ${res.error || 'Failed to post'}`, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '📸 IG'; }
+    }
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '📸 IG'; }
+  }
+}
+
+function copyToClipboard(elemId) {
+  const elem = document.getElementById(elemId);
+  if (!elem) return;
+  elem.select();
+  document.execCommand('copy');
+  toast('✅ Copied to clipboard', 'success');
 }
 
 /* ── Add item modal ──────────────────────────────────────────────────────── */
@@ -4313,6 +4379,32 @@ async function renderSettings() {
         </div>
       </div>
 
+      <!-- Instagram -->
+      <div class="settings-card">
+        <h3 class="settings-section-title">Instagram
+          <span class="badge ${settings?.has_instagram ? 'badge-ebay' : 'badge-danger'}" style="margin-left:8px">
+            ${settings?.has_instagram ? '✓ Connected' : 'Not set'}
+          </span>
+        </h3>
+        <p class="text-muted" style="font-size:13px;margin-bottom:14px">
+          Connect your Instagram Business Account to auto-post stories with Stripe payment links.
+          <a href="https://developers.facebook.com" target="_blank" style="color:var(--accent)">Get credentials ↗</a>
+        </p>
+        <div class="form-section">
+          <label class="form-label">Access Token</label>
+          <input id="s-ig-access-token" class="form-input" type="password" placeholder="${settings?.has_instagram ? '••••••• (set)' : 'Paste your Instagram access token'}">
+          <p style="color:var(--text-muted);font-size:12px;margin-top:4px">Get this from developers.facebook.com → your app → Use Cases → Generate token</p>
+        </div>
+        <div class="form-section">
+          <label class="form-label">Business Account ID</label>
+          <input id="s-ig-account-id" class="form-input" type="text" placeholder="${settings?.has_instagram ? settings?.instagram_business_account_id_masked || '(set)' : 'Your Instagram Business Account ID'}">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-accent btn-sm" onclick="saveInstagramSettings()">Connect Instagram</button>
+          ${settings?.has_instagram ? `<button class="btn btn-ghost btn-sm" onclick="disconnectInstagram()">Disconnect</button>` : ''}
+        </div>
+      </div>
+
     </div>
   `;
 }
@@ -4488,6 +4580,58 @@ async function testDiscordWebhook() {
     }
   } catch (e) {
     toast('Error: ' + extractError(e.message), 'error');
+  }
+}
+
+async function saveInstagramSettings() {
+  const accessToken = document.getElementById('s-ig-access-token')?.value.trim();
+  const accountId = document.getElementById('s-ig-account-id')?.value.trim();
+
+  if (!accessToken || !accountId) {
+    toast('Both access token and business account ID are required', 'warning');
+    return;
+  }
+
+  const btn = event?.target;
+  if (btn) btn.disabled = true;
+
+  try {
+    const resp = await api.post('/settings/instagram', {
+      access_token: accessToken,
+      business_account_id: accountId,
+    });
+    if (resp.success) {
+      toast('✅ Instagram account connected', 'success');
+      renderSettings();
+    } else {
+      toast('Failed: ' + resp.error, 'error');
+    }
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function disconnectInstagram() {
+  const ok = await confirmDialog('Disconnect Instagram', 'Remove Instagram account connection?');
+  if (!ok) return;
+
+  const btn = event?.target;
+  if (btn) btn.disabled = true;
+
+  try {
+    const resp = await api.delete('/settings/instagram');
+    if (resp.success) {
+      toast('✅ Instagram account disconnected', 'success');
+      renderSettings();
+    } else {
+      toast('Failed: ' + resp.error, 'error');
+    }
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
