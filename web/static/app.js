@@ -4499,10 +4499,14 @@ async function renderSettings() {
           <label class="form-label">Business Account ID</label>
           <input id="s-ig-account-id" class="form-input" type="text" placeholder="${settings?.has_instagram ? settings?.instagram_business_account_id_masked || '(set)' : 'Your Instagram Business Account ID'}">
         </div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-accent btn-sm" onclick="saveInstagramSettings()">Connect Instagram</button>
-          ${settings?.has_instagram ? `<button class="btn btn-ghost btn-sm" onclick="disconnectInstagram()">Disconnect</button>` : ''}
+          ${settings?.has_instagram ? `
+            <button class="btn btn-ghost btn-sm" onclick="refreshInstagramToken()">🔄 Refresh Token</button>
+            <button class="btn btn-ghost btn-sm" onclick="disconnectInstagram()">Disconnect</button>
+          ` : ''}
         </div>
+        ${settings?.has_instagram ? `<p style="color:var(--text-muted);font-size:11px;margin-top:8px">💡 Refresh your token every 60 days to keep posting active</p>` : ''}
       </div>
 
     </div>
@@ -4732,6 +4736,24 @@ async function disconnectInstagram() {
     toast('Error: ' + extractError(e.message), 'error');
   } finally {
     if (btn) btn.disabled = false;
+  }
+}
+
+async function refreshInstagramToken() {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
+
+  try {
+    const resp = await api.post('/settings/instagram/refresh-token', {});
+    if (resp.success) {
+      toast('✅ Instagram token refreshed — valid for 60 days', 'success');
+    } else {
+      toast('Failed: ' + resp.error, 'error');
+    }
+  } catch (e) {
+    toast('Error: ' + extractError(e.message), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Refresh Token'; }
   }
 }
 

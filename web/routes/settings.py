@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from web.auth import get_current_user
 from web.database import get_db
 from web.notifications import send_discord_notification
+from web.instagram_service import exchange_for_long_lived_token
 import requests
 import logging
 
@@ -261,3 +262,49 @@ async def disconnect_instagram(user: dict = Depends(get_current_user)):
         return {"success": True, "message": "Instagram account disconnected"}
     except Exception as e:
         return {"success": False, "error": f"Failed to disconnect: {str(e)}"}
+
+
+@router.post("/instagram/refresh-token")
+async def refresh_instagram_token(user: dict = Depends(get_current_user)):
+    """
+    Refresh Instagram access token to extend validity from 1 hour to 60 days.
+    Uses the Instagram Graph API token exchange endpoint.
+    """
+    db = get_db()
+
+    # Fetch current token
+    try:
+        result = db.table("user_profiles").select("instagram_access_token").eq("id", user["id"]).execute()
+        if not result.data:
+            return {"success": False, "error": "User not found"}
+
+        current_token = result.data[0].get("instagram_access_token")
+        if not current_token:
+            return {"success": False, "error": "No Instagram token to refresh"}
+    except Exception as e:
+        logger.error(f"Failed to fetch current token for user {user['id']}: {e}")
+        return {"success": False, "error": "Failed to fetch current token"}
+
+    # Exchange for long-lived token
+    try:
+        token_data = exchange_for_long_lived_token(current_token)
+        long_lived_token = token_data.get("access_token")
+        expires_in = token_data.get("expires_in")
+
+        # Save new token
+        db.table("user_profiles").update({
+            "instagram_access_token": long_lived_token,
+        }).eq("id", user["id"]).execute()
+
+        logger.info(f"Successfully refreshed Instagram token for user {user['id']}")
+        return {
+            "success": True,
+            "message": "Token refreshed successfully",
+            "expires_in": "60 days",
+        }
+    except ValueError as e:
+        logger.error(f"Token exchange failed for user {user['id']}: {e}")
+        return {"success": False, "error": str(e)}
+    except Exception as e:
+        logger.error(f"Unexpected error refreshing token for user {user['id']}: {e}")
+        return {"success": False, "error": "Failed to refresh token"}

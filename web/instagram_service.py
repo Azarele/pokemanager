@@ -31,7 +31,61 @@ else:
 _FALLBACK_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 _FALLBACK_BUSINESS_ACCOUNT_ID = os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID")
 
+# Instagram App credentials for token exchange
+INSTAGRAM_APP_ID = os.getenv("INSTAGRAM_APP_ID", "1572387654425263")
+INSTAGRAM_APP_SECRET = os.getenv("INSTAGRAM_APP_SECRET", "")
+
 SUPABASE_BUCKET = "ig-stories"
+
+if not INSTAGRAM_APP_SECRET:
+    logger.warning("INSTAGRAM_APP_SECRET not set — token refresh will not work")
+
+
+def exchange_for_long_lived_token(short_token: str) -> dict:
+    """
+    Exchange a short-lived Instagram User Token for a long-lived token.
+    Short-lived tokens expire in ~1 hour, long-lived tokens are valid for 60 days.
+
+    Returns: { access_token, expires_in }
+    Raises: ValueError if exchange fails
+    """
+    if not INSTAGRAM_APP_SECRET:
+        raise ValueError("INSTAGRAM_APP_SECRET not configured")
+
+    url = "https://graph.instagram.com/access_token"
+    params = {
+        "grant_type": "ig_exchange_token",
+        "client_id": INSTAGRAM_APP_ID,
+        "client_secret": INSTAGRAM_APP_SECRET,
+        "access_token": short_token,
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+
+        if "error" in data:
+            error_msg = data.get("error", {}).get("message", "Unknown error")
+            logger.error(f"Instagram token exchange failed: {data}")
+            raise ValueError(f"Token exchange failed: {error_msg}")
+
+        if response.status_code != 200:
+            logger.error(f"Instagram token exchange returned {response.status_code}: {data}")
+            raise ValueError(f"Token exchange failed with status {response.status_code}")
+
+        access_token = data.get("access_token")
+        expires_in = data.get("expires_in")
+
+        if not access_token:
+            logger.error(f"No access token in exchange response: {data}")
+            raise ValueError("Token exchange returned no access token")
+
+        logger.info(f"Successfully exchanged token, expires in {expires_in} seconds")
+        return {"access_token": access_token, "expires_in": expires_in}
+
+    except requests.RequestException as e:
+        logger.error(f"Instagram token exchange request failed: {str(e)}")
+        raise ValueError(f"Failed to exchange token: {str(e)}")
 
 
 def get_user_credentials(user_id: str) -> tuple:
@@ -255,15 +309,11 @@ def post_to_instagram(image_url: str, payment_link: str, user_id: str) -> str:
     }
 
     response = requests.post(container_url, json=payload, headers=headers, timeout=10)
-    if response.status_code != 200:
-        error_msg = response.text
-        logger.error(f"Failed to create Instagram media container: {error_msg}")
-        raise ValueError(f"Instagram API error: {error_msg}")
-
     data = response.json()
-    if "error" in data:
-        error_msg = data.get("error", {}).get("message", "Unknown error")
-        logger.error(f"Instagram API error: {error_msg}")
+
+    if response.status_code != 200 or "error" in data:
+        logger.error(f"Failed to create Instagram media container. Status: {response.status_code}, Full response: {data}")
+        error_msg = data.get("error", {}).get("message", response.text) if isinstance(data, dict) else response.text
         raise ValueError(f"Instagram API error: {error_msg}")
 
     creation_id = data.get("id")
