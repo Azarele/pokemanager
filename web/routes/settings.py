@@ -3,7 +3,9 @@ from web.auth import get_current_user
 from web.database import get_db
 from web.notifications import send_discord_notification
 import requests
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -193,17 +195,22 @@ async def save_instagram_settings(body: dict, user: dict = Depends(get_current_u
     if not access_token or not business_account_id:
         return {"success": False, "error": "Both access token and business account ID are required"}
 
-    # Validate token by hitting Facebook Graph API
+    # Validate token by hitting Facebook Graph API (Instagram API v21.0)
     try:
-        validate_url = f"https://graph.facebook.com/v19.0/me?access_token={access_token}"
+        validate_url = f"https://graph.facebook.com/v21.0/{business_account_id}?fields=id,name&access_token={access_token}"
         response = requests.get(validate_url, timeout=10)
-        if response.status_code != 200:
-            return {"success": False, "error": "Invalid access token"}
         data = response.json()
+
         if "error" in data:
             error_msg = data.get("error", {}).get("message", "Unknown error")
+            logger.error(f"Instagram token validation failed. Status: {response.status_code}, Response: {data}")
             return {"success": False, "error": f"Token validation failed: {error_msg}"}
+
+        if response.status_code != 200:
+            logger.error(f"Instagram token validation returned {response.status_code}. Response: {data}")
+            return {"success": False, "error": "Invalid access token or business account ID"}
     except Exception as e:
+        logger.error(f"Instagram token validation exception: {str(e)}")
         return {"success": False, "error": f"Failed to validate token: {str(e)}"}
 
     # Save to user_profiles
