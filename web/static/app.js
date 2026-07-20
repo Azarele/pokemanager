@@ -1360,6 +1360,10 @@ function openInstagramUploadModal(itemId) {
 
   const price = item.sale_price || item.quick_price || item.live_price || 0;
   const cardName = esc(item.card_name || '');
+  const isMobile = window.innerWidth <= 768;
+  const uploadText = isMobile
+    ? '📱 Tap to select image'
+    : '📁 Click or drag image here';
 
   showModal(`
     <h2 style="margin-bottom:6px">📸 Post ${cardName} to Instagram</h2>
@@ -1367,16 +1371,16 @@ function openInstagramUploadModal(itemId) {
       <!-- Image upload area -->
       <div class="form-section">
         <label class="form-label">Card Image (optional)</label>
-        <div id="ig-upload-area" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;background:var(--bg-secondary);cursor:pointer;transition:all 0.2s"
+        <div id="ig-upload-area" style="border:2px dashed var(--border);border-radius:8px;padding:${isMobile ? '32px 20px' : '20px'};text-align:center;background:var(--bg-secondary);cursor:pointer;transition:all 0.2s;min-height:${isMobile ? '100px' : '80px'};display:flex;align-items:center;justify-content:center"
              ondrop="handleInstagramImageDrop(event, ${itemId})" ondragover="event.preventDefault(); event.currentTarget.style.borderColor='var(--accent)'" ondragleave="event.currentTarget.style.borderColor='var(--border)'">
-          <div style="color:var(--text-muted);font-size:14px">
-            <p style="margin:0;font-weight:600">📁 Click or drag image here</p>
+          <div style="color:var(--text-muted);font-size:${isMobile ? '16px' : '14px'}">
+            <p style="margin:0;font-weight:600">${uploadText}</p>
             <p style="margin:4px 0 0 0;font-size:12px">JPG or PNG only</p>
           </div>
         </div>
-        <input type="file" id="ig-file-input-${itemId}" style="display:none" accept="image/jpeg,image/png" onchange="handleInstagramFileSelect(event, ${itemId})">
+        <input type="file" id="ig-file-input-${itemId}" style="display:none" accept="image/jpeg,image/png" capture="environment" onchange="handleInstagramFileSelect(event, ${itemId})">
         <div id="ig-preview-${itemId}" style="margin-top:12px;display:none">
-          <img id="ig-preview-img-${itemId}" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--border)">
+          <img id="ig-preview-img-${itemId}" style="max-width:100%;max-height:300px;border-radius:6px;border:1px solid var(--border)">
           <p id="ig-preview-name-${itemId}" style="margin:8px 0 0 0;color:var(--text-muted);font-size:12px"></p>
         </div>
       </div>
@@ -1384,21 +1388,25 @@ function openInstagramUploadModal(itemId) {
       <!-- Price field -->
       <div class="form-section">
         <label class="form-label">Price (£)</label>
-        <input type="number" id="ig-price-${itemId}" class="form-input" value="${price}" step="0.01" min="0">
+        <input type="number" id="ig-price-${itemId}" class="form-input" value="${price}" step="0.01" min="0" style="${isMobile ? 'font-size:16px;padding:12px;height:44px' : ''}">
       </div>
 
       <!-- Buttons -->
-      <div class="modal-actions">
-        <button class="btn btn-accent" onclick="submitInstagramPost(${itemId})">Post to Instagram</button>
-        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <div class="modal-actions" style="${isMobile ? 'flex-direction:column;gap:8px' : ''}">
+        <button class="btn btn-accent" onclick="submitInstagramPost(${itemId})" style="${isMobile ? 'width:100%;padding:12px;min-height:44px;font-size:16px' : ''}">Post to Instagram</button>
+        <button class="btn btn-ghost" onclick="closeModal()" style="${isMobile ? 'width:100%;padding:12px;min-height:44px;font-size:16px' : ''}">Cancel</button>
       </div>
     </div>
   `);
 
   // Set up click handler for upload area
-  document.getElementById('ig-upload-area').onclick = () => {
-    document.getElementById(`ig-file-input-${itemId}`).click();
-  };
+  const uploadArea = document.getElementById('ig-upload-area');
+  if (uploadArea) {
+    uploadArea.onclick = (e) => {
+      e.preventDefault();
+      document.getElementById(`ig-file-input-${itemId}`).click();
+    };
+  }
 }
 
 function handleInstagramFileSelect(event, itemId) {

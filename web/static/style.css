@@ -2417,6 +2417,16 @@ tr.watch-triggered td:first-child { border-left: 3px solid var(--success); }
     gap: 6px;
   }
 
+  /* Make inventory card action buttons more touch-friendly on mobile */
+  .inv-card-actions > button,
+  .inv-card-actions > [onclick] {
+    flex: 1 1 calc(33.333% - 4px);
+    min-width: 50px !important;
+    min-height: 36px !important;
+    padding: 6px 4px !important;
+    font-size: 11px !important;
+  }
+
   /* Chart scroll wrapper on mobile */
   .chart-scroll-wrapper {
     overflow-x: auto;
