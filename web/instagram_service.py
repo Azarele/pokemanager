@@ -90,7 +90,7 @@ def create_payment_link(title: str, price_gbp: float) -> str:
 
 
 def generate_story_image(
-    title: str, price_gbp: float, card_image_url: Optional[str] = None
+    title: str, price_gbp: float, card_image = None
 ) -> bytes:
     """
     Generate a 1080x1920 Instagram story image with:
@@ -99,6 +99,11 @@ def generate_story_image(
     - White price text bottom-center
     - "AZARAM VAULT" text top-center in muted color
     - Subtle white border around card image
+
+    card_image can be:
+    - None: no card image used
+    - str: URL to fetch the card image from
+    - PIL.Image: already-loaded card image (e.g., from file upload)
 
     Returns PIL Image as PNG bytes.
     """
@@ -132,14 +137,20 @@ def generate_story_image(
 
     # Load and place card image if provided
     card_img = None
-    if card_image_url:
+    if card_image:
         try:
-            response = requests.get(card_image_url, timeout=5)
-            if response.status_code == 200:
-                card_img = Image.open(io.BytesIO(response.content)).convert("RGB")
-                logger.info(f"Loaded card image: {card_image_url}")
+            if isinstance(card_image, str):
+                # URL string — fetch and load
+                response = requests.get(card_image, timeout=5)
+                if response.status_code == 200:
+                    card_img = Image.open(io.BytesIO(response.content)).convert("RGB")
+                    logger.info(f"Loaded card image from URL: {card_image}")
+            else:
+                # Assume PIL Image object
+                card_img = card_image.convert("RGB") if card_image.mode != "RGB" else card_image
+                logger.info("Using provided PIL Image for card")
         except Exception as e:
-            logger.warning(f"Failed to load card image {card_image_url}: {e}")
+            logger.warning(f"Failed to process card image: {e}")
 
     # Place card image if available (scaled to ~70% of width)
     if card_img:

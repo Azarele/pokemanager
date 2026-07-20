@@ -1354,23 +1354,112 @@ async function syncExistingListing(itemId) {
 }
 
 /* ── Instagram posting ───────────────────────────────────────────────────── */
-async function postToInstagram(itemId) {
+function openInstagramUploadModal(itemId) {
   const item = S.inventory.find(i => i.item_id === itemId);
   if (!item) return;
 
-  if (!item.sale_price && !item.quick_price && !item.live_price) {
-    toast('Set a price before posting to Instagram', 'warning');
+  const price = item.sale_price || item.quick_price || item.live_price || 0;
+  const cardName = esc(item.card_name || '');
+
+  showModal(`
+    <h2 style="margin-bottom:6px">📸 Post ${cardName} to Instagram</h2>
+    <div style="display:flex;flex-direction:column;gap:16px;margin-top:16px">
+      <!-- Image upload area -->
+      <div class="form-section">
+        <label class="form-label">Card Image (optional)</label>
+        <div id="ig-upload-area" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;background:var(--bg-secondary);cursor:pointer;transition:all 0.2s"
+             ondrop="handleInstagramImageDrop(event, ${itemId})" ondragover="event.preventDefault(); event.currentTarget.style.borderColor='var(--accent)'" ondragleave="event.currentTarget.style.borderColor='var(--border)'">
+          <div style="color:var(--text-muted);font-size:14px">
+            <p style="margin:0;font-weight:600">📁 Click or drag image here</p>
+            <p style="margin:4px 0 0 0;font-size:12px">JPG or PNG only</p>
+          </div>
+        </div>
+        <input type="file" id="ig-file-input-${itemId}" style="display:none" accept="image/jpeg,image/png" onchange="handleInstagramFileSelect(event, ${itemId})">
+        <div id="ig-preview-${itemId}" style="margin-top:12px;display:none">
+          <img id="ig-preview-img-${itemId}" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--border)">
+          <p id="ig-preview-name-${itemId}" style="margin:8px 0 0 0;color:var(--text-muted);font-size:12px"></p>
+        </div>
+      </div>
+
+      <!-- Price field -->
+      <div class="form-section">
+        <label class="form-label">Price (£)</label>
+        <input type="number" id="ig-price-${itemId}" class="form-input" value="${price}" step="0.01" min="0">
+      </div>
+
+      <!-- Buttons -->
+      <div class="modal-actions">
+        <button class="btn btn-accent" onclick="submitInstagramPost(${itemId})">Post to Instagram</button>
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  `);
+
+  // Set up click handler for upload area
+  document.getElementById('ig-upload-area').onclick = () => {
+    document.getElementById(`ig-file-input-${itemId}`).click();
+  };
+}
+
+function handleInstagramFileSelect(event, itemId) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (!['image/jpeg', 'image/png'].includes(file.type)) {
+    toast('Only JPG and PNG images are supported', 'warning');
     return;
   }
 
-  const btn = document.getElementById(`ig-btn-${itemId}`);
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const preview = document.getElementById(`ig-preview-${itemId}`);
+    const img = document.getElementById(`ig-preview-img-${itemId}`);
+    const name = document.getElementById(`ig-preview-name-${itemId}`);
+    img.src = e.target.result;
+    name.textContent = `Selected: ${file.name}`;
+    preview.style.display = 'block';
+    window._igUploadedFile = file;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleInstagramImageDrop(event, itemId) {
+  event.preventDefault();
+  event.stopPropagation();
+  const file = event.dataTransfer.files[0];
+  if (file) {
+    const input = document.getElementById(`ig-file-input-${itemId}`);
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    handleInstagramFileSelect({target: {files: [file]}}, itemId);
+  }
+}
+
+async function submitInstagramPost(itemId) {
+  const item = S.inventory.find(i => i.item_id === itemId);
+  if (!item) return;
+
+  const price = parseFloat(document.getElementById(`ig-price-${itemId}`)?.value) || 0;
+  if (!price || price <= 0) {
+    toast('Price must be greater than 0', 'warning');
+    return;
+  }
+
+  const btn = event?.target;
   if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
 
   try {
+    const formData = new FormData();
+    formData.append('item_id', itemId);
+    formData.append('price_override', price);
+    if (window._igUploadedFile) {
+      formData.append('image', window._igUploadedFile);
+    }
+
     const res = await fetch('/api/instagram/post-story', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ item_id: itemId })
+      body: formData
     }).then(r => r.json()).catch(e => ({ success: false, error: e.message }));
 
     if (res.success) {
@@ -1378,10 +1467,9 @@ async function postToInstagram(itemId) {
       item.ig_payment_link = res.payment_link;
       item.ig_media_id = res.ig_media_id;
       toast('✅ Posted to Instagram!', 'success');
+      window._igUploadedFile = null;
 
-      // Update button
-      if (btn) { btn.textContent = '✓ Posted'; btn.disabled = false; }
-
+      closeModal();
       // Show payment link modal
       showModal(`
         <h2 style="margin-bottom:6px">📸 Posted to Instagram</h2>
@@ -1401,12 +1489,16 @@ async function postToInstagram(itemId) {
       refreshInventoryGrid();
     } else {
       toast(`❌ ${res.error || 'Failed to post'}`, 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '📸 IG'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Post to Instagram'; }
     }
   } catch (e) {
     toast('Error: ' + extractError(e.message), 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '📸 IG'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Post to Instagram'; }
   }
+}
+
+async function postToInstagram(itemId) {
+  openInstagramUploadModal(itemId);
 }
 
 function copyToClipboard(elemId) {
