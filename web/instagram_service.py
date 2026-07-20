@@ -15,7 +15,7 @@ from typing import Optional
 import stripe
 import requests
 from PIL import Image, ImageDraw, ImageFont
-from web.database import get_db
+from supabase import create_client
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,17 @@ SUPABASE_BUCKET = "ig-stories"
 
 def get_user_credentials(user_id: str) -> tuple:
     """
-    Fetch Instagram credentials for a user from user_profiles.
+    Fetch Instagram credentials for a user from user_profiles using service role key.
     Returns (access_token, business_account_id).
     Raises ValueError if credentials not found or invalid.
     """
-    db = get_db()
-    user = db.table("user_profiles").select("instagram_access_token, instagram_business_account_id") \
+    # Use service key client to bypass RLS
+    sb_service = create_client(
+        os.getenv("SUPABASE_URL"),
+        os.getenv("SUPABASE_SERVICE_KEY")
+    )
+
+    user = sb_service.table("user_profiles").select("instagram_access_token, instagram_business_account_id") \
         .eq("id", user_id).execute()
 
     if not user.data:
@@ -204,18 +209,23 @@ def generate_story_image(
 def upload_image_to_supabase(image_bytes: bytes, filename: str) -> str:
     """
     Upload image to Supabase Storage and return public URL.
-    File is uploaded to ig-stories bucket.
+    File is uploaded to ig-stories bucket using service role key to bypass RLS.
     """
     try:
-        db = get_db()
-        response = db.storage.from_(SUPABASE_BUCKET).upload(
+        # Create service key client to bypass RLS on storage
+        sb_service = create_client(
+            os.getenv("SUPABASE_URL"),
+            os.getenv("SUPABASE_SERVICE_KEY")
+        )
+
+        response = sb_service.storage.from_(SUPABASE_BUCKET).upload(
             filename, image_bytes, {"content-type": "image/png"}
         )
         logger.info(f"Uploaded image to Supabase: {filename}")
 
         # Get public URL
         public_url = (
-            db.storage.from_(SUPABASE_BUCKET)
+            sb_service.storage.from_(SUPABASE_BUCKET)
             .get_public_url(filename)
         )
         return public_url
@@ -298,11 +308,16 @@ async def update_inventory_instagram_metadata(
     media_id: str,
 ) -> None:
     """
-    Update inventory item with Instagram posting metadata.
+    Update inventory item with Instagram posting metadata using service role key.
     """
-    db = get_db()
+    # Use service key client to bypass RLS
+    sb_service = create_client(
+        os.getenv("SUPABASE_URL"),
+        os.getenv("SUPABASE_SERVICE_KEY")
+    )
+
     now = datetime.utcnow().isoformat()
-    db.table("inventory_items").update({
+    sb_service.table("inventory_items").update({
         "ig_story_posted": True,
         "ig_payment_link": payment_link,
         "ig_media_id": media_id,
