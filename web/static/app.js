@@ -3155,7 +3155,7 @@ async function loadSalesByDate(date) {
         const pc = sale.profit >= 0 ? 'var(--success)' : 'var(--danger)';
         const rc = sale.roi_pct >= 0 ? 'var(--success)' : 'var(--danger)';
         const link = sale.ebay_listing_id ? ' &middot; <a href="https://www.ebay.co.uk/itm/' + sale.ebay_listing_id + '" target="_blank" style="color:var(--accent)">eBay ↗</a>' : '';
-        return '<tr style="border-bottom:1px solid var(--border)">' +
+        return '<tr style="border-bottom:1px solid var(--border)" data-item-id="' + sale.item_id + '">' +
             '<td style="padding:10px 12px;vertical-align:middle">' +
                 '<div style="display:flex;align-items:center;gap:10px">' +
                     '<div class="sale-thumb card-thumb" data-item-id="' + sale.item_id + '" style="width:36px;height:36px;flex-shrink:0;border-radius:4px;overflow:hidden;background:var(--surface2)"><div class="thumb-spinner"></div></div>' +
@@ -3167,10 +3167,10 @@ async function loadSalesByDate(date) {
             '</td>' +
             '<td style="text-align:right;padding:10px 12px;font-family:monospace">' + fmt(sale.purchase_price) + '</td>' +
             '<td style="text-align:right;padding:10px 12px;font-family:monospace">' + fmt(sale.sell_price) + '</td>' +
-            '<td style="text-align:right;padding:10px 12px;font-family:monospace;color:var(--danger)">−' + fmt(sale.ebay_fee) + '</td>' +
+            '<td style="text-align:right;padding:10px 12px;font-family:monospace;color:var(--danger);cursor:pointer" class="sale-editable-fee" data-field="ebay_fee" data-sell-price="' + sale.sell_price + '" data-purchase-price="' + sale.purchase_price + '">−' + fmt(sale.ebay_fee) + '</td>' +
             '<td style="text-align:right;padding:10px 12px;font-family:monospace;color:var(--danger)">−' + fmt(sale.postage_cost) + '</td>' +
-            '<td style="text-align:right;padding:10px 12px;font-family:monospace">' + fmt(sale.net_received) + '</td>' +
-            '<td style="text-align:right;padding:10px 12px;font-family:monospace;font-weight:700;color:' + pc + '">' + (sale.profit >= 0 ? '+' : '') + fmt(sale.profit) + '</td>' +
+            '<td style="text-align:right;padding:10px 12px;font-family:monospace;cursor:pointer" class="sale-editable-field" data-field="net_received" data-sell-price="' + sale.sell_price + '" data-purchase-price="' + sale.purchase_price + '">' + fmt(sale.net_received) + '</td>' +
+            '<td style="text-align:right;padding:10px 12px;font-family:monospace;font-weight:700;color:' + pc + ';cursor:pointer" class="sale-editable-field" data-field="profit" data-sell-price="' + sale.sell_price + '" data-purchase-price="' + sale.purchase_price + '">' + (sale.profit >= 0 ? '+' : '') + fmt(sale.profit) + '</td>' +
             '<td style="text-align:right;padding:10px 12px;color:' + rc + '">' + sale.roi_pct + '%</td>' +
         '</tr>';
     }).join('');
@@ -3206,6 +3206,66 @@ async function loadSalesByDate(date) {
 
     container.innerHTML = '<div style="overflow-x:auto;width:100%;box-sizing:border-box;position:relative">' + html + '</div>';
     observeThumbs(container);
+    attachSalesEditListeners(container);
+}
+
+function attachSalesEditListeners(container) {
+  container.querySelectorAll('.sale-editable-fee, .sale-editable-field').forEach(cell => {
+    cell.addEventListener('click', function(e) {
+      if (this.querySelector('input')) return;
+      const tr = this.closest('tr');
+      const itemId = parseInt(tr.getAttribute('data-item-id'));
+      const field = this.getAttribute('data-field');
+      const currentValue = parseFloat(this.textContent.replace(/[^0-9.-]/g, ''));
+      const sellPrice = parseFloat(this.getAttribute('data-sell-price'));
+      const purchasePrice = parseFloat(this.getAttribute('data-purchase-price'));
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = '0.01';
+      input.value = currentValue;
+      input.style.cssText = 'width:100%;padding:4px 8px;border:1px solid var(--accent);border-radius:4px;background:var(--surface);color:var(--text);font-family:monospace;font-size:13px;box-sizing:border-box';
+
+      const originalContent = this.innerHTML;
+      this.innerHTML = '';
+      this.appendChild(input);
+      input.focus();
+      input.select();
+
+      const saveValue = async () => {
+        const newValue = parseFloat(input.value) || currentValue;
+        const updates = { [field]: newValue };
+
+        if (field === 'ebay_fee') {
+          updates.net_received = sellPrice - newValue;
+          updates.profit = updates.net_received - purchasePrice;
+        }
+
+        try {
+          const res = await fetch(`/api/sales/${itemId}/fees`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(updates)
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          await loadSalesByDate(document.getElementById('sales-date-picker')?.value || new Date().toISOString().slice(0,10));
+          toast('✅ Updated', 'success', 2000);
+        } catch(e) {
+          this.innerHTML = originalContent;
+          toast('❌ Failed to update: ' + extractError(e.message), 'error');
+        }
+      };
+
+      input.addEventListener('blur', saveValue);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveValue();
+        if (e.key === 'Escape') {
+          this.innerHTML = originalContent;
+        }
+      });
+    });
+  });
 }
 
 async function syncSalesNow() {

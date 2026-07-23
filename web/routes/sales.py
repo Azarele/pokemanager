@@ -2,14 +2,22 @@ import asyncio
 import json
 from datetime import date, timedelta, datetime as _dt
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from web import db_inventory as db
 from web.auth import get_current_user
 from web.notifications import send_discord_notification
+from web.database import get_db
 
 router = APIRouter()
+
+
+class UpdateFeesRequest(BaseModel):
+    ebay_fee: float = None
+    net_received: float = None
+    profit: float = None
 
 
 @router.get("/today")
@@ -247,3 +255,46 @@ async def sales_by_date(
             "avg_roi":         round(sum(s["roi_pct"] for s in sales) / len(sales), 1) if sales else 0,
         }
     }
+
+
+@router.patch("/{item_id}/fees")
+async def update_sale_fees(
+    item_id: int,
+    req: UpdateFeesRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Update fee-related fields for a sold item."""
+    database = get_db()
+
+    item = database.table("inventory_items").select("*") \
+        .eq("user_id", user["id"]).eq("item_id", item_id).single().execute()
+
+    if not item.data:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    updates = {}
+
+    if req.ebay_fee is not None:
+        updates["ebay_fee"] = round(req.ebay_fee, 2)
+        if req.net_received is None:
+            sell_price = float(item.data.get("sell_price") or 0)
+            updates["net_received"] = round(sell_price - req.ebay_fee, 2)
+            if req.profit is None:
+                purchase_price = float(item.data.get("purchase_price") or 0)
+                updates["profit"] = round(updates["net_received"] - purchase_price, 2)
+
+    if req.net_received is not None:
+        updates["net_received"] = round(req.net_received, 2)
+
+    if req.profit is not None:
+        updates["profit"] = round(req.profit, 2)
+
+    if not updates:
+        return item.data
+
+    result = database.table("inventory_items").update(updates) \
+        .eq("user_id", user["id"]).eq("item_id", item_id).execute()
+
+    if result.data:
+        return result.data[0]
+    return item.data
