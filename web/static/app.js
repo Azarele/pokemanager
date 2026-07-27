@@ -2514,6 +2514,7 @@ function buildListingsPage() {
           <div style="font-size:11px;color:var(--text-muted)">#${i.item_id}</div>
           <div class="listed-meta">
             <span class="price-tag">Listed: ${fmt(i.sell_price)}</span>
+            <span class="price-tag">Market: ${fmt(i.live_price)}</span>
             <span class="price-tag" style="color:var(--accent)">Quick: ${fmt(i.quick_price)}</span>
           </div>
         </div>
