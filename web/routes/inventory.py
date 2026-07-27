@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Optional
@@ -8,12 +9,12 @@ from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
 
-import audit
 import lister_ebay_api
-import scraper
 from web import db_inventory as db
 from web import user_config
 from web.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -47,8 +48,12 @@ def _load_cache() -> None:
                 else:
                     dropped += 1  # old None result
             _image_cache = migrated
-            print(f"[image_cache] Loaded {len(_image_cache)} entries, dropped {dropped} None results")
-        except Exception:
+            logger.info(f"Image cache: loaded {len(_image_cache)} entries, dropped {dropped} None results")
+        except (json.JSONDecodeError, OSError) as e:
+            logger.error(f"Failed to load image cache: {e}")
+            _image_cache = {}
+        except Exception as e:
+            logger.error(f"Unexpected error loading image cache: {e}", exc_info=True)
             _image_cache = {}
 
 
@@ -142,16 +147,16 @@ async def _scrape_pc_image(pc_url: str, item_id: int = 0) -> Optional[str]:
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-GB,en;q=0.5',
         }
-        print(f"[image] Fetching {pc_url} via HTTP for item {item_id}")
+        logger.info(f"[image] Fetching {pc_url} via HTTP for item {item_id}")
         resp = requests.get(pc_url, headers=headers, timeout=15)
         resp.raise_for_status()
         html = resp.text
     except Exception as e:
-        print(f"[image] HTTP fetch failed for item {item_id}: {e}")
+        logger.info(f"[image] HTTP fetch failed for item {item_id}: {e}")
         return None
 
     if not html:
-        print(f"[image] Empty response for item {item_id}")
+        logger.info(f"[image] Empty response for item {item_id}")
         return None
 
     soup = BeautifulSoup(html, "html.parser")
@@ -161,7 +166,7 @@ async def _scrape_pc_image(pc_url: str, item_id: int = 0) -> Optional[str]:
     if og_image:
         image_url = og_image.get('content')
         if image_url:
-            print(f"[image] Found og:image for item {item_id}: {image_url[:80]}")
+            logger.info(f"[image] Found og:image for item {item_id}: {image_url[:80]}")
             return image_url
 
     # Fallback: look for specific selectors
@@ -174,7 +179,7 @@ async def _scrape_pc_image(pc_url: str, item_id: int = 0) -> Optional[str]:
             if raw:
                 resolved = _resolve_src(str(raw))
                 if resolved:
-                    print(f"[image] Found for item {item_id} via '{sel}': {resolved[:80]}")
+                    logger.info(f"[image] Found for item {item_id} via '{sel}': {resolved[:80]}")
                     return resolved
 
     # Last resort: find any reasonably-sized image that isn't a logo/icon
@@ -185,10 +190,10 @@ async def _scrape_pc_image(pc_url: str, item_id: int = 0) -> Optional[str]:
                 continue
             resolved = _resolve_src(str(raw))
             if resolved and "logo" not in resolved and "icon" not in resolved:
-                print(f"[image] Fallback image for item {item_id}: {resolved[:80]}")
+                logger.info(f"[image] Fallback image for item {item_id}: {resolved[:80]}")
                 return resolved
 
-    print(f"[image] No card image found for item {item_id} ({pc_url})")
+    logger.info(f"[image] No card image found for item {item_id} ({pc_url})")
     return None
 
 
@@ -205,7 +210,7 @@ def _ensure_cache_upgraded() -> None:
                 updated += 1
     if updated > 0:
         _save_cache()
-        print(f"[image_cache] Upgraded {updated} entries to higher resolution URLs")
+        logger.info(f"[image_cache] Upgraded {updated} entries to higher resolution URLs")
 
 
 _ensure_cache_upgraded()
@@ -236,88 +241,6 @@ async def get_inventory(
 ):
     status_filter = status if status in ("Inventory", "Sold") else None
     items = await db.get_all_items(user["id"], status_filter=status_filter)
-
-    # TODO: Re-enable as background job, not blocking page load
-    # Fetch eBay listing prices (both live_price and sell_price) for items with ebay_listing_id
-    # DISABLED: eBay fetch was blocking page loads even with timeouts
-    # Will implement as background job that syncs prices asynchronously
-    # For now, prices are read from database directly without live eBay fetch
-    # try:
-    #     # Group by listing ID first to detect bundles
-    #     listings_by_id = {}
-    #     for item in items:
-    #         listing_id = item.get("ebay_listing_id")
-    #         if listing_id and item.get("ebay_listed") == "Yes":
-    #             if listing_id not in listings_by_id:
-    #                 listings_by_id[listing_id] = []
-    #             listings_by_id[listing_id].append(item)
-    #
-    #     # Wrap entire fetch in 10-second timeout so inventory never hangs
-    #     async def fetch_ebay_prices():
-    #         # Fetch prices from eBay using user's credentials
-    #         async with user_config.apply(user):
-    #             # Fetch prices from eBay and sync to items
-    #             for listing_id, listing_items in listings_by_id.items():
-    #                 try:
-    #                     # Individual fetch with 5-second timeout
-    #                     offer = await asyncio.wait_for(
-    #                         lister_ebay_api.get_offer_details(listing_id),
-    #                         timeout=5.0
-    #                     )
-    #
-    #                     if not offer:
-    #                         print(f"[inventory] No offer found for listing {listing_id}")
-    #                         continue
-    #
-    #                     current_price = offer.get("current_price")
-    #                     if not current_price:
-    #                         print(f"[inventory] No current_price in offer for listing {listing_id}")
-    #                         continue
-    #
-    #                     # Detect if this is a true bundle or quantity listing
-    #                     unique_names = set(i.get("card_name", "") for i in listing_items)
-    #                     is_bundle = len(unique_names) > 1
-    #
-    #                     # Determine price per item
-    #                     if len(listing_items) > 1 and is_bundle:
-    #                         price_per_item = round(current_price / len(listing_items), 2)
-    #                     else:
-    #                         price_per_item = current_price
-    #
-    #                     # Update sell_price for all items sharing this listing
-    #                     for item in listing_items:
-    #                         item["sell_price"] = price_per_item
-    #
-    #                 except asyncio.TimeoutError:
-    #                     print(f"[inventory] Timeout fetching listing {listing_id} (>5s)")
-    #                 except Exception as e:
-    #                     print(f"[inventory] Error fetching listing {listing_id}: {e}")
-    #
-    #             # Fetch eBay market prices for items with null live_price
-    #             for item in items:
-    #                 listing_id = item.get("ebay_listing_id")
-    #                 if listing_id and not item.get("live_price"):
-    #                     try:
-    #                         # Individual fetch with 5-second timeout
-    #                         offer = await asyncio.wait_for(
-    #                             lister_ebay_api.get_offer_details(listing_id),
-    #                             timeout=5.0
-    #                         )
-    #                         if offer and offer.get("current_price"):
-    #                             item["live_price"] = offer["current_price"]
-    #                     except asyncio.TimeoutError:
-    #                         print(f"[inventory] Timeout fetching market price for listing {listing_id} (>5s)")
-    #                     except Exception as e:
-    #                         print(f"[inventory] Failed to fetch market price for listing {listing_id}: {e}")
-    #
-    #     # Global 10-second timeout for entire eBay fetch section
-    #     try:
-    #         await asyncio.wait_for(fetch_ebay_prices(), timeout=10.0)
-    #     except asyncio.TimeoutError:
-    #         print(f"[inventory] Warning: eBay price fetch exceeded 10s timeout, returning without prices")
-    #
-    # except Exception as e:
-    #     print(f"[inventory] Warning: eBay price fetch failed, continuing without prices: {e}")
 
     # Split live_price for bundles (already split sell_price above)
     # Rebuild listing groups to detect true bundles
@@ -417,7 +340,7 @@ async def get_item(item_id: int, user: dict = Depends(get_current_user)):
                 if offer and offer.get("current_price"):
                     item["live_price"] = offer["current_price"]
             except Exception as e:
-                print(f"[inventory] Failed to fetch price for listing {listing_id}: {e}")
+                logger.info(f"[inventory] Failed to fetch price for listing {listing_id}: {e}")
 
         # Split listing price only for true bundles (different card names)
         # Keep full price for quantity listings (same card name)
@@ -549,8 +472,8 @@ class BundleSellRequest(BaseModel):
 @router.post("/add")
 async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_user)):
     from datetime import date
-    print(f"[add] === Received POST /inventory/add ===")
-    print(f"[add] acquisition_type={req.acquisition_type}, pc_url={req.pc_url}, purchase_price={req.purchase_price}")
+    logger.info(f"[add] === Received POST /inventory/add ===")
+    logger.info(f"[add] acquisition_type={req.acquisition_type}, pc_url={req.pc_url}, purchase_price={req.purchase_price}")
 
     if req.purchase_price <= 0:
         return {"success": False, "error": "Purchase price must be greater than 0"}
@@ -568,19 +491,19 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
 
         # Scrape card info if URL provided
         if req.pc_url.strip():
-            print(f"[add] Scraping card from {req.pc_url}")
+            logger.info(f"[add] Scraping card from {req.pc_url}")
             card_name, live_price = await scraper.scrape_card(req.pc_url, req.condition, req.region)
-            print(f"[add] Scrape result: card_name={card_name}, live_price={live_price}")
+            logger.info(f"[add] Scrape result: card_name={card_name}, live_price={live_price}")
 
             if not card_name:
-                print(f"[add] ERROR: Could not derive card name from URL")
+                logger.info(f"[add] ERROR: Could not derive card name from URL")
                 return {"success": False, "error": "Could not extract card name from PriceCharting URL"}
         else:
             # For trade-ins without URL, use a placeholder name for now
             card_name = f"Trade-in ({req.traded_item_names or 'items'})"
             live_price = req.purchase_price
 
-        print(f"[add] Adding item: card_name={card_name}, live_price={live_price}, acquisition_type={req.acquisition_type}")
+        logger.info(f"[add] Adding item: card_name={card_name}, live_price={live_price}, acquisition_type={req.acquisition_type}")
         item_id = await db.add_item(
             user["id"],
             card_name=card_name,
@@ -597,7 +520,7 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
             traded_item_names=req.traded_item_names,
             trade_cash_difference=req.trade_cash_difference,
         )
-        print(f"[add] Item added: item_id={item_id}")
+        logger.info(f"[add] Item added: item_id={item_id}")
 
         # Mark traded items as 'Traded' if this is a trade-in
         if req.acquisition_type == "trade" and req.traded_item_ids:
@@ -615,9 +538,9 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
                             "date_sold": today,
                             "acquisition_type": "traded_away"
                         }).eq("item_id", traded_id).eq("user_id", user["id"]).execute()
-                        print(f"[add] Marked item {traded_id} as Traded")
+                        logger.info(f"[add] Marked item {traded_id} as Traded")
                 except Exception as e:
-                    print(f"[add] Warning: Could not mark item {traded_id} as traded: {e}")
+                    logger.info(f"[add] Warning: Could not mark item {traded_id} as traded: {e}")
 
         # Fetch and cache the card image in background
         try:
@@ -625,15 +548,15 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
             image_url = await _scrape_pc_image(req.pc_url, item_id) if req.pc_url else None
             async with _cache_lock:
                 _write_cache(cache_key, image_url)
-            print(f"[add] Image cached for item {item_id}: {image_url is not None}")
+            logger.info(f"[add] Image cached for item {item_id}: {image_url is not None}")
         except Exception as e:
-            print(f"[add] Image cache failed (non-blocking): {e}")
+            logger.info(f"[add] Image cache failed (non-blocking): {e}")
 
         audit.log_mutation("web_add", item_id, "added", {
             "card_name": card_name, "purchase_price": req.purchase_price,
             "live_price": live_price, "acquisition_type": req.acquisition_type, "user_id": user["id"],
         })
-        print(f"[add] SUCCESS: item_id={item_id}, card_name={card_name}")
+        logger.info(f"[add] SUCCESS: item_id={item_id}, card_name={card_name}")
 
         return {
             "success":    True,
@@ -644,8 +567,8 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
         }
     except Exception as e:
         import traceback
-        print(f"[add] EXCEPTION: {type(e).__name__}: {e}")
-        print(f"[add] Traceback:\n{traceback.format_exc()}")
+        logger.info(f"[add] EXCEPTION: {type(e).__name__}: {e}")
+        logger.info(f"[add] Traceback:\n{traceback.format_exc()}")
         return {"success": False, "error": str(e)}
 
 
@@ -655,7 +578,7 @@ async def bundle_sell(req: BundleSellRequest, user: dict = Depends(get_current_u
     from web.database import get_db as _get_db
     import uuid
 
-    print(f"[bundle] === Received POST /inventory/bundle-sell ===")
+    logger.info(f"[bundle] === Received POST /inventory/bundle-sell ===")
 
     item_ids = req.item_ids
     sell_price = req.sell_price
@@ -684,7 +607,7 @@ async def bundle_sell(req: BundleSellRequest, user: dict = Depends(get_current_u
         if not items:
             return {"success": False, "error": "Items not found"}
 
-        print(f"[bundle] Found {len(items)} items")
+        logger.info(f"[bundle] Found {len(items)} items")
 
         # Calculate totals
         total_cost = sum(float(i.get("purchase_price") or 0) for i in items)
@@ -695,7 +618,7 @@ async def bundle_sell(req: BundleSellRequest, user: dict = Depends(get_current_u
         bundle_id = str(uuid.uuid4())
         item_names = ", ".join(i.get("card_name", "") for i in items)
 
-        print(f"[bundle] Total cost: £{total_cost}, sell price: £{sell_price}, fee: £{ebay_fee}, profit: £{profit}")
+        logger.info(f"[bundle] Total cost: £{total_cost}, sell price: £{sell_price}, fee: £{ebay_fee}, profit: £{profit}")
 
         # Distribute sale values equally across items
         sell_price_per_item = round(sell_price / len(items), 2)
@@ -718,7 +641,7 @@ async def bundle_sell(req: BundleSellRequest, user: dict = Depends(get_current_u
                 "fees_verified": False
             }).eq("item_id", item["item_id"]).eq("user_id", user_id).execute()
 
-            print(f"[bundle] Updated item {item['item_id']}: profit £{item_profit}")
+            logger.info(f"[bundle] Updated item {item['item_id']}: profit £{item_profit}")
 
         # Save bundle record
         database.table("bundles").insert({
@@ -733,7 +656,7 @@ async def bundle_sell(req: BundleSellRequest, user: dict = Depends(get_current_u
             "item_names": item_names
         }).execute()
 
-        print(f"[bundle] SUCCESS: Created bundle {bundle_id} with {len(items)} items, profit: £{profit}")
+        logger.info(f"[bundle] SUCCESS: Created bundle {bundle_id} with {len(items)} items, profit: £{profit}")
         audit.log_mutation("web_bundle_sell", bundle_id, "bundle_sold", {
             "item_count": len(items), "sell_price": sell_price, "profit": profit, "user_id": user_id
         })
@@ -746,8 +669,8 @@ async def bundle_sell(req: BundleSellRequest, user: dict = Depends(get_current_u
         }
     except Exception as e:
         import traceback
-        print(f"[bundle] EXCEPTION: {type(e).__name__}: {e}")
-        print(f"[bundle] Traceback:\n{traceback.format_exc()}")
+        logger.info(f"[bundle] EXCEPTION: {type(e).__name__}: {e}")
+        logger.info(f"[bundle] Traceback:\n{traceback.format_exc()}")
         return {"success": False, "error": str(e)}
 
 
@@ -762,13 +685,13 @@ async def delete_item(item_id: int, user: dict = Depends(get_current_user)):
         await db.remove_item(user["id"], item_id)
         audit.log_mutation("web_remove", item_id, "removed", {"source": "web_dashboard", "user_id": user["id"]})
 
-        print(f"[web] Removed item {item_id} ({item.get('card_name', '')})")
+        logger.info(f"[web] Removed item {item_id} ({item.get('card_name', '')})")
         return {"success": True, "item_id": item_id}
     except ValueError as e:
-        print(f"[web] Remove failed for {item_id}: {e}")
+        logger.info(f"[web] Remove failed for {item_id}: {e}")
         return {"success": False, "error": str(e)}
     except Exception as e:
-        print(f"[web] Remove error for {item_id}: {e}")
+        logger.info(f"[web] Remove error for {item_id}: {e}")
         return {"success": False, "error": f"Server error: {e}"}
 
 
@@ -885,10 +808,10 @@ async def set_listing(
         await db.edit_item(user["id"], item_id, "ebay_listing_id", listing_id)
         await db.edit_item(user["id"], item_id, "ebay_listed", "Yes")
 
-        print(f"[web] Set eBay listing for item {item_id}: {listing_id}")
+        logger.info(f"[web] Set eBay listing for item {item_id}: {listing_id}")
         return {"success": True, "item_id": item_id, "ebay_listing_id": listing_id}
     except Exception as e:
-        print(f"[web] Set listing error for {item_id}: {e}")
+        logger.info(f"[web] Set listing error for {item_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to set listing: {e}")
 
 
@@ -911,12 +834,12 @@ async def scrape_test():
     }
 
     try:
-        print(f"[debug] Testing HTTP request to {url}")
+        logger.info(f"[debug] Testing HTTP request to {url}")
         resp = requests.get(url, headers=headers, timeout=15)
         html_sample = resp.text[:500]
 
-        print(f"[debug] Response status: {resp.status_code}")
-        print(f"[debug] Content length: {len(resp.text)}")
+        logger.info(f"[debug] Response status: {resp.status_code}")
+        logger.info(f"[debug] Content length: {len(resp.text)}")
 
         return {
             "status": resp.status_code,
@@ -928,5 +851,5 @@ async def scrape_test():
             "has_completed_auctions": "completed_auctions" in resp.text,
         }
     except Exception as e:
-        print(f"[debug] HTTP request failed: {e}")
+        logger.info(f"[debug] HTTP request failed: {e}")
         return {"error": str(e), "error_type": type(e).__name__}

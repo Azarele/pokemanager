@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -6,13 +7,14 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-import audit
 import config
 import lister_ebay_api
 from web import db_inventory as db
 from web import user_config
 from web.auth import get_current_user
 from web.ws_manager import manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -149,7 +151,7 @@ async def list_ebay(
         stored_urls = item.get("image_urls", [])
         if stored_urls:
             tmp_paths = await _download_images_to_temp(item_id, stored_urls)
-            print(f"[images] Reusing {len(tmp_paths)} stored image(s) for item {item_id}")
+            logger.info(f"[images] Reusing {len(tmp_paths)} stored image(s) for item {item_id}")
 
     try:
         import traceback
@@ -158,7 +160,7 @@ async def list_ebay(
         use_promo = use_promoted_listing.lower() == 'true' and promoted_listing_pct > 0
         promo_pct = promoted_listing_pct if use_promo else None
 
-        print(f"[listings] Listing item {item_id}: price={price}, use_promo={use_promo}, promo_pct={promo_pct}")
+        logger.info(f"[listings] Listing item {item_id}: price={price}, use_promo={use_promo}, promo_pct={promo_pct}")
 
         async with user_config.apply(user):
             # Note: promoted_listing_pct is stored in database for future API integration
@@ -190,8 +192,8 @@ async def list_ebay(
         }
     except Exception as e:
         import traceback
-        print(f"[listings] Error creating eBay listing for item {item_id}: {e}")
-        print(traceback.format_exc())
+        logger.info(f"[listings] Error creating eBay listing for item {item_id}: {e}")
+        logger.info(traceback.format_exc())
         raise
     finally:
         for p in tmp_paths:
@@ -214,7 +216,7 @@ async def _download_images_to_temp(item_id: int, urls: list[str]) -> list[Path]:
                         path.write_bytes(await resp.read())
                         paths.append(path)
             except Exception as e:
-                print(f"[images] Failed to download {url}: {e}")
+                logger.info(f"[images] Failed to download {url}: {e}")
     return paths
 
 # ── Delist from eBay ──────────────────────────────────────────────────────
@@ -321,7 +323,7 @@ async def apply_promotion_to_all(user: dict = Depends(get_current_user)):
             await db.edit_item(user["id"], item_id, "promoted_listing_pct", promoted_pct)
             await db.edit_item(user["id"], item_id, "use_promoted_listing", True)
             updated += 1
-            print(f"[listings] Updated promotion for item {item_id} (listing {listing_id}) to {promoted_pct}%")
+            logger.info(f"[listings] Updated promotion for item {item_id} (listing {listing_id}) to {promoted_pct}%")
 
             # Rate limit API calls
             await asyncio.sleep(0.2)
@@ -329,7 +331,7 @@ async def apply_promotion_to_all(user: dict = Depends(get_current_user)):
         except Exception as e:
             failed += 1
             errors.append(f"Item {item['item_id']}: {str(e)}")
-            print(f"[listings] Failed to update item {item['item_id']}: {e}")
+            logger.info(f"[listings] Failed to update item {item['item_id']}: {e}")
 
     return {
         "updated": updated,
@@ -358,99 +360,14 @@ async def get_ebay_policies(user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         import traceback
-        print(f"[listings] Error fetching eBay policies: {e}")
-        print(traceback.format_exc())
+        logger.info(f"[listings] Error fetching eBay policies: {e}")
+        logger.info(traceback.format_exc())
         return {
             "success": False,
             "error": str(e),
             "fulfillment": [],
             "payment": [],
             "return": [],
-        }
-
-
-@router.get("/ebay-policies-debug")
-async def debug_ebay_policies(user: dict = Depends(get_current_user)):
-    """Debug endpoint: Fetch ALL policies (fulfillment, payment, return) from eBay with raw responses."""
-    print("\n" + "="*80)
-    print("[DEBUG] eBay Policies Debug Endpoint Called")
-    print("="*80)
-
-    try:
-        # Log config values
-        print(f"\n[CONFIG] Current policy IDs from environment:")
-        print(f"  EBAY_FULFILLMENT_POLICY_ID: {config.EBAY_FULFILLMENT_POLICY_ID or '(empty)'}")
-        print(f"  EBAY_PAYMENT_POLICY_ID: {config.EBAY_PAYMENT_POLICY_ID or '(empty)'}")
-        print(f"  EBAY_RETURN_POLICY_ID: {config.EBAY_RETURN_POLICY_ID or '(empty)'}")
-
-        print(f"\n[FETCH] Fetching available policies from eBay...")
-        async with user_config.apply(user):
-            fulfillment = await lister_ebay_api.fetch_fulfillment_policies()
-            payment = await lister_ebay_api.fetch_payment_policies()
-            returns = await lister_ebay_api.fetch_return_policies()
-
-        # Log fetched policies
-        print(f"\n[SUCCESS] Fulfillment Policies ({len(fulfillment)} found):")
-        for p in fulfillment:
-            print(f"  - {p['name']} (ID: {p['id']})")
-            if p.get('description'):
-                print(f"    Description: {p['description']}")
-
-        print(f"\n[SUCCESS] Payment Policies ({len(payment)} found):")
-        for p in payment:
-            print(f"  - {p['name']} (ID: {p['id']})")
-            if p.get('description'):
-                print(f"    Description: {p['description']}")
-
-        print(f"\n[SUCCESS] Return Policies ({len(returns)} found):")
-        for p in returns:
-            print(f"  - {p['name']} (ID: {p['id']})")
-            if p.get('description'):
-                print(f"    Description: {p['description']}")
-
-        # Verify which policies from config are in the list
-        print(f"\n[VERIFY] Checking if config policies exist on eBay:")
-        if config.EBAY_FULFILLMENT_POLICY_ID:
-            found = any(p['id'] == config.EBAY_FULFILLMENT_POLICY_ID for p in fulfillment)
-            status = "✓ FOUND" if found else "✗ NOT FOUND"
-            print(f"  Fulfillment {config.EBAY_FULFILLMENT_POLICY_ID}: {status}")
-        if config.EBAY_PAYMENT_POLICY_ID:
-            found = any(p['id'] == config.EBAY_PAYMENT_POLICY_ID for p in payment)
-            status = "✓ FOUND" if found else "✗ NOT FOUND"
-            print(f"  Payment {config.EBAY_PAYMENT_POLICY_ID}: {status}")
-        if config.EBAY_RETURN_POLICY_ID:
-            found = any(p['id'] == config.EBAY_RETURN_POLICY_ID for p in returns)
-            status = "✓ FOUND" if found else "✗ NOT FOUND"
-            print(f"  Return {config.EBAY_RETURN_POLICY_ID}: {status}")
-
-        print("\n" + "="*80)
-
-        return {
-            "success": True,
-            "config_values": {
-                "fulfillment_policy_id": config.EBAY_FULFILLMENT_POLICY_ID or "(empty)",
-                "payment_policy_id": config.EBAY_PAYMENT_POLICY_ID or "(empty)",
-                "return_policy_id": config.EBAY_RETURN_POLICY_ID or "(empty)",
-            },
-            "available_policies": {
-                "fulfillment": fulfillment,
-                "payment": payment,
-                "returns": returns,
-            }
-        }
-    except Exception as e:
-        import traceback
-        print(f"\n[ERROR] Failed to fetch eBay policies: {e}")
-        print(traceback.format_exc())
-        print("="*80)
-        return {
-            "success": False,
-            "error": str(e),
-            "config_values": {
-                "fulfillment_policy_id": config.EBAY_FULFILLMENT_POLICY_ID or "(empty)",
-                "payment_policy_id": config.EBAY_PAYMENT_POLICY_ID or "(empty)",
-                "return_policy_id": config.EBAY_RETURN_POLICY_ID or "(empty)",
-            }
         }
 
 
@@ -547,7 +464,7 @@ async def sold_and_delist(item_id: int, body: dict, user: dict = Depends(get_cur
             results["delisted"] = True
         except Exception as e:
             results["warning"] = f"Could not end listing: {str(e)}"
-            print(f"[sold-delist] Could not end listing {listing_id}: {e}")
+            logger.info(f"[sold-delist] Could not end listing {listing_id}: {e}")
 
     # Step 2: Mark as sold in database
     try:
@@ -731,9 +648,9 @@ async def bundle_list_on_ebay(req: BundleListRequest, user: dict = Depends(get_c
                 dest = Path(config.TEMP_IMAGES_DIR) / safe_name
                 dest.write_bytes(image_data)
                 image_paths.append(dest)
-                print(f"[bundle-list] Saved photo {idx+1}: {dest}")
+                logger.info(f"[bundle-list] Saved photo {idx+1}: {dest}")
             except Exception as e:
-                print(f"[bundle-list] Error converting photo {idx}: {e}")
+                logger.info(f"[bundle-list] Error converting photo {idx}: {e}")
 
         # Create eBay listing using existing lister
         async with user_config.apply(user):
@@ -786,7 +703,7 @@ async def bundle_list_on_ebay(req: BundleListRequest, user: dict = Depends(get_c
         }
 
     except Exception as e:
-        print(f"[bundle-list] Error: {e}")
+        logger.info(f"[bundle-list] Error: {e}")
         import traceback
         traceback.print_exc()
         return {"success": False, "error": str(e)}
@@ -835,7 +752,7 @@ async def sync_listing_prices(user: dict = Depends(get_current_user)):
                 offer = await lister_ebay_api.get_offer_details(listing_id)
 
             if not offer:
-                print(f"[sync-prices] No offer found for listing {listing_id}")
+                logger.info(f"[sync-prices] No offer found for listing {listing_id}")
                 failed += len(listing_items)
                 results.append({
                     "listing_id": listing_id,
@@ -847,7 +764,7 @@ async def sync_listing_prices(user: dict = Depends(get_current_user)):
 
             ebay_price = offer.get("current_price")
             if not ebay_price:
-                print(f"[sync-prices] No price in offer for listing {listing_id}: {offer}")
+                logger.info(f"[sync-prices] No price in offer for listing {listing_id}: {offer}")
                 failed += len(listing_items)
                 results.append({
                     "listing_id": listing_id,
@@ -857,37 +774,37 @@ async def sync_listing_prices(user: dict = Depends(get_current_user)):
                 })
                 continue
 
-            print(f"[sync-prices] Fetched listing {listing_id}: £{ebay_price} ({len(listing_items)} items)")
+            logger.info(f"[sync-prices] Fetched listing {listing_id}: £{ebay_price} ({len(listing_items)} items)")
 
             # Log for specific test listings
             if listing_id in ("336711544234", "336711556909"):
-                print(f"[sync-prices] TEST LISTING {listing_id}: fetched £{ebay_price}")
-                print(f"[sync-prices]   Full eBay response: {offer}")
-                print(f"[sync-prices]   Items sharing this listing: {len(listing_items)}")
+                logger.info(f"[sync-prices] TEST LISTING {listing_id}: fetched £{ebay_price}")
+                logger.info(f"[sync-prices]   Full eBay response: {offer}")
+                logger.info(f"[sync-prices]   Items sharing this listing: {len(listing_items)}")
                 for item in listing_items:
-                    print(f"[sync-prices]     - Item {item['item_id']}: {item['card_name']}")
+                    logger.info(f"[sync-prices]     - Item {item['item_id']}: {item['card_name']}")
 
             # Determine price per item
             is_bundle = bundles.get(listing_id, False)
             if len(listing_items) > 1 and is_bundle:
                 # True bundle: divide price equally
                 price_per_item = round(ebay_price / len(listing_items), 2)
-                print(f"[sync-prices] True bundle: dividing £{ebay_price} by {len(listing_items)} = £{price_per_item} per item")
+                logger.info(f"[sync-prices] True bundle: dividing £{ebay_price} by {len(listing_items)} = £{price_per_item} per item")
             else:
                 # Quantity listing or single item: keep full price
                 price_per_item = ebay_price
                 if len(listing_items) > 1:
-                    print(f"[sync-prices] Quantity listing: keeping £{ebay_price} for each of {len(listing_items)} items")
+                    logger.info(f"[sync-prices] Quantity listing: keeping £{ebay_price} for each of {len(listing_items)} items")
 
             # Update each item
             for item in listing_items:
                 try:
                     await db.update_sell_price(user["id"], item["item_id"], price_per_item)
                     updated += 1
-                    print(f"[sync-prices] Updated item {item['item_id']}: £{price_per_item}")
+                    logger.info(f"[sync-prices] Updated item {item['item_id']}: £{price_per_item}")
                 except Exception as e:
                     failed += 1
-                    print(f"[sync-prices] Failed to update item {item['item_id']}: {e}")
+                    logger.info(f"[sync-prices] Failed to update item {item['item_id']}: {e}")
 
             results.append({
                 "listing_id": listing_id,
@@ -900,7 +817,7 @@ async def sync_listing_prices(user: dict = Depends(get_current_user)):
 
         except Exception as e:
             failed += len(listing_items)
-            print(f"[sync-prices] Error fetching listing {listing_id}: {e}")
+            logger.info(f"[sync-prices] Error fetching listing {listing_id}: {e}")
             results.append({
                 "listing_id": listing_id,
                 "items_count": len(listing_items),

@@ -38,7 +38,7 @@ def sync_add_item(item: dict) -> None:
             "source":           str(item.get("source") or ""),
         }, on_conflict="user_id,item_id").execute()
     except Exception as e:
-        print(f"[bot_sync] sync_add_item failed: {e}")
+        logger.info(f"[bot_sync] sync_add_item failed: {e}")
 
 
 def sync_sell_item(item_id: int, sell_price: float, profit: float) -> None:
@@ -54,7 +54,7 @@ def sync_sell_item(item_id: int, sell_price: float, profit: float) -> None:
             "date_sold":  str(date.today()),
         }).eq("user_id", _USER_ID).eq("item_id", item_id).execute()
     except Exception as e:
-        print(f"[bot_sync] sync_sell_item failed: {e}")
+        logger.info(f"[bot_sync] sync_sell_item failed: {e}")
 
 
 def sync_unsell_item(item_id: int) -> None:
@@ -70,7 +70,7 @@ def sync_unsell_item(item_id: int) -> None:
             "date_sold":  None,
         }).eq("user_id", _USER_ID).eq("item_id", item_id).execute()
     except Exception as e:
-        print(f"[bot_sync] sync_unsell_item failed: {e}")
+        logger.info(f"[bot_sync] sync_unsell_item failed: {e}")
 
 
 def sync_remove_item(item_id: int) -> None:
@@ -81,7 +81,7 @@ def sync_remove_item(item_id: int) -> None:
         db.table("inventory_items").delete() \
             .eq("user_id", _USER_ID).eq("item_id", item_id).execute()
     except Exception as e:
-        print(f"[bot_sync] sync_remove_item failed: {e}")
+        logger.info(f"[bot_sync] sync_remove_item failed: {e}")
 
 
 def sync_price_update(item_id: int, live_price: float, quick_price: float = None,
@@ -104,7 +104,7 @@ def sync_price_update(item_id: int, live_price: float, quick_price: float = None
             "live_price_gbp": live_price,
         }).execute()
     except Exception as e:
-        print(f"[bot_sync] sync_price_update failed: {e}")
+        logger.info(f"[bot_sync] sync_price_update failed: {e}")
 
 
 def sync_ebay_listed(item_id: int, listing_id: str, price: float) -> None:
@@ -118,7 +118,7 @@ def sync_ebay_listed(item_id: int, listing_id: str, price: float) -> None:
             "sell_price":      price,
         }).eq("user_id", _USER_ID).eq("item_id", item_id).execute()
     except Exception as e:
-        print(f"[bot_sync] sync_ebay_listed failed: {e}")
+        logger.info(f"[bot_sync] sync_ebay_listed failed: {e}")
 
 
 def sync_ebay_delisted(item_id: int) -> None:
@@ -131,7 +131,7 @@ def sync_ebay_delisted(item_id: int) -> None:
             "ebay_listed":     "No",
         }).eq("user_id", _USER_ID).eq("item_id", item_id).execute()
     except Exception as e:
-        print(f"[bot_sync] sync_ebay_delisted failed: {e}")
+        logger.info(f"[bot_sync] sync_ebay_delisted failed: {e}")
 
 
 def sync_ebay_sold(item_id: int, sell_price: float, profit: float) -> None:

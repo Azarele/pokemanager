@@ -15,7 +15,7 @@ _ENABLED = bool(os.getenv("RESEND_API_KEY", "").startswith("re_"))
 
 def _send(to: str, subject: str, html: str) -> bool:
     if not _ENABLED:
-        print(f"[email] Not configured — would send '{subject}' to {to}")
+        logger.info(f"[email] Not configured — would send '{subject}' to {to}")
         return False
     try:
         resend.Emails.send({
@@ -24,10 +24,10 @@ def _send(to: str, subject: str, html: str) -> bool:
             "subject": subject,
             "html": html,
         })
-        print(f"[email] Sent '{subject}' to {to}")
+        logger.info(f"[email] Sent '{subject}' to {to}")
         return True
     except Exception as e:
-        print(f"[email] Failed to send '{subject}' to {to}: {e}")
+        logger.info(f"[email] Failed to send '{subject}' to {to}: {e}")
         return False
 
 

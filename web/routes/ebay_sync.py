@@ -3,6 +3,7 @@ eBay sales sync — auto-detect completed sales and offers, send Discord notific
 """
 import asyncio
 import base64
+import logging
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
@@ -20,6 +21,7 @@ from web.notifications import send_discord_notification
 
 import config
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Per-user token cache: {user_id: {"token": "...", "expiry": unix_timestamp}}
@@ -120,7 +122,7 @@ async def _get_recent_orders(
         }
         headers = _get_ebay_headers(access_token)
 
-        print(f"[ebay_sync] Querying most recent {params['limit']} orders for user {user_id}")
+        logger.info(f"[ebay_sync] Querying most recent {params['limit']} orders for user {user_id}")
 
         resp = requests.get(
             "https://api.ebay.com/sell/fulfillment/v1/order",
@@ -130,17 +132,17 @@ async def _get_recent_orders(
         )
 
         if resp.status_code != 200:
-            print(f"[ebay_sync] get_recent_orders HTTP {resp.status_code}: {resp.text}")
+            logger.info(f"[ebay_sync] get_recent_orders HTTP {resp.status_code}: {resp.text}")
             return []
 
         data = resp.json()
         orders = data.get("orders", [])
-        print(f"[ebay_sync] Found {len(orders)} orders for user {user_id}")
+        logger.info(f"[ebay_sync] Found {len(orders)} orders for user {user_id}")
         if orders:
-            print(f"[ebay_sync] Raw API response (first order): {orders[0] if orders else 'None'}")
+            logger.info(f"[ebay_sync] Raw API response (first order): {orders[0] if orders else 'None'}")
         return orders
     except Exception as e:
-        print(f"[ebay_sync] Error fetching orders: {e}")
+        logger.info(f"[ebay_sync] Error fetching orders: {e}")
         return []
 
 
@@ -171,17 +173,17 @@ async def _get_pending_offers(
         if resp.status_code != 200:
             # 404 or other errors might mean no offers or insufficient permissions
             if resp.status_code == 404:
-                print(f"[ebay_sync] No active offers found or endpoint not available (HTTP 404)")
+                logger.info(f"[ebay_sync] No active offers found or endpoint not available (HTTP 404)")
             else:
-                print(f"[ebay_sync] get_pending_offers HTTP {resp.status_code}: {resp.text}")
+                logger.info(f"[ebay_sync] get_pending_offers HTTP {resp.status_code}: {resp.text}")
             return []
 
         data = resp.json()
         offers = data.get("offers", [])
-        print(f"[ebay_sync] Found {len(offers)} active offers for user {user_id}")
+        logger.info(f"[ebay_sync] Found {len(offers)} active offers for user {user_id}")
         return offers
     except Exception as e:
-        print(f"[ebay_sync] Error fetching offers: {e}")
+        logger.info(f"[ebay_sync] Error fetching offers: {e}")
         return []
 
 
@@ -202,7 +204,7 @@ async def _sync_user_sales(user_id: str) -> dict:
     try:
         access_token = await _get_user_ebay_token(user_id)
     except Exception as e:
-        print(f"[ebay_sync] Could not get token for user {user_id}: {e}")
+        logger.info(f"[ebay_sync] Could not get token for user {user_id}: {e}")
         return stats
 
     # Get user's settings and inventory once
@@ -218,10 +220,18 @@ async def _sync_user_sales(user_id: str) -> dict:
     # Fetch all inventory items once for this user
     inventory_items = await db.get_all_items(user_id)
     inventory_by_id = {i["item_id"]: i for i in inventory_items}
+    # Build lookup for bundle detection (avoid N+1 query pattern)
+    inventory_by_listing_id = {}
+    for item in inventory_items:
+        listing_id = item.get("ebay_listing_id")
+        if listing_id and item.get("status") == "Inventory":
+            if listing_id not in inventory_by_listing_id:
+                inventory_by_listing_id[listing_id] = []
+            inventory_by_listing_id[listing_id].append(item)
 
     # Fetch orders and sync them
     orders = await _get_recent_orders(user_id, access_token)
-    print(f"[ebay_sync] === SYNC START === Processing {len(orders)} orders for user {user_id}")
+    logger.info(f"[ebay_sync] === SYNC START === Processing {len(orders)} orders for user {user_id}")
     for order in orders:
         try:
             order_id = order.get("orderId")
@@ -236,7 +246,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                 # SKU format is "pokemaz-{item_id}" — extract the number
                 # Skip bundles (pokemaz-bundle-*) as they represent multiple items
                 if "-bundle-" in sku:
-                    print(f"[ebay_sync] Skipping bundle SKU: {sku}")
+                    logger.info(f"[ebay_sync] Skipping bundle SKU: {sku}")
                     continue
 
                 try:
@@ -245,7 +255,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                     else:
                         item_id = int(sku)
                 except (ValueError, TypeError, IndexError):
-                    print(f"[ebay_sync] Could not parse SKU: {sku}")
+                    logger.info(f"[ebay_sync] Could not parse SKU: {sku}")
                     continue
 
                 # Check if item exists and is not already sold
@@ -254,24 +264,24 @@ async def _sync_user_sales(user_id: str) -> dict:
 
                 # Fallback: try matching by eBay listing_id if SKU-based lookup failed
                 if not inv_item and ebay_listing_id:
-                    print(f"[ebay_sync] SKU mismatch for {sku}, attempting fallback match by listing_id {ebay_listing_id}")
+                    logger.info(f"[ebay_sync] SKU mismatch for {sku}, attempting fallback match by listing_id {ebay_listing_id}")
                     inv_item = await db.get_item_by_listing_id(user_id, ebay_listing_id)
                     if inv_item:
-                        print(f"[ebay_sync] ✓ Matched by listing_id {ebay_listing_id} to item {inv_item.get('item_id')}")
+                        logger.info(f"[ebay_sync] ✓ Matched by listing_id {ebay_listing_id} to item {inv_item.get('item_id')}")
                         item_id = inv_item.get("item_id")
 
                 if not inv_item:
-                    print(f"[ebay_sync] No inventory item found for SKU: {sku}, listing_id: {ebay_listing_id}")
+                    logger.info(f"[ebay_sync] No inventory item found for SKU: {sku}, listing_id: {ebay_listing_id}")
                     continue
 
                 # Check for bundle listing (multiple items share same listing_id)
                 if ebay_listing_id:
-                    all_bundle_items = [i for i in inventory_items if i.get("ebay_listing_id") == ebay_listing_id and i.get("status") == "Inventory"]
-                    print(f"[ebay_sync] Listing {ebay_listing_id}: Found {len(all_bundle_items)} unsold items with this listing")
+                    all_bundle_items = inventory_by_listing_id.get(ebay_listing_id, [])
+                    logger.info(f"[ebay_sync] Listing {ebay_listing_id}: Found {len(all_bundle_items)} unsold items with this listing")
                     if len(all_bundle_items) > 1:
                         # Bundle sale - split proceeds proportionally by market value
-                        print(f"[ebay_sync] ✓ BUNDLE DETECTED: {len(all_bundle_items)} items share listing {ebay_listing_id}")
-                        print(f"[ebay_sync] Bundle item IDs: {[i['item_id'] for i in all_bundle_items]}")
+                        logger.info(f"[ebay_sync] ✓ BUNDLE DETECTED: {len(all_bundle_items)} items share listing {ebay_listing_id}")
+                        logger.info(f"[ebay_sync] Bundle item IDs: {[i['item_id'] for i in all_bundle_items]}")
 
                         # Extract price paid for entire bundle
                         cost_obj = item.get("lineItemCost", {})
@@ -294,7 +304,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                             else:
                                 ebay_fee_total = round(total_price_paid * ebay_fee_rate, 2)
 
-                        print(f"[ebay_sync] Bundle: total_price={total_price_paid}, total_market={total_market}, total_fee={ebay_fee_total}")
+                        logger.info(f"[ebay_sync] Bundle: total_price={total_price_paid}, total_market={total_market}, total_fee={ebay_fee_total}")
 
                         # Process each item in bundle with proportional split
                         for bundle_item in all_bundle_items:
@@ -312,7 +322,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                             item_purchase_price = float(bundle_item.get("purchase_price") or 0)
                             item_profit = round(item_price_share - item_fee_share - item_purchase_price, 2)
 
-                            print(f"[ebay_sync] Bundle item {item_id_b}: market={item_market}, share={item_price_share}, fee_share={item_fee_share}, profit={item_profit}")
+                            logger.info(f"[ebay_sync] Bundle item {item_id_b}: market={item_market}, share={item_price_share}, fee_share={item_fee_share}, profit={item_profit}")
 
                             # Mark item as sold with proportional split
                             await db.edit_item(user_id, item_id_b, "status", "Sold")
@@ -326,23 +336,23 @@ async def _sync_user_sales(user_id: str) -> dict:
 
                             stats["synced"] += 1
 
-                        print(f"[ebay_sync] ✓ Bundle sale synced: {len(all_bundle_items)} items from order {order_id}")
+                        logger.info(f"[ebay_sync] ✓ Bundle sale synced: {len(all_bundle_items)} items from order {order_id}")
                         continue
 
                 # Check if item is already sold
                 already_sold = inv_item.get("status") == "Sold"
-                print(f"[ebay_sync] Checking order {order_id}, item {item_id}, listing_id {ebay_listing_id}, status {inv_item.get('status')}")
+                logger.info(f"[ebay_sync] Checking order {order_id}, item {item_id}, listing_id {ebay_listing_id}, status {inv_item.get('status')}")
 
                 if already_sold:
                     stored_order_id = inv_item.get("ebay_order_id")
                     if stored_order_id and stored_order_id == order_id:
                         # Same order, already synced
-                        print(f"[ebay_sync] Item {item_id} already synced with order {order_id}")
+                        logger.info(f"[ebay_sync] Item {item_id} already synced with order {order_id}")
                         stats["skipped"] += 1
                         continue
                     elif stored_order_id and stored_order_id != order_id:
                         # Different order = re-sold after cancellation/relist
-                        print(f"[ebay_sync] Item {item_id} re-sold after cancellation! Previous order: {stored_order_id}, New order: {order_id}")
+                        logger.info(f"[ebay_sync] Item {item_id} re-sold after cancellation! Previous order: {stored_order_id}, New order: {order_id}")
                         # Extract order data for re-sale
                         cost_obj = item.get("lineItemCost", {})
                         if isinstance(cost_obj, dict):
@@ -369,12 +379,12 @@ async def _sync_user_sales(user_id: str) -> dict:
                         await db.edit_item(user_id, item_id, "date_sold", order_creation_date)
                         await db.edit_item(user_id, item_id, "ebay_order_id", order_id)
 
-                        print(f"[ebay_sync] ✓ Item {item_id} re-sold after cancellation - updated with new order {order_id}, profit: £{profit}")
+                        logger.info(f"[ebay_sync] ✓ Item {item_id} re-sold after cancellation - updated with new order {order_id}, profit: £{profit}")
                         stats["synced"] += 1
                         continue
                     else:
                         # No order_id stored (from before this feature), sync now
-                        print(f"[ebay_sync] Item {item_id} already sold but no order_id stored, syncing now")
+                        logger.info(f"[ebay_sync] Item {item_id} already sold but no order_id stored, syncing now")
                         # Fall through to process the sale
 
                 # Extract order data - lineItemCost is a dict with value/currency
@@ -398,11 +408,11 @@ async def _sync_user_sales(user_id: str) -> dict:
                     if inv_item.get("promoted_listing_pct"):
                         promo_pct = float(inv_item.get("promoted_listing_pct"))
                         ebay_fee = round(price_paid * (promo_pct / 100), 2)
-                        print(f"[ebay_sync] Item {item_id}: Using item promotion {promo_pct}% = £{ebay_fee:.2f}")
+                        logger.info(f"[ebay_sync] Item {item_id}: Using item promotion {promo_pct}% = £{ebay_fee:.2f}")
                     else:
                         # Fall back to default rate
                         ebay_fee = round(price_paid * ebay_fee_rate, 2)
-                        print(f"[ebay_sync] Item {item_id}: Using default rate {ebay_fee_rate*100:.2f}% = £{ebay_fee:.2f}")
+                        logger.info(f"[ebay_sync] Item {item_id}: Using default rate {ebay_fee_rate*100:.2f}% = £{ebay_fee:.2f}")
 
                 # Calculate profit: sale price - purchase price - actual ebay fees
                 # Buyer pays postage via eBay Simple Delivery (we don't deduct postage)
@@ -410,7 +420,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                 profit = round(net_received - purchase_price, 2)
 
                 # Log actual fee breakdown for verification
-                print(f"[ebay_sync] Item {item_id}: price={price_paid}, fee={ebay_fee}, net={net_received}, profit={profit}")
+                logger.info(f"[ebay_sync] Item {item_id}: price={price_paid}, fee={ebay_fee}, net={net_received}, profit={profit}")
 
                 # Mark as sold with order info and calculated profit
                 await db.edit_item(user_id, item_id, "status", "Sold")
@@ -441,18 +451,18 @@ async def _sync_user_sales(user_id: str) -> dict:
                 )
 
                 stats["synced"] += 1
-                print(f"[ebay_sync] Successfully synced item {item_id} (profit: £{profit}) for user {user_id}")
-                print(f"[ebay_sync] Found inventory match: {inv_item}")
+                logger.info(f"[ebay_sync] Successfully synced item {item_id} (profit: £{profit}) for user {user_id}")
+                logger.info(f"[ebay_sync] Found inventory match: {inv_item}")
 
         except Exception as e:
             stats["errors"] += 1
-            print(f"[ebay_sync] Error processing order {order.get('orderId')}: {e}")
+            logger.info(f"[ebay_sync] Error processing order {order.get('orderId')}: {e}")
 
     # Fetch pending offers (don't auto-process, just notify)
     offers = await _get_pending_offers(user_id, access_token)
     stats["offers_found"] = len(offers)
 
-    print(f"[ebay_sync] === SYNC END === Results for {user_id}: synced={stats['synced']}, skipped={stats['skipped']}, errors={stats['errors']}, offers={stats['offers_found']}")
+    logger.info(f"[ebay_sync] === SYNC END === Results for {user_id}: synced={stats['synced']}, skipped={stats['skipped']}, errors={stats['errors']}, offers={stats['offers_found']}")
     return stats
 
 
@@ -512,21 +522,21 @@ async def _check_best_offers(user_id: str, ebay_token: str) -> dict:
             )
 
         if response.status_code != 200:
-            print(f"[ebay_sync] GetBestOffers error: {response.status_code} {response.text}")
+            logger.info(f"[ebay_sync] GetBestOffers error: {response.status_code} {response.text}")
             return stats
 
         # Parse XML response
         try:
             root = ET.fromstring(response.text)
         except ET.ParseError as e:
-            print(f"[ebay_sync] XML parse error: {e}")
+            logger.info(f"[ebay_sync] XML parse error: {e}")
             return stats
 
         # Extract offers from XML
         ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
         best_offer_list = root.findall(".//ebay:BestOffer", ns)
 
-        print(f"[ebay_sync] Found {len(best_offer_list)} pending best offers for user {user_id}")
+        logger.info(f"[ebay_sync] Found {len(best_offer_list)} pending best offers for user {user_id}")
 
         for offer in best_offer_list:
             try:
@@ -539,7 +549,7 @@ async def _check_best_offers(user_id: str, ebay_token: str) -> dict:
                 ).eq("user_id", user_id).execute()
 
                 if existing.data:
-                    print(f"[ebay_sync] Already notified for offer {offer_id}")
+                    logger.info(f"[ebay_sync] Already notified for offer {offer_id}")
                     continue
 
                 # Get offer price
@@ -552,7 +562,7 @@ async def _check_best_offers(user_id: str, ebay_token: str) -> dict:
                 # Find matching inventory item
                 inv_item = inventory_by_listing.get(str(item_id))
                 if not inv_item:
-                    print(f"[ebay_sync] No inventory item found for listing {item_id}")
+                    logger.info(f"[ebay_sync] No inventory item found for listing {item_id}")
                     continue
 
                 # Calculate ROI
@@ -611,17 +621,17 @@ async def _check_best_offers(user_id: str, ebay_token: str) -> dict:
                 }).execute()
 
                 stats["notified"] += 1
-                print(f"[ebay_sync] Sent best offer notification for item {item_id}: £{offer_price}")
+                logger.info(f"[ebay_sync] Sent best offer notification for item {item_id}: £{offer_price}")
 
             except Exception as e:
                 stats["errors"] += 1
-                print(f"[ebay_sync] Error processing best offer: {e}")
+                logger.info(f"[ebay_sync] Error processing best offer: {e}")
 
         stats["checked"] = len(best_offer_list)
         return stats
 
     except Exception as e:
-        print(f"[ebay_sync] Error checking best offers: {e}")
+        logger.info(f"[ebay_sync] Error checking best offers: {e}")
         return stats
 
 
@@ -750,10 +760,10 @@ async def check_ebay_offers(user: dict = Depends(get_current_user)):
                 "recommendation": recommendation,
             })
 
-            print(f"[ebay_sync] Sent offer notification for listing {listing_id}")
+            logger.info(f"[ebay_sync] Sent offer notification for listing {listing_id}")
 
         except Exception as e:
-            print(f"[ebay_sync] Error processing offer: {e}")
+            logger.info(f"[ebay_sync] Error processing offer: {e}")
 
     return {
         "success": True,
@@ -774,28 +784,28 @@ async def sync_all_users_ebay():
         ).execute()
 
         user_ids = [p["id"] for p in (profiles.data or [])]
-        print(f"[ebay_sync] Starting sync for {len(user_ids)} users")
+        logger.info(f"[ebay_sync] Starting sync for {len(user_ids)} users")
 
         for user_id in user_ids:
             try:
                 # Sync completed sales
                 stats = await _sync_user_sales(user_id)
-                print(f"[ebay_sync] User {user_id}: synced={stats['synced']}, skipped={stats['skipped']}, errors={stats['errors']}")
+                logger.info(f"[ebay_sync] User {user_id}: synced={stats['synced']}, skipped={stats['skipped']}, errors={stats['errors']}")
 
                 # Check for pending best offers
                 try:
                     access_token = await _get_user_ebay_token(user_id)
                     offer_stats = await _check_best_offers(user_id, access_token)
-                    print(f"[ebay_sync] User {user_id}: best_offers checked={offer_stats['checked']}, notified={offer_stats['notified']}, errors={offer_stats['errors']}")
+                    logger.info(f"[ebay_sync] User {user_id}: best_offers checked={offer_stats['checked']}, notified={offer_stats['notified']}, errors={offer_stats['errors']}")
                 except Exception as e:
-                    print(f"[ebay_sync] Error checking best offers for user {user_id}: {e}")
+                    logger.info(f"[ebay_sync] Error checking best offers for user {user_id}: {e}")
 
             except Exception as e:
-                print(f"[ebay_sync] Error syncing user {user_id}: {e}")
+                logger.info(f"[ebay_sync] Error syncing user {user_id}: {e}")
 
-        print("[ebay_sync] Background sync complete")
+        logger.info("[ebay_sync] Background sync complete")
     except Exception as e:
-        print(f"[ebay_sync] Background sync failed: {e}")
+        logger.info(f"[ebay_sync] Background sync failed: {e}")
 
 
 @router.post("/backfill-fees")
@@ -839,7 +849,7 @@ async def backfill_historical_fees(user: dict = Depends(get_current_user)):
 
         data = resp.json()
         orders = data.get("orders", [])
-        print(f"[ebay_sync] Backfill: fetched {len(orders)} orders for user {user['id']}")
+        logger.info(f"[ebay_sync] Backfill: fetched {len(orders)} orders for user {user['id']}")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch eBay orders: {e}")
@@ -915,13 +925,13 @@ async def backfill_historical_fees(user: dict = Depends(get_current_user)):
                         "new_profit": profit,
                         "fees": total_fees,
                     })
-                    print(f"[ebay_sync] Updated item {inv_item['item_id']}: profit {current_profit} → {profit}")
+                    logger.info(f"[ebay_sync] Updated item {inv_item['item_id']}: profit {current_profit} → {profit}")
                 else:
                     stats["skipped"] += 1
 
         except Exception as e:
             stats["errors"] += 1
-            print(f"[ebay_sync] Backfill error processing order {order.get('orderId')}: {e}")
+            logger.info(f"[ebay_sync] Backfill error processing order {order.get('orderId')}: {e}")
 
     return {
         "success": True,

@@ -2,12 +2,15 @@
 Stripe billing routes for PokeManager subscriptions.
 """
 import os
+import logging
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from web.auth import get_current_user
 from web.database import get_db
 from web.notifications import send_discord_notification
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -119,7 +122,7 @@ async def stripe_webhook(request: Request):
         import json
         data = json.loads(str(obj))
 
-    print(f"[billing] Webhook: {event_type}")
+    logger.info(f"[billing] Webhook: {event_type}")
 
     if event_type == "checkout.session.completed":
         metadata = data.get("metadata") or {}
@@ -127,7 +130,7 @@ async def stripe_webhook(request: Request):
         plan     = metadata.get("plan")
         sub_id   = data.get("subscription")
 
-        print(f"[billing] checkout.session.completed — user_id={user_id}, plan={plan}")
+        logger.info(f"[billing] checkout.session.completed — user_id={user_id}, plan={plan}")
 
         if user_id and plan:
             db.table("user_profiles").update({
@@ -135,7 +138,7 @@ async def stripe_webhook(request: Request):
                 "stripe_subscription_id": sub_id,
                 "subscription_status":    "active",
             }).eq("id", user_id).execute()
-            print(f"[billing] ✅ Upgraded {user_id} to {plan}")
+            logger.info(f"[billing] ✅ Upgraded {user_id} to {plan}")
             plan_display = {"gym_leader": "Gym Leader", "champion": "Champion"}.get(plan, plan)
             await send_discord_notification(
                 user_id,
@@ -170,7 +173,7 @@ async def stripe_webhook(request: Request):
             db.table("user_profiles").update(updates).eq(
                 "id", profile.data["id"]
             ).execute()
-            print(f"[billing] Updated subscription for {customer_id}: {updates}")
+            logger.info(f"[billing] Updated subscription for {customer_id}: {updates}")
 
     elif event_type in ("customer.subscription.deleted", "customer.subscription.canceled"):
         customer_id = data.get("customer")
@@ -185,6 +188,6 @@ async def stripe_webhook(request: Request):
                 "subscription_status":    "canceled",
                 "stripe_subscription_id": None,
             }).eq("id", profile.data["id"]).execute()
-            print(f"[billing] Downgraded {customer_id} to free")
+            logger.info(f"[billing] Downgraded {customer_id} to free")
 
     return {"received": True}

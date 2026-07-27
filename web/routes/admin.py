@@ -2,12 +2,14 @@
 Admin routes — only accessible to users with role='admin'.
 Provides business analytics, user management, and Stripe revenue data.
 """
+import logging
 import os
 import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from web.auth import get_current_user
 from web.database import get_db
-from supabase import create_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
@@ -80,14 +82,10 @@ async def list_users(
     offset: int = 0,
     plan: str = None,
 ):
-    # Create service key client to bypass RLS
-    sb_service = create_client(
-        os.getenv("SUPABASE_URL"),
-        os.getenv("SUPABASE_SERVICE_KEY")
-    )
+    db = get_db()
 
-    # Fetch ALL users from user_profiles using service key
-    query = sb_service.table("user_profiles").select(
+    # Fetch ALL users from user_profiles
+    query = db.table("user_profiles").select(
         "id, email, display_name, plan, role, created_at, subscription_status, subscription_period_end, stripe_customer_id"
     )
 
@@ -100,7 +98,7 @@ async def list_users(
 
     # Add item counts and verify email is present
     for u in users:
-        items = sb_service.table("inventory_items").select("id", count="exact")\
+        items = db.table("inventory_items").select("id", count="exact")\
             .eq("user_id", u["id"]).execute()
         u["item_count"] = items.count or 0
         if not u.get("email"):

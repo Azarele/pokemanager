@@ -1,14 +1,16 @@
 import asyncio
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 import lister_ebay_api
-import scraper
 from web import db_inventory as db
 from web import user_config
 from web.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -159,7 +161,7 @@ async def refresh_bulk_prices(body: dict, user: dict = Depends(get_current_user)
             updated += 1
 
         except Exception as e:
-            print(f"[price-refresh] Error for item {item_id}: {e}")
+            logger.info(f"[price-refresh] Error for item {item_id}: {e}")
             failed += 1
 
         await asyncio.sleep(0.5)  # avoid rate-limiting PriceCharting

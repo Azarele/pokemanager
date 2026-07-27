@@ -1,7 +1,10 @@
+import logging
 from fastapi import APIRouter, Depends
 
 from web import db_inventory as db
 from web.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -13,7 +16,7 @@ async def get_price_summary(item_id: int, user: dict = Depends(get_current_user)
     try:
         history = await db.get_price_history(user["id"], item_id, limit=_LIMIT_DEFAULT)
     except Exception as e:
-        print(f"[price_history] Error reading history for {item_id}: {e}")
+        logger.info(f"[price_history] Error reading history for {item_id}: {e}")
         return {"item_id": item_id, "trend": "unknown", "history": [], "error": str(e)}
     if not history:
         return {"item_id": item_id, "trend": "unknown", "history": []}
@@ -50,6 +53,6 @@ async def get_price_history(item_id: int, days: int = _LIMIT_DEFAULT, user: dict
     try:
         history = await db.get_price_history(user["id"], item_id, limit=days)
     except Exception as e:
-        print(f"[price_history] Error reading history for {item_id}: {e}")
+        logger.info(f"[price_history] Error reading history for {item_id}: {e}")
         return {"item_id": item_id, "history": [], "count": 0, "error": str(e)}
     return {"item_id": item_id, "history": history, "count": len(history)}

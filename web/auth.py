@@ -7,6 +7,7 @@ Token sources (checked in order):
   2. access_token cookie (for browser sessions)
 """
 import os
+import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, Request, status
@@ -15,7 +16,11 @@ from passlib.context import CryptContext
 
 from web.database import get_db
 
-SECRET_KEY = os.getenv("JWT_SECRET", "change-me-in-production")
+logger = logging.getLogger(__name__)
+
+SECRET_KEY = os.getenv("JWT_SECRET")
+if not SECRET_KEY:
+    raise ValueError("JWT_SECRET environment variable is not set. This is required for secure token generation.")
 ALGORITHM  = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 REFRESH_TOKEN_EXPIRE_DAYS   = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
@@ -95,5 +100,8 @@ async def get_current_user_optional(request: Request) -> dict | None:
     """Same as get_current_user but returns None instead of raising."""
     try:
         return await get_current_user(request)
-    except Exception:
+    except (HTTPException, JWTError):
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error in optional auth: {e}", exc_info=True)
         return None

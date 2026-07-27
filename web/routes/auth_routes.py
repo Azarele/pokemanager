@@ -1,9 +1,13 @@
+import os
+import logging
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 
 from web.auth import create_access_token, create_refresh_token, decode_token
 from web.database import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -22,15 +26,16 @@ class LoginRequest(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    secure = os.getenv("ENVIRONMENT", "production") != "development"
     response.set_cookie(
         "access_token", access_token,
         httponly=True, samesite="lax",
-        max_age=3600, secure=False,
+        max_age=3600, secure=secure,
     )
     response.set_cookie(
         "refresh_token", refresh_token,
         httponly=True, samesite="lax",
-        max_age=86400 * 30, secure=False,
+        max_age=86400 * 30, secure=secure,
     )
 
 
@@ -66,12 +71,12 @@ async def register(body: RegisterRequest):
 
     _ensure_profile(db, user.id, body.email, body.display_name)
 
-    # Send welcome email
+    # Send welcome email (non-blocking, failure is not critical)
     try:
         from web.email import send_welcome
         send_welcome(body.email, body.display_name or body.email.split("@")[0])
     except Exception as e:
-        print(f"[email] Welcome email failed: {e}")
+        logger.warning(f"Welcome email failed (non-critical): {e}")
 
     access_token  = create_access_token(user.id, body.email)
     refresh_token = create_refresh_token(user.id)
@@ -89,7 +94,8 @@ async def login(body: LoginRequest):
             "email": body.email,
             "password": body.password,
         })
-    except Exception:
+    except Exception as e:
+        logger.error(f"Login attempt failed for {body.email}: {e}")
         raise HTTPException(401, "Invalid email or password")
 
     user = auth_response.user
@@ -244,7 +250,7 @@ async def google_session(body: dict):
                 from web.email import send_welcome
                 send_welcome(user.email, name)
             except Exception as e:
-                print(f"[email] Welcome email failed: {e}")
+                logger.info(f"[email] Welcome email failed: {e}")
 
         # Issue our own JWT tokens
         our_access = create_access_token(user.id, user.email)
@@ -253,5 +259,5 @@ async def google_session(body: dict):
         _set_auth_cookies(resp, our_access, our_refresh)
         return resp
     except Exception as e:
-        print(f"[oauth] google-session error: {e}")
+        logger.info(f"[oauth] google-session error: {e}")
         return JSONResponse({"success": False, "error": str(e)})

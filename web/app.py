@@ -23,6 +23,11 @@ from web.ws_manager import manager
 
 logger = logging.getLogger(__name__)
 
+# Validate Stripe configuration at startup
+stripe_key = os.getenv("STRIPE_SECRET_KEY", "").strip()
+if not stripe_key:
+    logger.warning("STRIPE_SECRET_KEY not set — Stripe features will be unavailable")
+
 _here = Path(__file__).parent
 _index_html   = (_here / "templates" / "index.html").read_text()
 _landing_html = (_here / "templates" / "landing.html").read_text()

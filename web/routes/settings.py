@@ -149,7 +149,7 @@ async def migrate_from_excel(user: dict = Depends(get_current_user)):
                 }).execute()
                 migrated += 1
             except Exception as e:
-                print(f"[migrate] Error on item {item_id}: {e}")
+                logger.info(f"[migrate] Error on item {item_id}: {e}")
                 errors += 1
 
         return {

@@ -3,18 +3,21 @@ Gemini Vision-powered card identification for Scan & Add and Scan & Sell flows.
 """
 import asyncio
 import json
+import logging
 import os
 import re
+
 import aiohttp
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
 
-import scraper
 import lister_ebay_api
 from web import db_inventory as db
 from web.auth import get_current_user
 from web import user_config
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -41,7 +44,7 @@ async def search_pricecharting(card_name: str, card_number: str = "") -> dict:
             search_queries.append(f"{card_name.strip()} {card_number}")
 
         for search_q in search_queries:
-            print(f"[scan] Searching PriceCharting for: {search_q}")
+            logger.info(f"[scan] Searching PriceCharting for: {search_q}")
 
             pc_search = (
                 "https://www.pricecharting.com/search-products"
@@ -61,7 +64,7 @@ async def search_pricecharting(card_name: str, card_number: str = "") -> dict:
             rows = pc_soup.select("table#games_table tbody tr")
 
             if not rows:
-                print(f"[scan] No results for '{search_q}', trying next query...")
+                logger.info(f"[scan] No results for '{search_q}', trying next query...")
                 continue
 
             best_href = None
@@ -113,7 +116,7 @@ async def search_pricecharting(card_name: str, card_number: str = "") -> dict:
                 fx_rate = await asyncio.to_thread(scraper.get_usd_to_gbp)
                 market_price_gbp = round(market_price_usd * fx_rate, 2)
 
-                print(f"[scan] Found card on PriceCharting: {best_name} @ £{market_price_gbp}")
+                logger.info(f"[scan] Found card on PriceCharting: {best_name} @ £{market_price_gbp}")
                 return {
                     "pc_url": pc_url,
                     "pc_name": best_name,
@@ -121,14 +124,14 @@ async def search_pricecharting(card_name: str, card_number: str = "") -> dict:
                 }
             except Exception as e:
                 # Return PC URL even if price scrape fails
-                print(f"[scan] Failed to scrape price for {pc_url}: {e}")
+                logger.info(f"[scan] Failed to scrape price for {pc_url}: {e}")
                 return {"pc_url": pc_url, "pc_name": best_name}
 
-        print(f"[scan] No PriceCharting results found for '{card_name}'")
+        logger.info(f"[scan] No PriceCharting results found for '{card_name}'")
         return {}
 
     except Exception as e:
-        print(f"[scan] PriceCharting search failed for '{card_name}': {e}")
+        logger.info(f"[scan] PriceCharting search failed for '{card_name}': {e}")
         return {}
 
 

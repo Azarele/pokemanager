@@ -1,11 +1,15 @@
-import secrets
+import logging
 import os
+import secrets
 from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from web.auth import get_current_user
 from web.database import get_db as _get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -35,7 +39,7 @@ async def get_staff_members(user: dict = Depends(get_current_user)):
         .execute()
 
     staff = result.data or []
-    print(f"[staff] Found {len(staff)} staff members for owner {user['id']}")
+    logger.info(f"[staff] Found {len(staff)} staff members for owner {user['id']}")
 
     return {"success": True, "staff": staff}
 
@@ -46,7 +50,7 @@ async def invite_staff(req: InviteStaffRequest, user: dict = Depends(get_current
     if user.get("plan") != "champion":
         return {"success": False, "error": "Staff accounts require Champion plan"}
 
-    print(f"[staff] Invite request from {user['id']}: email={req.email}, role={req.role}")
+    logger.info(f"[staff] Invite request from {user['id']}: email={req.email}, role={req.role}")
 
     database = _get_db()
 
@@ -103,11 +107,11 @@ async def invite_staff(req: InviteStaffRequest, user: dict = Depends(get_current
             "invite_status": "pending",
         }).execute()
 
-        print(f"[staff] Created invite: token={token[:10]}..., email={req.email}")
+        logger.info(f"[staff] Created invite: token={token[:10]}..., email={req.email}")
 
         # TODO: Send email via Resend
         invite_link = f"{os.getenv('SITE_URL', 'http://localhost:3000')}/staff/accept?token={token}"
-        print(f"[staff] Invite link: {invite_link}")
+        logger.info(f"[staff] Invite link: {invite_link}")
 
         return {
             "success": True,
@@ -115,14 +119,14 @@ async def invite_staff(req: InviteStaffRequest, user: dict = Depends(get_current
             "invite_link": invite_link
         }
     except Exception as e:
-        print(f"[staff] Invite failed: {e}")
+        logger.info(f"[staff] Invite failed: {e}")
         return {"success": False, "error": str(e)}
 
 
 @router.post("/accept")
 async def accept_invite(req: AcceptInviteRequest, user: dict = Depends(get_current_user)):
     """Accept staff invite (auto-links to current user)."""
-    print(f"[staff] Accept invite: token={req.token[:10]}..., user={user['id']}")
+    logger.info(f"[staff] Accept invite: token={req.token[:10]}..., user={user['id']}")
 
     database = _get_db()
 
@@ -160,7 +164,7 @@ async def accept_invite(req: AcceptInviteRequest, user: dict = Depends(get_curre
         "staff_permissions": invite["permissions"],
     }).eq("id", user["id"]).execute()
 
-    print(f"[staff] Accepted invite: staff={user['id']}, owner={owner_id}")
+    logger.info(f"[staff] Accepted invite: staff={user['id']}, owner={owner_id}")
 
     return {
         "success": True,
@@ -172,7 +176,7 @@ async def accept_invite(req: AcceptInviteRequest, user: dict = Depends(get_curre
 @router.delete("/members/{staff_id}")
 async def remove_staff(staff_id: str, user: dict = Depends(get_current_user)):
     """Remove staff member (owner only)."""
-    print(f"[staff] Remove staff: staff_id={staff_id}, owner={user['id']}")
+    logger.info(f"[staff] Remove staff: staff_id={staff_id}, owner={user['id']}")
 
     database = _get_db()
 
@@ -201,7 +205,7 @@ async def remove_staff(staff_id: str, user: dict = Depends(get_current_user)):
             "staff_permissions": None,
         }).eq("id", staff_user_id).execute()
 
-    print(f"[staff] Removed staff member {staff_user_id}")
+    logger.info(f"[staff] Removed staff member {staff_user_id}")
 
     return {"success": True, "message": "Staff member removed"}
 
@@ -209,7 +213,7 @@ async def remove_staff(staff_id: str, user: dict = Depends(get_current_user)):
 @router.patch("/members/{staff_id}/permissions")
 async def update_permissions(staff_id: str, data: dict, user: dict = Depends(get_current_user)):
     """Update staff member permissions (owner only)."""
-    print(f"[staff] Update permissions: staff_id={staff_id}, owner={user['id']}")
+    logger.info(f"[staff] Update permissions: staff_id={staff_id}, owner={user['id']}")
 
     database = _get_db()
 
@@ -237,7 +241,7 @@ async def update_permissions(staff_id: str, data: dict, user: dict = Depends(get
             "staff_permissions": permissions
         }).eq("id", staff["staff_user_id"]).execute()
 
-    print(f"[staff] Updated permissions for {staff['staff_user_id']}")
+    logger.info(f"[staff] Updated permissions for {staff['staff_user_id']}")
 
     return {"success": True, "message": "Permissions updated"}
 
@@ -246,7 +250,7 @@ async def update_permissions(staff_id: str, data: dict, user: dict = Depends(get
 async def get_activity_log(user: dict = Depends(get_current_user)):
     """Get activity log for owner's account."""
     limit = 100
-    print(f"[staff] Activity log request from {user['id']}")
+    logger.info(f"[staff] Activity log request from {user['id']}")
 
     database = _get_db()
 
@@ -259,7 +263,7 @@ async def get_activity_log(user: dict = Depends(get_current_user)):
         .execute()
 
     activities = result.data or []
-    print(f"[staff] Found {len(activities)} activity records")
+    logger.info(f"[staff] Found {len(activities)} activity records")
 
     return {"success": True, "activities": activities, "limit": limit}
 
@@ -276,6 +280,6 @@ async def log_activity(owner_id: str, user_id: str, user_email: str, action: str
             "item_id": item_id,
             "details": details or {},
         }).execute()
-        print(f"[activity] Logged: {action} by {user_email} for item {item_id}")
+        logger.info(f"[activity] Logged: {action} by {user_email} for item {item_id}")
     except Exception as e:
-        print(f"[activity] Failed to log activity: {e}")
+        logger.info(f"[activity] Failed to log activity: {e}")
