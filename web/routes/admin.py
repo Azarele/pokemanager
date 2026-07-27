@@ -8,6 +8,7 @@ import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from web.auth import get_current_user
 from web.database import get_db
+from web.background_sync import sync_ebay_live_prices
 
 logger = logging.getLogger(__name__)
 
@@ -211,3 +212,27 @@ async def get_revenue(admin: dict = Depends(require_admin)):
 
     except Exception as e:
         return {"configured": True, "error": str(e), "monthly": []}
+
+
+@router.post("/sync-ebay-prices")
+async def trigger_ebay_price_sync(admin: dict = Depends(require_admin)):
+    """
+    Manually trigger eBay live price sync for all active inventory items.
+    Used for testing or forcing an immediate price update.
+    Admin only.
+    """
+    try:
+        logger.info("[admin] Admin {user_id} triggered manual eBay price sync".format(
+            user_id=admin["id"]
+        ))
+        await sync_ebay_live_prices()
+        return {
+            "success": True,
+            "message": "eBay price sync completed successfully"
+        }
+    except Exception as e:
+        logger.error(f"[admin] Manual price sync failed: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e)
+        }

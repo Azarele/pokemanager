@@ -8,6 +8,7 @@ if _root not in sys.path:
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, HTTPException, APIRouter
@@ -20,6 +21,7 @@ from web.routes import inventory, listings, analytics, pricing, watchlist, sales
 from web.middleware.auth import AuthMiddleware
 from web.middleware.rate_limit import RateLimitMiddleware
 from web.ws_manager import manager
+from web.background_sync import start_background_sync, stop_background_sync
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,20 @@ _here = Path(__file__).parent
 _index_html   = (_here / "templates" / "index.html").read_text()
 _landing_html = (_here / "templates" / "landing.html").read_text()
 
-app = FastAPI(title="PokeManager", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan context manager for startup and shutdown."""
+    # Startup
+    logger.info("Starting PokeManager")
+    start_background_sync()
+    yield
+    # Shutdown
+    logger.info("Shutting down PokeManager")
+    await stop_background_sync()
+
+
+app = FastAPI(title="PokeManager", version="1.0.0", lifespan=lifespan)
 
 # Public routes (no auth required)
 public_router = APIRouter()
@@ -55,7 +70,7 @@ async def public_stats():
 
         revenue = int(sum(float(r.get("sell_price") or 0) for r in sold.data))
 
-        print(f"[public-stats] revenue={revenue}, sold={len(sold.data)}, inv={len(inv.data)}, users={len(users.data)}")
+        logger.info(f"[public-stats] revenue={revenue}, sold={len(sold.data)}, inv={len(inv.data)}, users={len(users.data)}")
 
         return {
             "total_revenue": revenue,
