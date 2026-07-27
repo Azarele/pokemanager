@@ -237,100 +237,87 @@ async def get_inventory(
     status_filter = status if status in ("Inventory", "Sold") else None
     items = await db.get_all_items(user["id"], status_filter=status_filter)
 
+    # TODO: Re-enable as background job, not blocking page load
     # Fetch eBay listing prices (both live_price and sell_price) for items with ebay_listing_id
-    # Global timeout: 10 seconds for all eBay fetches. Individual fetches timeout at 5 seconds.
-    # If eBay is slow/unavailable, inventory still loads with null prices.
-    try:
-        # Group by listing ID first to detect bundles
-        listings_by_id = {}
-        for item in items:
-            listing_id = item.get("ebay_listing_id")
-            if listing_id and item.get("ebay_listed") == "Yes":
-                if listing_id not in listings_by_id:
-                    listings_by_id[listing_id] = []
-                listings_by_id[listing_id].append(item)
-
-        # Wrap entire fetch in 10-second timeout so inventory never hangs
-        async def fetch_ebay_prices():
-            # Fetch prices from eBay using user's credentials
-            async with user_config.apply(user):
-                # Fetch prices from eBay and sync to items
-                for listing_id, listing_items in listings_by_id.items():
-                    try:
-                        # Individual fetch with 5-second timeout
-                        offer = await asyncio.wait_for(
-                            lister_ebay_api.get_offer_details(listing_id),
-                            timeout=5.0
-                        )
-
-                        # Log for test listings
-                        if listing_id in ("336711544234", "336711556909"):
-                            print(f"\n{'='*80}")
-                            print(f"[inventory-FETCH] TEST LISTING {listing_id}")
-                            print(f"[inventory-FETCH] eBay API Response: {offer}")
-                            print(f"[inventory-FETCH] Items sharing this listing: {len(listing_items)}")
-                            for item in listing_items:
-                                print(f"[inventory-FETCH]   - Item {item['item_id']}: {item['card_name']}")
-                            print(f"{'='*80}\n")
-
-                        if not offer:
-                            print(f"[inventory] No offer found for listing {listing_id}")
-                            continue
-
-                        current_price = offer.get("current_price")
-                        if not current_price:
-                            print(f"[inventory] No current_price in offer for listing {listing_id}")
-                            continue
-
-                        # Detect if this is a true bundle or quantity listing
-                        unique_names = set(i.get("card_name", "") for i in listing_items)
-                        is_bundle = len(unique_names) > 1
-
-                        # Determine price per item
-                        if len(listing_items) > 1 and is_bundle:
-                            price_per_item = round(current_price / len(listing_items), 2)
-                            print(f"[inventory] Listing {listing_id}: True bundle - £{current_price} ÷ {len(listing_items)} = £{price_per_item} per item")
-                        else:
-                            price_per_item = current_price
-                            if len(listing_items) > 1:
-                                print(f"[inventory] Listing {listing_id}: Quantity listing - £{current_price} for each of {len(listing_items)} items")
-
-                        # Update sell_price for all items sharing this listing
-                        for item in listing_items:
-                            item["sell_price"] = price_per_item
-                            print(f"[inventory] Item {item['item_id']}: set sell_price = £{price_per_item}")
-
-                    except asyncio.TimeoutError:
-                        print(f"[inventory] Timeout fetching listing {listing_id} (>5s)")
-                    except Exception as e:
-                        print(f"[inventory] Error fetching listing {listing_id}: {e}")
-
-                # Fetch eBay market prices for items with null live_price
-                for item in items:
-                    listing_id = item.get("ebay_listing_id")
-                    if listing_id and not item.get("live_price"):
-                        try:
-                            # Individual fetch with 5-second timeout
-                            offer = await asyncio.wait_for(
-                                lister_ebay_api.get_offer_details(listing_id),
-                                timeout=5.0
-                            )
-                            if offer and offer.get("current_price"):
-                                item["live_price"] = offer["current_price"]
-                                print(f"[inventory] Fetched market price for item {item['item_id']}: £{item['live_price']}")
-                        except asyncio.TimeoutError:
-                            print(f"[inventory] Timeout fetching market price for listing {listing_id} (>5s)")
-                        except Exception as e:
-                            print(f"[inventory] Failed to fetch market price for listing {listing_id}: {e}")
-
-        # Global 10-second timeout for entire eBay fetch section
-        try:
-            await asyncio.wait_for(fetch_ebay_prices(), timeout=10.0)
-        except asyncio.TimeoutError:
-            print(f"[inventory] Warning: eBay price fetch exceeded 10s timeout, returning without prices")
-
-    except Exception as e:
-        print(f"[inventory] Warning: eBay price fetch failed, continuing without prices: {e}")
+    # DISABLED: eBay fetch was blocking page loads even with timeouts
+    # Will implement as background job that syncs prices asynchronously
+    # For now, prices are read from database directly without live eBay fetch
+    # try:
+    #     # Group by listing ID first to detect bundles
+    #     listings_by_id = {}
+    #     for item in items:
+    #         listing_id = item.get("ebay_listing_id")
+    #         if listing_id and item.get("ebay_listed") == "Yes":
+    #             if listing_id not in listings_by_id:
+    #                 listings_by_id[listing_id] = []
+    #             listings_by_id[listing_id].append(item)
+    #
+    #     # Wrap entire fetch in 10-second timeout so inventory never hangs
+    #     async def fetch_ebay_prices():
+    #         # Fetch prices from eBay using user's credentials
+    #         async with user_config.apply(user):
+    #             # Fetch prices from eBay and sync to items
+    #             for listing_id, listing_items in listings_by_id.items():
+    #                 try:
+    #                     # Individual fetch with 5-second timeout
+    #                     offer = await asyncio.wait_for(
+    #                         lister_ebay_api.get_offer_details(listing_id),
+    #                         timeout=5.0
+    #                     )
+    #
+    #                     if not offer:
+    #                         print(f"[inventory] No offer found for listing {listing_id}")
+    #                         continue
+    #
+    #                     current_price = offer.get("current_price")
+    #                     if not current_price:
+    #                         print(f"[inventory] No current_price in offer for listing {listing_id}")
+    #                         continue
+    #
+    #                     # Detect if this is a true bundle or quantity listing
+    #                     unique_names = set(i.get("card_name", "") for i in listing_items)
+    #                     is_bundle = len(unique_names) > 1
+    #
+    #                     # Determine price per item
+    #                     if len(listing_items) > 1 and is_bundle:
+    #                         price_per_item = round(current_price / len(listing_items), 2)
+    #                     else:
+    #                         price_per_item = current_price
+    #
+    #                     # Update sell_price for all items sharing this listing
+    #                     for item in listing_items:
+    #                         item["sell_price"] = price_per_item
+    #
+    #                 except asyncio.TimeoutError:
+    #                     print(f"[inventory] Timeout fetching listing {listing_id} (>5s)")
+    #                 except Exception as e:
+    #                     print(f"[inventory] Error fetching listing {listing_id}: {e}")
+    #
+    #             # Fetch eBay market prices for items with null live_price
+    #             for item in items:
+    #                 listing_id = item.get("ebay_listing_id")
+    #                 if listing_id and not item.get("live_price"):
+    #                     try:
+    #                         # Individual fetch with 5-second timeout
+    #                         offer = await asyncio.wait_for(
+    #                             lister_ebay_api.get_offer_details(listing_id),
+    #                             timeout=5.0
+    #                         )
+    #                         if offer and offer.get("current_price"):
+    #                             item["live_price"] = offer["current_price"]
+    #                     except asyncio.TimeoutError:
+    #                         print(f"[inventory] Timeout fetching market price for listing {listing_id} (>5s)")
+    #                     except Exception as e:
+    #                         print(f"[inventory] Failed to fetch market price for listing {listing_id}: {e}")
+    #
+    #     # Global 10-second timeout for entire eBay fetch section
+    #     try:
+    #         await asyncio.wait_for(fetch_ebay_prices(), timeout=10.0)
+    #     except asyncio.TimeoutError:
+    #         print(f"[inventory] Warning: eBay price fetch exceeded 10s timeout, returning without prices")
+    #
+    # except Exception as e:
+    #     print(f"[inventory] Warning: eBay price fetch failed, continuing without prices: {e}")
 
     # Split live_price for bundles (already split sell_price above)
     # Rebuild listing groups to detect true bundles
