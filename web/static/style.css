@@ -895,6 +895,7 @@ select { position: relative; z-index: 10; }
 /* ── Source ROI table ────────────────────────────────────────────────────── */
 .source-table {
   width: 100%; border-collapse: collapse; font-size: 0.84rem;
+  table-layout: fixed;
 }
 .source-table th, .source-table td {
   padding: 7px 10px; text-align: left;

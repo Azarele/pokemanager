@@ -2369,12 +2369,10 @@ async function renderAnalytics() {
         <div id="best-time-section"></div>
         <div class="chart-card">
           <div class="chart-header"><span class="chart-title">ROI by Source</span></div>
-          <div style="overflow-x:auto">
-            <table class="source-table">
-              <thead><tr><th>Source</th><th>Items Sold</th><th>Revenue</th><th>Profit</th><th>ROI</th></tr></thead>
-              <tbody>${sourceRows}</tbody>
-            </table>
-          </div>
+          <table class="source-table">
+            <thead><tr><th>Source</th><th>Items Sold</th><th>Revenue</th><th>Profit</th><th>ROI</th></tr></thead>
+            <tbody>${sourceRows}</tbody>
+          </table>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:16px">
@@ -4104,7 +4102,7 @@ async function renderBestTimePanel() {
 
     const canvas = document.getElementById('best-time-chart');
     const colors = data.by_day.map(d =>
-      d.day === data.best_day ? 'var(--success)' : 'rgba(108,99,255,0.6)'
+      d.day === data.best_day ? CHART_THEME.success : CHART_THEME.accent
     );
     S.charts.bestTime = safeCreateChart('best-time-chart', {
       type: 'bar',
