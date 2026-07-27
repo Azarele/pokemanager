@@ -993,6 +993,7 @@ async def get_offer_details(listing_id: str) -> dict | None:
     """
     Return {offer_id, current_price} for an active eBay listing, or None on failure.
     Uses the Sell Inventory API with the user OAuth token.
+    Returns None silently on any error (token, network, parsing) — never raises.
     """
     try:
         access_token = await _get_access_token()
@@ -1001,34 +1002,42 @@ async def get_offer_details(listing_id: str) -> dict | None:
         return None
 
     def _fetch() -> dict | None:
-        resp = requests.get(
-            f"{_INVENTORY_URL}/offer",
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Content-Language": "en-GB",
-            },
-            params={"listing_id": listing_id},
-            timeout=15,
-        )
-        if resp.status_code != 200:
-            print(f"[ebay_api] get_offer_details HTTP {resp.status_code} for listing {listing_id}")
-            return None
-        offers = resp.json().get("offers", [])
-        if not offers:
-            return None
-        offer = offers[0]
         try:
-            current_price = float(
-                offer.get("pricingSummary", {}).get("price", {}).get("value", 0)
+            resp = requests.get(
+                f"{_INVENTORY_URL}/offer",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Language": "en-GB",
+                },
+                params={"listing_id": listing_id},
+                timeout=15,
             )
-        except (TypeError, ValueError):
-            current_price = 0.0
-        return {
-            "offer_id":      offer.get("offerId"),
-            "current_price": current_price,
-        }
+            if resp.status_code != 200:
+                print(f"[ebay_api] get_offer_details HTTP {resp.status_code} for listing {listing_id}")
+                return None
+            offers = resp.json().get("offers", [])
+            if not offers:
+                return None
+            offer = offers[0]
+            try:
+                current_price = float(
+                    offer.get("pricingSummary", {}).get("price", {}).get("value", 0)
+                )
+            except (TypeError, ValueError):
+                current_price = 0.0
+            return {
+                "offer_id":      offer.get("offerId"),
+                "current_price": current_price,
+            }
+        except Exception as e:
+            print(f"[ebay_api] get_offer_details error for listing {listing_id}: {e}")
+            return None
 
-    return await asyncio.to_thread(_fetch)
+    try:
+        return await asyncio.to_thread(_fetch)
+    except Exception as e:
+        print(f"[ebay_api] get_offer_details thread error for listing {listing_id}: {e}")
+        return None
 
 
 async def update_offer_price_direct(offer_id: str, new_price_gbp: float) -> bool:
