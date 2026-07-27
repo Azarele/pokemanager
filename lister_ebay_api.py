@@ -299,11 +299,11 @@ _MIME_TYPES = {
  
 async def _get_access_token() -> str:
     global _access_token, _token_expiry
- 
+
     # Reuse cached token until 5 minutes before expiry
     if _access_token and time.time() < _token_expiry - 300:
         return _access_token
- 
+
     def _exchange() -> dict:
         credentials = base64.b64encode(
             f"{config.EBAY_APP_ID}:{config.EBAY_CERT_ID}".encode()
@@ -326,12 +326,57 @@ async def _get_access_token() -> str:
                 f"[ebay_api] Token refresh failed: HTTP {resp.status_code} — {resp.text[:500]}"
             )
         return resp.json()
- 
+
     data = await asyncio.to_thread(_exchange)
     _access_token = data["access_token"]
     _token_expiry = time.time() + data.get("expires_in", 7200)
     print(f"[ebay_api] Access token refreshed (expires in {data.get('expires_in', '?')}s).")
     return _access_token
+
+
+async def refresh_oauth_token(refresh_token: str) -> dict | None:
+    """
+    Refresh an eBay OAuth access token using a refresh token.
+    Returns dict with 'access_token' and 'expires_in' on success, None on failure.
+    Called by background sync to refresh user tokens periodically.
+    """
+    def _exchange() -> dict | None:
+        try:
+            credentials = base64.b64encode(
+                f"{config.EBAY_APP_ID}:{config.EBAY_CERT_ID}".encode()
+            ).decode()
+            resp = requests.post(
+                _TOKEN_URL,
+                headers={
+                    "Authorization": f"Basic {credentials}",
+                    "Content-Type":  "application/x-www-form-urlencoded",
+                },
+                data={
+                    "grant_type":    "refresh_token",
+                    "refresh_token": refresh_token,
+                    "scope":         _TOKEN_SCOPES,
+                },
+                timeout=30,
+            )
+            if resp.status_code != 200:
+                import logging
+                logging.getLogger(__name__).error(
+                    f"[ebay_api] Token refresh failed: HTTP {resp.status_code}"
+                )
+                return None
+            return resp.json()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"[ebay_api] Token refresh error: {e}")
+            return None
+
+    try:
+        data = await asyncio.to_thread(_exchange)
+        return data if data else None
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"[ebay_api] Async token refresh failed: {e}")
+        return None
  
  
 # ---------------------------------------------------------------------------

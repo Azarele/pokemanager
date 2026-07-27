@@ -18,6 +18,7 @@ from web.auth import get_current_user
 from web.database import get_db
 from web import db_inventory as db
 from web.notifications import send_discord_notification
+from web.routes.notifications import send_push_notification
 
 import config
 
@@ -278,10 +279,18 @@ async def _sync_user_sales(user_id: str) -> dict:
                 if ebay_listing_id:
                     all_bundle_items = inventory_by_listing_id.get(ebay_listing_id, [])
                     logger.info(f"[ebay_sync] Listing {ebay_listing_id}: Found {len(all_bundle_items)} unsold items with this listing")
-                    if len(all_bundle_items) > 1:
-                        # Bundle sale - split proceeds proportionally by market value
-                        logger.info(f"[ebay_sync] ✓ BUNDLE DETECTED: {len(all_bundle_items)} items share listing {ebay_listing_id}")
+
+                    # Get order quantity from line item (how many units sold in this order)
+                    order_quantity = int(item.get("quantity", 1))
+
+                    if len(all_bundle_items) > 1 and order_quantity > 1:
+                        # Multiple items in bundle, multiple units in order — mark only quantity number of items as sold
+                        logger.info(f"[ebay_sync] ✓ BUNDLE DETECTED: {len(all_bundle_items)} items share listing {ebay_listing_id}, order quantity: {order_quantity}")
+
+                        # Sort by item_id to pick oldest items first
+                        items_to_mark = sorted(all_bundle_items, key=lambda i: i["item_id"])[:order_quantity]
                         logger.info(f"[ebay_sync] Bundle item IDs: {[i['item_id'] for i in all_bundle_items]}")
+                        logger.info(f"[ebay_sync] Marking {len(items_to_mark)} items as sold (quantity: {order_quantity})")
 
                         # Extract price paid for entire bundle
                         cost_obj = item.get("lineItemCost", {})
@@ -290,14 +299,14 @@ async def _sync_user_sales(user_id: str) -> dict:
                         else:
                             total_price_paid = float(cost_obj or 0)
 
-                        # Calculate total market value across bundle
-                        total_market = sum(float(i.get("live_price") or 0) for i in all_bundle_items)
+                        # Calculate total market value across items being marked sold
+                        total_market = sum(float(i.get("live_price") or 0) for i in items_to_mark)
 
                         # Calculate eBay fee (apply to bundle price)
                         ebay_fee_total = 0.0
                         if total_price_paid > 0:
                             # Use first item's promotion setting or default
-                            first_bundle_item = all_bundle_items[0]
+                            first_bundle_item = items_to_mark[0]
                             if first_bundle_item.get("promoted_listing_pct"):
                                 promo_pct = float(first_bundle_item.get("promoted_listing_pct"))
                                 ebay_fee_total = round(total_price_paid * (promo_pct / 100), 2)
@@ -306,8 +315,8 @@ async def _sync_user_sales(user_id: str) -> dict:
 
                         logger.info(f"[ebay_sync] Bundle: total_price={total_price_paid}, total_market={total_market}, total_fee={ebay_fee_total}")
 
-                        # Process each item in bundle with proportional split
-                        for bundle_item in all_bundle_items:
+                        # Process each marked item with proportional split
+                        for bundle_item in items_to_mark:
                             item_id_b = bundle_item["item_id"]
                             item_market = float(bundle_item.get("live_price") or 0)
 
@@ -315,7 +324,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                             if total_market > 0:
                                 proportion = item_market / total_market
                             else:
-                                proportion = 1.0 / len(all_bundle_items)
+                                proportion = 1.0 / len(items_to_mark)
 
                             item_price_share = round(total_price_paid * proportion, 2)
                             item_fee_share = round(ebay_fee_total * proportion, 2)
@@ -336,8 +345,13 @@ async def _sync_user_sales(user_id: str) -> dict:
 
                             stats["synced"] += 1
 
-                        logger.info(f"[ebay_sync] ✓ Bundle sale synced: {len(all_bundle_items)} items from order {order_id}")
+                        logger.info(f"[ebay_sync] ✓ Bundle sale synced: {len(items_to_mark)} items from order {order_id}")
                         continue
+                    elif len(all_bundle_items) > 1:
+                        # Multiple items but single unit ordered — mark just one item as sold
+                        logger.info(f"[ebay_sync] Single unit from listing with {len(all_bundle_items)} items, marking oldest item")
+                        items_to_mark = sorted(all_bundle_items, key=lambda i: i["item_id"])[:1]
+                        order_quantity = 1
 
                 # Check if item is already sold
                 already_sold = inv_item.get("status") == "Sold"
@@ -449,6 +463,17 @@ async def _sync_user_sales(user_id: str) -> dict:
                     ),
                     5763719 if profit > 0 else 15548997,  # green if profitable, red if loss
                 )
+
+                # Send Web Push notification
+                try:
+                    card_name = inv_item.get('card_name', 'Item')
+                    await send_push_notification(
+                        user_id,
+                        "💰 Sold!",
+                        f"{card_name} sold for £{price_paid:.2f}"
+                    )
+                except Exception as e:
+                    logger.error(f"[ebay_sync] Push notification failed for user {user_id}: {e}")
 
                 stats["synced"] += 1
                 logger.info(f"[ebay_sync] Successfully synced item {item_id} (profit: £{profit}) for user {user_id}")

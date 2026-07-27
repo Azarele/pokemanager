@@ -2192,11 +2192,66 @@ function downloadCsvTemplate() {
 
 
 /* ── Browser notifications + global event stream ────────────────────────── */
-function requestNotificationPermission() {
+async function requestNotificationPermission() {
   if (!('Notification' in window)) return;
   if (Notification.permission === 'default') {
-    Notification.requestPermission();
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        subscribeToWebPush();
+      }
+    });
+  } else if (Notification.permission === 'granted') {
+    subscribeToWebPush();
   }
+}
+
+async function subscribeToWebPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+  try {
+    const registration = await navigator.serviceWorker.register('/static/sw.js').catch(() => {
+      // Service worker may not exist, which is fine
+      return null;
+    });
+
+    if (!registration) return;
+
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      // VAPID public key should be provided by the backend
+      // For now, we'll skip if it's not available
+      const vapidPublicKey = document.querySelector('meta[name="vapid-public-key"]')?.content;
+      if (!vapidPublicKey) return;
+
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+      });
+    }
+
+    // Send subscription to server
+    if (subscription) {
+      await fetch('/api/notifications/subscribe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ subscription: subscription.toJSON() })
+      });
+    }
+  } catch (error) {
+    console.log('Web Push subscription failed:', error);
+    // Fail silently - Web Push is optional
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 }
 
 function sendBrowserNotification(title, body, icon = '/static/icons/icon-192.png') {
@@ -3005,6 +3060,7 @@ async function renderSales() {
         <span style="font-size:0.95rem;font-weight:600">Browse by Date</span>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="syncSalesNow()" id="sync-sales-btn">🔄 Sync eBay Sales</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportSalesCSV()">📥 Export CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="changeSalesDate(-1)">← Prev</button>
           <input type="date" id="sales-date-picker" class="form-input"
                  style="width:150px"
@@ -3077,6 +3133,26 @@ function renderWeekChart(days) {
       },
     },
   });
+}
+
+async function exportSalesCSV() {
+  try {
+    const response = await fetch('/api/export/csv');
+    if (!response.ok) throw new Error('Export failed');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pokemanager-sales-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    toast('CSV exported successfully', 'success');
+  } catch (e) {
+    logger.error('CSV export failed:', e);
+    toast('Failed to export CSV', 'error');
+  }
 }
 
 function renderTodaySalesList(sales) {

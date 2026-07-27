@@ -1,10 +1,11 @@
 """
 Background tasks for PokeManager.
-Handles periodic syncing of eBay live prices without blocking user requests.
+Handles periodic syncing of eBay live prices and token refresh without blocking user requests.
 """
 import asyncio
 import logging
 from typing import Optional
+from datetime import datetime, timezone
 
 import lister_ebay_api
 from web.database import get_db
@@ -14,6 +15,7 @@ from web import user_config
 logger = logging.getLogger(__name__)
 
 _sync_task: Optional[asyncio.Task] = None
+_token_refresh_task: Optional[asyncio.Task] = None
 
 
 async def sync_ebay_live_prices():
@@ -175,17 +177,122 @@ async def background_sync_loop():
         logger.error(f"[bg-sync] Fatal error in sync loop: {e}", exc_info=True)
 
 
+async def refresh_ebay_tokens():
+    """
+    Refresh eBay access tokens for all users who have refresh tokens.
+    Updates ebay_access_token and ebay_token_expires_at in database.
+    Runs every 12 hours to keep tokens fresh.
+    """
+    try:
+        logger.info("[bg-token] Starting eBay token refresh")
+        db_client = get_db()
+
+        # Fetch all users with eBay refresh tokens
+        result = db_client.table("user_profiles").select(
+            "id, ebay_app_id, ebay_cert_id, ebay_refresh_token"
+        ).not_.is_("ebay_refresh_token", "null").execute()
+
+        users_with_tokens = result.data or []
+        if not users_with_tokens:
+            logger.info("[bg-token] No users with eBay tokens to refresh")
+            return
+
+        logger.info(f"[bg-token] Refreshing tokens for {len(users_with_tokens)} users")
+
+        success_count = 0
+        error_count = 0
+
+        for user in users_with_tokens:
+            user_id = user.get("id")
+            try:
+                # Create user context with their eBay credentials
+                user_dict = {
+                    "id": user_id,
+                    "ebay_app_id": user.get("ebay_app_id"),
+                    "ebay_cert_id": user.get("ebay_cert_id"),
+                    "ebay_refresh_token": user.get("ebay_refresh_token"),
+                }
+
+                # Refresh the token using eBay API
+                async with user_config.apply(user_dict):
+                    new_token = await lister_ebay_api.refresh_oauth_token(
+                        user.get("ebay_refresh_token")
+                    )
+
+                if not new_token:
+                    logger.warning(f"[bg-token] Failed to refresh token for user {user_id}")
+                    error_count += 1
+                    continue
+
+                # Calculate expiration time (eBay tokens usually expire in 24 hours)
+                expires_at = datetime.now(timezone.utc).isoformat()
+
+                # Update user profile with new token
+                db_client.table("user_profiles").update({
+                    "ebay_access_token": new_token.get("access_token"),
+                    "ebay_token_expires_at": expires_at,
+                }).eq("id", user_id).execute()
+
+                success_count += 1
+                logger.info(f"[bg-token] Refreshed token for user {user_id}")
+
+            except Exception as e:
+                logger.error(f"[bg-token] Error refreshing token for user {user_id}: {e}")
+                error_count += 1
+
+        logger.info(
+            f"[bg-token] Token refresh complete: "
+            f"success={success_count}, errors={error_count}"
+        )
+
+    except Exception as e:
+        logger.error(f"[bg-token] Fatal error in token refresh: {e}", exc_info=True)
+
+
+async def token_refresh_loop():
+    """
+    Periodic token refresh loop.
+    Waits 120 seconds after startup, then refreshes every 12 hours.
+    """
+    try:
+        # Wait 120 seconds before first refresh (let app stabilize)
+        logger.info("[bg-token] Scheduling first token refresh in 120 seconds")
+        await asyncio.sleep(120)
+
+        # Run periodic refreshes every 12 hours
+        refresh_interval = 12 * 60 * 60  # 12 hours in seconds
+        while True:
+            try:
+                await refresh_ebay_tokens()
+            except asyncio.CancelledError:
+                logger.info("[bg-token] Token refresh cancelled")
+                break
+            except Exception as e:
+                logger.error(f"[bg-token] Error in refresh loop: {e}", exc_info=True)
+
+            # Wait before next refresh
+            await asyncio.sleep(refresh_interval)
+
+    except asyncio.CancelledError:
+        logger.info("[bg-token] Token refresh task stopped")
+    except Exception as e:
+        logger.error(f"[bg-token] Fatal error in refresh loop: {e}", exc_info=True)
+
+
 def start_background_sync() -> asyncio.Task:
     """Start the background sync task. Returns the task handle for cleanup."""
-    global _sync_task
+    global _sync_task, _token_refresh_task
     _sync_task = asyncio.create_task(background_sync_loop())
+    _token_refresh_task = asyncio.create_task(token_refresh_loop())
     logger.info("[bg-sync] Background sync task started")
+    logger.info("[bg-token] Token refresh task started")
     return _sync_task
 
 
 async def stop_background_sync():
     """Stop the background sync task gracefully."""
-    global _sync_task
+    global _sync_task, _token_refresh_task
+
     if _sync_task and not _sync_task.done():
         logger.info("[bg-sync] Stopping background sync task")
         _sync_task.cancel()
@@ -195,3 +302,13 @@ async def stop_background_sync():
             pass
         _sync_task = None
         logger.info("[bg-sync] Background sync task stopped")
+
+    if _token_refresh_task and not _token_refresh_task.done():
+        logger.info("[bg-token] Stopping token refresh task")
+        _token_refresh_task.cancel()
+        try:
+            await _token_refresh_task
+        except asyncio.CancelledError:
+            pass
+        _token_refresh_task = None
+        logger.info("[bg-token] Token refresh task stopped")

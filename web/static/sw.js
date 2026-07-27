@@ -39,3 +39,39 @@ self.addEventListener('fetch', event => {
         })
     );
 });
+
+// Web Push API handlers
+self.addEventListener('push', event => {
+    try {
+        const data = event.data?.json() || { title: 'PokeManager', body: 'New notification' };
+        const options = {
+            body: data.body || '',
+            icon: '/static/icons/icon-192.png',
+            badge: '/static/icons/icon-192.png',
+            tag: 'pokemanager-notification',
+            requireInteraction: false,
+        };
+
+        event.waitUntil(
+            self.registration.showNotification(data.title || 'PokeManager', options)
+        );
+    } catch (error) {
+        console.error('Push notification error:', error);
+    }
+});
+
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    event.waitUntil(
+        clients.matchAll({ type: 'window' }).then(clientList => {
+            for (let client of clientList) {
+                if (client.url === '/' && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow('/');
+            }
+        })
+    );
+});
