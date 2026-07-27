@@ -734,9 +734,7 @@ function renderInventoryCard(item) {
        }`;
 
   const sellAction = isSold
-    ? `<div style="padding:0 8px 8px 8px;width:100%;box-sizing:border-box">
-         <button onclick="openSoldAndDelistModal(${item.item_id})" class="btn btn-success" style="width:100%;padding:10px">💰 Sold</button>
-       </div>`
+    ? ''
     : canList || !isListed
     ? `<div style="padding:0 8px 8px 8px;width:100%;box-sizing:border-box">
          <button onclick="openSellModal(${item.item_id})" class="btn btn-success" style="width:100%;padding:10px">💰 Sell</button>
