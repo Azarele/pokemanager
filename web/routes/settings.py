@@ -318,10 +318,11 @@ async def get_ebay_auth_url(user: dict = Depends(get_current_user)):
     """Generate and return the eBay OAuth authorization URL."""
     from urllib.parse import urlencode
 
-    if not config.EBAY_APP_ID:
+    app_id = user.get("ebay_app_id", "").strip()
+    if not app_id:
         raise HTTPException(
-            status_code=500,
-            detail="Server configuration error: EBAY_APP_ID environment variable not set. Contact administrator."
+            status_code=400,
+            detail="eBay App ID not configured in Settings. Please add your eBay App ID first."
         )
 
     scopes = " ".join([
@@ -333,7 +334,7 @@ async def get_ebay_auth_url(user: dict = Depends(get_current_user)):
     auth_url = (
         "https://auth.ebay.com/oauth2/authorize?"
         + urlencode({
-            "client_id": config.EBAY_APP_ID,
+            "client_id": app_id,
             "redirect_uri": config.EBAY_REDIRECT_URI,
             "response_type": "code",
             "scope": scopes,
@@ -366,20 +367,23 @@ async def exchange_ebay_token(body: dict, user: dict = Depends(get_current_user)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid redirect URL: {e}")
 
-    if not config.EBAY_APP_ID:
+    app_id = user.get("ebay_app_id", "").strip()
+    cert_id = user.get("ebay_cert_id", "").strip()
+
+    if not app_id:
         raise HTTPException(
-            status_code=500,
-            detail="Server configuration error: EBAY_APP_ID environment variable not set. Contact administrator."
+            status_code=400,
+            detail="eBay App ID not configured in Settings. Please add your eBay App ID first."
         )
-    if not config.EBAY_CERT_ID:
+    if not cert_id:
         raise HTTPException(
-            status_code=500,
-            detail="Server configuration error: EBAY_CERT_ID environment variable not set. Contact administrator."
+            status_code=400,
+            detail="eBay Cert ID not configured in Settings. Please add your eBay Cert ID first."
         )
 
     # Exchange code for tokens
     try:
-        credentials = base64.b64encode(f"{config.EBAY_APP_ID}:{config.EBAY_CERT_ID}".encode()).decode()
+        credentials = base64.b64encode(f"{app_id}:{cert_id}".encode()).decode()
         resp = requests.post(
             "https://api.ebay.com/identity/v1/oauth2/token",
             headers={
