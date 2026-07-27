@@ -320,7 +320,10 @@ async def get_ebay_auth_url(user: dict = Depends(get_current_user)):
 
     app_id = os.getenv("EBAY_APP_ID", "").strip()
     if not app_id:
-        raise HTTPException(status_code=400, detail="eBay app not configured on server")
+        raise HTTPException(
+            status_code=500,
+            detail="Server configuration error: EBAY_APP_ID environment variable not set. Contact administrator."
+        )
 
     redirect_uri = os.getenv(
         "EBAY_REDIRECT_URI",
@@ -372,8 +375,16 @@ async def exchange_ebay_token(body: dict, user: dict = Depends(get_current_user)
 
     app_id = os.getenv("EBAY_APP_ID", "").strip()
     cert_id = os.getenv("EBAY_CERT_ID", "").strip()
-    if not app_id or not cert_id:
-        raise HTTPException(status_code=500, detail="eBay credentials not configured on server")
+    if not app_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Server configuration error: EBAY_APP_ID environment variable not set. Contact administrator."
+        )
+    if not cert_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Server configuration error: EBAY_CERT_ID environment variable not set. Contact administrator."
+        )
 
     redirect_uri = os.getenv(
         "EBAY_REDIRECT_URI",
