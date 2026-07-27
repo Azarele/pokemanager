@@ -790,3 +790,127 @@ async def bundle_list_on_ebay(req: BundleListRequest, user: dict = Depends(get_c
         import traceback
         traceback.print_exc()
         return {"success": False, "error": str(e)}
+
+
+# ── Sync eBay listing prices ────────────────────────────────────────────────
+
+@router.post("/sync-prices")
+async def sync_listing_prices(user: dict = Depends(get_current_user)):
+    """Fetch current eBay listing prices and sync back to inventory.
+
+    For bundle listings (multiple items with same ebay_listing_id):
+    - Same-name items (quantity listing): all get full price
+    - Different-name items (true bundle): split price equally
+    """
+    all_items = await db.get_all_items(user["id"], status_filter="Inventory")
+    listed = [
+        i for i in all_items
+        if str(i.get("ebay_listed", "")) == "Yes"
+        and str(i.get("ebay_listing_id", "") or "").strip().isdigit()
+    ]
+
+    # Group items by listing ID to detect bundles
+    listings_by_id = {}
+    for item in listed:
+        listing_id = item.get("ebay_listing_id")
+        if listing_id:
+            if listing_id not in listings_by_id:
+                listings_by_id[listing_id] = []
+            listings_by_id[listing_id].append(item)
+
+    # Detect true bundles (different card names) vs quantity listings (same name)
+    bundles = {}
+    for listing_id, listing_items in listings_by_id.items():
+        if len(listing_items) > 1:
+            unique_names = set(i.get("card_name", "") for i in listing_items)
+            bundles[listing_id] = len(unique_names) > 1
+
+    updated = failed = 0
+    results = []
+
+    # Fetch prices from eBay and sync to inventory
+    for listing_id, listing_items in listings_by_id.items():
+        try:
+            async with user_config.apply(user):
+                offer = await lister_ebay_api.get_offer_details(listing_id)
+
+            if not offer:
+                print(f"[sync-prices] No offer found for listing {listing_id}")
+                failed += len(listing_items)
+                results.append({
+                    "listing_id": listing_id,
+                    "items_count": len(listing_items),
+                    "status": "no_offer",
+                    "price": None,
+                })
+                continue
+
+            ebay_price = offer.get("current_price")
+            if not ebay_price:
+                print(f"[sync-prices] No price in offer for listing {listing_id}: {offer}")
+                failed += len(listing_items)
+                results.append({
+                    "listing_id": listing_id,
+                    "items_count": len(listing_items),
+                    "status": "no_price",
+                    "price": None,
+                })
+                continue
+
+            print(f"[sync-prices] Fetched listing {listing_id}: £{ebay_price} ({len(listing_items)} items)")
+
+            # Log for specific test listings
+            if listing_id in ("336711544234", "336711556909"):
+                print(f"[sync-prices] TEST LISTING {listing_id}: fetched £{ebay_price}")
+                print(f"[sync-prices]   Full eBay response: {offer}")
+                print(f"[sync-prices]   Items sharing this listing: {len(listing_items)}")
+                for item in listing_items:
+                    print(f"[sync-prices]     - Item {item['item_id']}: {item['card_name']}")
+
+            # Determine price per item
+            is_bundle = bundles.get(listing_id, False)
+            if len(listing_items) > 1 and is_bundle:
+                # True bundle: divide price equally
+                price_per_item = round(ebay_price / len(listing_items), 2)
+                print(f"[sync-prices] True bundle: dividing £{ebay_price} by {len(listing_items)} = £{price_per_item} per item")
+            else:
+                # Quantity listing or single item: keep full price
+                price_per_item = ebay_price
+                if len(listing_items) > 1:
+                    print(f"[sync-prices] Quantity listing: keeping £{ebay_price} for each of {len(listing_items)} items")
+
+            # Update each item
+            for item in listing_items:
+                try:
+                    await db.update_sell_price(user["id"], item["item_id"], price_per_item)
+                    updated += 1
+                    print(f"[sync-prices] Updated item {item['item_id']}: £{price_per_item}")
+                except Exception as e:
+                    failed += 1
+                    print(f"[sync-prices] Failed to update item {item['item_id']}: {e}")
+
+            results.append({
+                "listing_id": listing_id,
+                "items_count": len(listing_items),
+                "is_bundle": is_bundle,
+                "ebay_price": ebay_price,
+                "price_per_item": price_per_item,
+                "status": "success",
+            })
+
+        except Exception as e:
+            failed += len(listing_items)
+            print(f"[sync-prices] Error fetching listing {listing_id}: {e}")
+            results.append({
+                "listing_id": listing_id,
+                "items_count": len(listing_items),
+                "status": "error",
+                "error": str(e),
+            })
+
+    return {
+        "total": len(listed),
+        "updated": updated,
+        "failed": failed,
+        "results": results,
+    }
