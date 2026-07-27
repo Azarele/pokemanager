@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
 
 import audit
+import lister_ebay_api
 import scraper
 from web import db_inventory as db
 from web.auth import get_current_user
@@ -235,6 +236,18 @@ async def get_inventory(
     status_filter = status if status in ("Inventory", "Sold") else None
     items = await db.get_all_items(user["id"], status_filter=status_filter)
 
+    # Fetch eBay listing prices for bundle items with null live_price
+    for item in items:
+        listing_id = item.get("ebay_listing_id")
+        if listing_id and not item.get("live_price"):
+            try:
+                offer = await lister_ebay_api.get_offer_details(listing_id)
+                if offer and offer.get("current_price"):
+                    item["live_price"] = offer["current_price"]
+                    print(f"[inventory] Fetched price for bundle item {item['item_id']}: £{item['live_price']}")
+            except Exception as e:
+                print(f"[inventory] Failed to fetch price for listing {listing_id}: {e}")
+
     # Split listing price for bundles (different card names) sharing the same ebay_listing_id
     # For quantity listings (same card name), keep full price per item
     # Group items by listing ID to detect bundles vs quantity listings
@@ -326,9 +339,18 @@ async def get_item(item_id: int, user: dict = Depends(get_current_user)):
     try:
         item = await db.get_item(user["id"], item_id)
 
+        # Fetch eBay listing price for bundle items with null live_price
+        listing_id = item.get("ebay_listing_id")
+        if listing_id and not item.get("live_price"):
+            try:
+                offer = await lister_ebay_api.get_offer_details(listing_id)
+                if offer and offer.get("current_price"):
+                    item["live_price"] = offer["current_price"]
+            except Exception as e:
+                print(f"[inventory] Failed to fetch price for listing {listing_id}: {e}")
+
         # Split listing price only for true bundles (different card names)
         # Keep full price for quantity listings (same card name)
-        listing_id = item.get("ebay_listing_id")
         if listing_id:
             all_items = await db.get_all_items(user["id"])
             listing_items = [i for i in all_items if i.get("ebay_listing_id") == listing_id]

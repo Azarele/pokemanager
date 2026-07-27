@@ -2816,7 +2816,8 @@ let _ws = null;
 function connectWS() {
   if (_ws && _ws.readyState < 2) return;
   try {
-    _ws = new WebSocket(`ws://${location.host}/ws/updates`);
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    _ws = new WebSocket(`${wsProtocol}//${location.host}/ws/updates`);
     _ws.onmessage = ev => {
       const msg = JSON.parse(ev.data);
       if (msg.type === 'reprice_progress') {
