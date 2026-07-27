@@ -12,6 +12,7 @@ import audit
 import lister_ebay_api
 import scraper
 from web import db_inventory as db
+from web import user_config
 from web.auth import get_current_user
 
 router = APIRouter()
@@ -248,62 +249,64 @@ async def get_inventory(
                     listings_by_id[listing_id] = []
                 listings_by_id[listing_id].append(item)
 
-        # Fetch prices from eBay and sync to items
-        for listing_id, listing_items in listings_by_id.items():
-            try:
-                offer = await lister_ebay_api.get_offer_details(listing_id)
-
-                # Log for test listings
-                if listing_id in ("336711544234", "336711556909"):
-                    print(f"\n{'='*80}")
-                    print(f"[inventory-FETCH] TEST LISTING {listing_id}")
-                    print(f"[inventory-FETCH] eBay API Response: {offer}")
-                    print(f"[inventory-FETCH] Items sharing this listing: {len(listing_items)}")
-                    for item in listing_items:
-                        print(f"[inventory-FETCH]   - Item {item['item_id']}: {item['card_name']}")
-                    print(f"{'='*80}\n")
-
-                if not offer:
-                    print(f"[inventory] No offer found for listing {listing_id}")
-                    continue
-
-                current_price = offer.get("current_price")
-                if not current_price:
-                    print(f"[inventory] No current_price in offer for listing {listing_id}")
-                    continue
-
-                # Detect if this is a true bundle or quantity listing
-                unique_names = set(i.get("card_name", "") for i in listing_items)
-                is_bundle = len(unique_names) > 1
-
-                # Determine price per item
-                if len(listing_items) > 1 and is_bundle:
-                    price_per_item = round(current_price / len(listing_items), 2)
-                    print(f"[inventory] Listing {listing_id}: True bundle - £{current_price} ÷ {len(listing_items)} = £{price_per_item} per item")
-                else:
-                    price_per_item = current_price
-                    if len(listing_items) > 1:
-                        print(f"[inventory] Listing {listing_id}: Quantity listing - £{current_price} for each of {len(listing_items)} items")
-
-                # Update sell_price for all items sharing this listing
-                for item in listing_items:
-                    item["sell_price"] = price_per_item
-                    print(f"[inventory] Item {item['item_id']}: set sell_price = £{price_per_item}")
-
-            except Exception as e:
-                print(f"[inventory] Error fetching listing {listing_id}: {e}")
-
-        # Fetch eBay market prices for items with null live_price
-        for item in items:
-            listing_id = item.get("ebay_listing_id")
-            if listing_id and not item.get("live_price"):
+        # Fetch prices from eBay using user's credentials
+        async with user_config.apply(user):
+            # Fetch prices from eBay and sync to items
+            for listing_id, listing_items in listings_by_id.items():
                 try:
                     offer = await lister_ebay_api.get_offer_details(listing_id)
-                    if offer and offer.get("current_price"):
-                        item["live_price"] = offer["current_price"]
-                        print(f"[inventory] Fetched market price for item {item['item_id']}: £{item['live_price']}")
+
+                    # Log for test listings
+                    if listing_id in ("336711544234", "336711556909"):
+                        print(f"\n{'='*80}")
+                        print(f"[inventory-FETCH] TEST LISTING {listing_id}")
+                        print(f"[inventory-FETCH] eBay API Response: {offer}")
+                        print(f"[inventory-FETCH] Items sharing this listing: {len(listing_items)}")
+                        for item in listing_items:
+                            print(f"[inventory-FETCH]   - Item {item['item_id']}: {item['card_name']}")
+                        print(f"{'='*80}\n")
+
+                    if not offer:
+                        print(f"[inventory] No offer found for listing {listing_id}")
+                        continue
+
+                    current_price = offer.get("current_price")
+                    if not current_price:
+                        print(f"[inventory] No current_price in offer for listing {listing_id}")
+                        continue
+
+                    # Detect if this is a true bundle or quantity listing
+                    unique_names = set(i.get("card_name", "") for i in listing_items)
+                    is_bundle = len(unique_names) > 1
+
+                    # Determine price per item
+                    if len(listing_items) > 1 and is_bundle:
+                        price_per_item = round(current_price / len(listing_items), 2)
+                        print(f"[inventory] Listing {listing_id}: True bundle - £{current_price} ÷ {len(listing_items)} = £{price_per_item} per item")
+                    else:
+                        price_per_item = current_price
+                        if len(listing_items) > 1:
+                            print(f"[inventory] Listing {listing_id}: Quantity listing - £{current_price} for each of {len(listing_items)} items")
+
+                    # Update sell_price for all items sharing this listing
+                    for item in listing_items:
+                        item["sell_price"] = price_per_item
+                        print(f"[inventory] Item {item['item_id']}: set sell_price = £{price_per_item}")
+
                 except Exception as e:
-                    print(f"[inventory] Failed to fetch market price for listing {listing_id}: {e}")
+                    print(f"[inventory] Error fetching listing {listing_id}: {e}")
+
+            # Fetch eBay market prices for items with null live_price
+            for item in items:
+                listing_id = item.get("ebay_listing_id")
+                if listing_id and not item.get("live_price"):
+                    try:
+                        offer = await lister_ebay_api.get_offer_details(listing_id)
+                        if offer and offer.get("current_price"):
+                            item["live_price"] = offer["current_price"]
+                            print(f"[inventory] Fetched market price for item {item['item_id']}: £{item['live_price']}")
+                    except Exception as e:
+                        print(f"[inventory] Failed to fetch market price for listing {listing_id}: {e}")
 
     except Exception as e:
         print(f"[inventory] Warning: eBay price fetch failed, continuing without prices: {e}")

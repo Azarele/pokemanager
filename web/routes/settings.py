@@ -308,3 +308,116 @@ async def refresh_instagram_token(user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Unexpected error refreshing token for user {user['id']}: {e}")
         return {"success": False, "error": "Failed to refresh token"}
+
+
+# ── eBay OAuth Token Management ───────────────────────────────────────────
+
+@router.get("/ebay/auth-url")
+async def get_ebay_auth_url(user: dict = Depends(get_current_user)):
+    """Generate and return the eBay OAuth authorization URL."""
+    import os
+    from urllib.parse import urlencode
+
+    app_id = os.getenv("EBAY_APP_ID", "").strip()
+    if not app_id:
+        raise HTTPException(status_code=400, detail="eBay app not configured on server")
+
+    redirect_uri = os.getenv(
+        "EBAY_REDIRECT_URI",
+        "https://auth.ebay.com/oauth2/ThirdPartyAuthSucessFailure?isAuthSuccessful=true",
+    )
+
+    scopes = " ".join([
+        "https://api.ebay.com/oauth/api_scope/sell.inventory",
+        "https://api.ebay.com/oauth/api_scope/sell.account",
+        "https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly",
+    ])
+
+    auth_url = (
+        "https://auth.ebay.com/oauth2/authorize?"
+        + urlencode({
+            "client_id": app_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": scopes,
+        })
+    )
+
+    return {
+        "auth_url": auth_url,
+        "instructions": "Log in to eBay, grant permission, then copy the full redirect URL from your browser and paste it in the Settings page."
+    }
+
+
+@router.post("/ebay/callback")
+async def exchange_ebay_token(body: dict, user: dict = Depends(get_current_user)):
+    """Exchange eBay auth code for refresh token and save to user profile."""
+    import os
+    import base64
+    from urllib.parse import parse_qs, urlparse
+
+    redirect_url = body.get("redirect_url", "").strip()
+    if not redirect_url:
+        raise HTTPException(status_code=400, detail="redirect_url is required")
+
+    # Extract auth code from redirect URL
+    try:
+        parsed = urlparse(redirect_url)
+        qs = parse_qs(parsed.query)
+        code = qs.get("code", [None])[0]
+        if not code:
+            raise ValueError("No code in URL")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid redirect URL: {e}")
+
+    app_id = os.getenv("EBAY_APP_ID", "").strip()
+    cert_id = os.getenv("EBAY_CERT_ID", "").strip()
+    if not app_id or not cert_id:
+        raise HTTPException(status_code=500, detail="eBay credentials not configured on server")
+
+    redirect_uri = os.getenv(
+        "EBAY_REDIRECT_URI",
+        "https://auth.ebay.com/oauth2/ThirdPartyAuthSucessFailure?isAuthSuccessful=true",
+    )
+
+    # Exchange code for tokens
+    try:
+        credentials = base64.b64encode(f"{app_id}:{cert_id}".encode()).decode()
+        resp = requests.post(
+            "https://api.ebay.com/identity/v1/oauth2/token",
+            headers={
+                "Authorization": f"Basic {credentials}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirect_uri,
+            },
+            timeout=30,
+        )
+
+        if resp.status_code != 200:
+            raise ValueError(f"eBay token exchange failed: {resp.text}")
+
+        tokens = resp.json()
+        refresh_token = tokens.get("refresh_token")
+        if not refresh_token:
+            raise ValueError("No refresh token in eBay response")
+
+        # Save refresh token to user profile
+        db = get_db()
+        db.table("user_profiles").update({
+            "ebay_refresh_token": refresh_token
+        }).eq("id", user["id"]).execute()
+
+        logger.info(f"[ebay-oauth] User {user['id']} connected eBay account")
+
+        return {
+            "success": True,
+            "message": "eBay account connected successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"[ebay-oauth] Token exchange failed for user {user['id']}: {e}")
+        raise HTTPException(status_code=400, detail=f"Token exchange failed: {e}")
