@@ -3,6 +3,7 @@ from web.auth import get_current_user
 from web.database import get_db
 from web.notifications import send_discord_notification
 from web.instagram_service import exchange_for_long_lived_token
+import config
 import requests
 import logging
 
@@ -315,20 +316,13 @@ async def refresh_instagram_token(user: dict = Depends(get_current_user)):
 @router.get("/ebay/auth-url")
 async def get_ebay_auth_url(user: dict = Depends(get_current_user)):
     """Generate and return the eBay OAuth authorization URL."""
-    import os
     from urllib.parse import urlencode
 
-    app_id = os.getenv("EBAY_APP_ID", "").strip()
-    if not app_id:
+    if not config.EBAY_APP_ID:
         raise HTTPException(
             status_code=500,
             detail="Server configuration error: EBAY_APP_ID environment variable not set. Contact administrator."
         )
-
-    redirect_uri = os.getenv(
-        "EBAY_REDIRECT_URI",
-        "https://auth.ebay.com/oauth2/ThirdPartyAuthSucessFailure?isAuthSuccessful=true",
-    )
 
     scopes = " ".join([
         "https://api.ebay.com/oauth/api_scope/sell.inventory",
@@ -339,8 +333,8 @@ async def get_ebay_auth_url(user: dict = Depends(get_current_user)):
     auth_url = (
         "https://auth.ebay.com/oauth2/authorize?"
         + urlencode({
-            "client_id": app_id,
-            "redirect_uri": redirect_uri,
+            "client_id": config.EBAY_APP_ID,
+            "redirect_uri": config.EBAY_REDIRECT_URI,
             "response_type": "code",
             "scope": scopes,
         })
@@ -355,7 +349,6 @@ async def get_ebay_auth_url(user: dict = Depends(get_current_user)):
 @router.post("/ebay/callback")
 async def exchange_ebay_token(body: dict, user: dict = Depends(get_current_user)):
     """Exchange eBay auth code for refresh token and save to user profile."""
-    import os
     import base64
     from urllib.parse import parse_qs, urlparse
 
@@ -373,27 +366,20 @@ async def exchange_ebay_token(body: dict, user: dict = Depends(get_current_user)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid redirect URL: {e}")
 
-    app_id = os.getenv("EBAY_APP_ID", "").strip()
-    cert_id = os.getenv("EBAY_CERT_ID", "").strip()
-    if not app_id:
+    if not config.EBAY_APP_ID:
         raise HTTPException(
             status_code=500,
             detail="Server configuration error: EBAY_APP_ID environment variable not set. Contact administrator."
         )
-    if not cert_id:
+    if not config.EBAY_CERT_ID:
         raise HTTPException(
             status_code=500,
             detail="Server configuration error: EBAY_CERT_ID environment variable not set. Contact administrator."
         )
 
-    redirect_uri = os.getenv(
-        "EBAY_REDIRECT_URI",
-        "https://auth.ebay.com/oauth2/ThirdPartyAuthSucessFailure?isAuthSuccessful=true",
-    )
-
     # Exchange code for tokens
     try:
-        credentials = base64.b64encode(f"{app_id}:{cert_id}".encode()).decode()
+        credentials = base64.b64encode(f"{config.EBAY_APP_ID}:{config.EBAY_CERT_ID}".encode()).decode()
         resp = requests.post(
             "https://api.ebay.com/identity/v1/oauth2/token",
             headers={
@@ -403,7 +389,7 @@ async def exchange_ebay_token(body: dict, user: dict = Depends(get_current_user)
             data={
                 "grant_type": "authorization_code",
                 "code": code,
-                "redirect_uri": redirect_uri,
+                "redirect_uri": config.EBAY_REDIRECT_URI,
             },
             timeout=30,
         )
