@@ -4415,6 +4415,35 @@ async function renderSettings() {
         </div>
       </div>
 
+      <!-- eBay OAuth Connection -->
+      <div class="settings-card">
+        <h3 class="settings-section-title">eBay Connection (OAuth)
+          <span class="badge ${settings?.has_ebay ? 'badge-ebay' : 'badge-danger'}" style="margin-left:8px">
+            ${settings?.has_ebay ? '✓ Connected' : 'Not connected'}
+          </span>
+        </h3>
+        <p class="text-muted" style="font-size:13px;margin-bottom:14px">
+          Connect your personal eBay account without needing terminal access or API keys.
+        </p>
+        <div class="form-section">
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            <strong>How it works:</strong><br>
+            1. Click "Connect eBay" below<br>
+            2. Log in and grant permission<br>
+            3. Copy the redirect URL from your browser<br>
+            4. Paste it in the box below and click "Save Token"
+          </p>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <button class="btn btn-accent btn-sm" onclick="startEbayOAuth()">🔗 Connect eBay</button>
+        </div>
+        <div class="form-section">
+          <label class="form-label">Paste redirect URL here</label>
+          <textarea id="ebay-redirect-url" class="form-input" placeholder="Full URL from eBay after granting permission..." style="min-height:60px;font-size:12px"></textarea>
+        </div>
+        <button class="btn btn-accent btn-sm" onclick="saveEbayOAuthToken()">💾 Save Token</button>
+      </div>
+
       <!-- eBay Business Policies -->
       <div class="settings-card">
         <h3 class="settings-section-title">eBay Business Policies</h3>
@@ -4669,6 +4698,39 @@ async function saveEbayPolicies() {
     const resp = await api.patch('/settings', updates);
     if (resp.success) { toast('eBay policies saved', 'success'); renderSettings(); }
     else toast('Failed: ' + resp.error, 'error');
+  } catch (e) {
+    toast('Failed: ' + extractError(e.message), 'error');
+  }
+}
+
+async function startEbayOAuth() {
+  try {
+    const resp = await api.get('/settings/ebay/auth-url');
+    if (!resp.auth_url) {
+      toast('Failed to get auth URL', 'error');
+      return;
+    }
+    window.open(resp.auth_url, 'ebay_oauth', 'width=800,height=600');
+  } catch (e) {
+    toast('Failed: ' + extractError(e.message), 'error');
+  }
+}
+
+async function saveEbayOAuthToken() {
+  const redirectUrl = document.getElementById('ebay-redirect-url')?.value.trim();
+  if (!redirectUrl) {
+    toast('Please paste the redirect URL', 'warning');
+    return;
+  }
+  try {
+    const resp = await api.post('/settings/ebay/callback', { redirect_url: redirectUrl });
+    if (resp.success) {
+      toast('eBay account connected!', 'success');
+      document.getElementById('ebay-redirect-url').value = '';
+      renderSettings();
+    } else {
+      toast('Failed: ' + resp.error, 'error');
+    }
   } catch (e) {
     toast('Failed: ' + extractError(e.message), 'error');
   }
