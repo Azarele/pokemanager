@@ -235,20 +235,32 @@ async def get_inventory(
     status_filter = status if status in ("Inventory", "Sold") else None
     items = await db.get_all_items(user["id"], status_filter=status_filter)
 
-    # Split listing price for items sharing the same ebay_listing_id
-    # Count items per listing ID
-    listing_counts = {}
+    # Split listing price for bundles (different card names) sharing the same ebay_listing_id
+    # For quantity listings (same card name), keep full price per item
+    # Group items by listing ID to detect bundles vs quantity listings
+    listings_by_id = {}
     for item in items:
         listing_id = item.get("ebay_listing_id")
         if listing_id:
-            listing_counts[listing_id] = listing_counts.get(listing_id, 0) + 1
+            if listing_id not in listings_by_id:
+                listings_by_id[listing_id] = []
+            listings_by_id[listing_id].append(item)
 
-    # Adjust live_price for items in shared listings
+    # Check which listings are true bundles (different card names)
+    bundles = {}
+    for listing_id, listing_items in listings_by_id.items():
+        if len(listing_items) > 1:
+            # Get unique card names in this listing
+            unique_names = set(i.get("card_name", "") for i in listing_items)
+            # True bundle if card names differ, quantity listing if all same
+            bundles[listing_id] = len(unique_names) > 1
+
+    # Adjust live_price only for true bundles (not quantity listings)
     for item in items:
         listing_id = item.get("ebay_listing_id")
-        if listing_id and listing_counts.get(listing_id, 1) > 1:
-            # Divide live_price by the number of items sharing this listing
-            count = listing_counts[listing_id]
+        if listing_id and bundles.get(listing_id, False):
+            # This is a true bundle (different items) — divide price equally
+            count = len(listings_by_id[listing_id])
             if item.get("live_price"):
                 item["live_price"] = round(item["live_price"] / count, 2)
 
@@ -314,13 +326,21 @@ async def get_item(item_id: int, user: dict = Depends(get_current_user)):
     try:
         item = await db.get_item(user["id"], item_id)
 
-        # Split listing price if item shares eBay listing ID with others
+        # Split listing price only for true bundles (different card names)
+        # Keep full price for quantity listings (same card name)
         listing_id = item.get("ebay_listing_id")
         if listing_id:
             all_items = await db.get_all_items(user["id"])
-            listing_count = sum(1 for i in all_items if i.get("ebay_listing_id") == listing_id)
-            if listing_count > 1 and item.get("live_price"):
-                item["live_price"] = round(item["live_price"] / listing_count, 2)
+            listing_items = [i for i in all_items if i.get("ebay_listing_id") == listing_id]
+
+            if len(listing_items) > 1:
+                # Check if this is a true bundle (different card names) or quantity listing (same name)
+                unique_names = set(i.get("card_name", "") for i in listing_items)
+                is_bundle = len(unique_names) > 1
+
+                if is_bundle and item.get("live_price"):
+                    # True bundle — divide price equally among items
+                    item["live_price"] = round(item["live_price"] / len(listing_items), 2)
 
         return item
     except ValueError as e:
