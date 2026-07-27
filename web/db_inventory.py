@@ -104,7 +104,7 @@ _EDITABLE_FIELDS = {
     "purchase_price": "purchase_price", "live_price": "live_price",
     "quick_price": "quick_price", "potential_profit": "potential_profit",
     "sell_price": "sell_price", "profit": "profit",
-    "status": "status", "ebay_listing_id": "ebay_listing_id",
+    "status": "status", "ebay_listing_id": "ebay_listing_id", "ebay_order_id": "ebay_order_id",
     "ebay_listed": "ebay_listed",
     "date_sold": "date_sold", "price_verified": "price_verified",
     "source": "source", "image_urls": "image_urls",
