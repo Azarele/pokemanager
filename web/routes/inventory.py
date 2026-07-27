@@ -234,6 +234,24 @@ async def get_inventory(
 ):
     status_filter = status if status in ("Inventory", "Sold") else None
     items = await db.get_all_items(user["id"], status_filter=status_filter)
+
+    # Split listing price for items sharing the same ebay_listing_id
+    # Count items per listing ID
+    listing_counts = {}
+    for item in items:
+        listing_id = item.get("ebay_listing_id")
+        if listing_id:
+            listing_counts[listing_id] = listing_counts.get(listing_id, 0) + 1
+
+    # Adjust live_price for items in shared listings
+    for item in items:
+        listing_id = item.get("ebay_listing_id")
+        if listing_id and listing_counts.get(listing_id, 1) > 1:
+            # Divide live_price by the number of items sharing this listing
+            count = listing_counts[listing_id]
+            if item.get("live_price"):
+                item["live_price"] = round(item["live_price"] / count, 2)
+
     if search:
         q = search.lower()
         items = [
@@ -294,7 +312,17 @@ async def clear_all_image_cache(user: dict = Depends(get_current_user)):
 @router.get("/{item_id}")
 async def get_item(item_id: int, user: dict = Depends(get_current_user)):
     try:
-        return await db.get_item(user["id"], item_id)
+        item = await db.get_item(user["id"], item_id)
+
+        # Split listing price if item shares eBay listing ID with others
+        listing_id = item.get("ebay_listing_id")
+        if listing_id:
+            all_items = await db.get_all_items(user["id"])
+            listing_count = sum(1 for i in all_items if i.get("ebay_listing_id") == listing_id)
+            if listing_count > 1 and item.get("live_price"):
+                item["live_price"] = round(item["live_price"] / listing_count, 2)
+
+        return item
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
