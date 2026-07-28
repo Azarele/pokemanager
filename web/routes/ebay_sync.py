@@ -270,6 +270,8 @@ async def _sync_user_sales(user_id: str) -> dict:
                     if inv_item:
                         logger.info(f"[ebay_sync] ✓ Matched by listing_id {ebay_listing_id} to item {inv_item.get('item_id')}")
                         item_id = inv_item.get("item_id")
+                        # Mark item as listed since we found an active eBay listing
+                        await db.edit_item(user_id, item_id, "ebay_listed", "Yes")
 
                 if not inv_item:
                     logger.info(f"[ebay_sync] No inventory item found for SKU: {sku}, listing_id: {ebay_listing_id}")
@@ -340,6 +342,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                             await db.edit_item(user_id, item_id_b, "ebay_fee", item_fee_share)
                             await db.edit_item(user_id, item_id_b, "profit", item_profit)
                             await db.edit_item(user_id, item_id_b, "ebay_order_id", order_id)
+                            await db.edit_item(user_id, item_id_b, "ebay_listed", "Yes")
                             if ebay_listing_id:
                                 await db.edit_item(user_id, item_id_b, "ebay_listing_id", ebay_listing_id)
 
@@ -392,6 +395,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                         await db.edit_item(user_id, item_id, "ebay_fee", ebay_fee)
                         await db.edit_item(user_id, item_id, "date_sold", order_creation_date)
                         await db.edit_item(user_id, item_id, "ebay_order_id", order_id)
+                        await db.edit_item(user_id, item_id, "ebay_listed", "Yes")
 
                         logger.info(f"[ebay_sync] ✓ Item {item_id} re-sold after cancellation - updated with new order {order_id}, profit: £{profit}")
                         stats["synced"] += 1
@@ -442,6 +446,7 @@ async def _sync_user_sales(user_id: str) -> dict:
                 await db.edit_item(user_id, item_id, "sell_price", price_paid)
                 await db.edit_item(user_id, item_id, "profit", profit)
                 await db.edit_item(user_id, item_id, "ebay_order_id", order_id)
+                await db.edit_item(user_id, item_id, "ebay_listed", "Yes")
                 if ebay_listing_id:
                     await db.edit_item(user_id, item_id, "ebay_listing_id", ebay_listing_id)
 
@@ -735,6 +740,10 @@ async def check_ebay_offers(user: dict = Depends(get_current_user)):
             inv_item = inventory_by_listing_id.get(str(listing_id))
             if not inv_item:
                 continue
+
+            # Mark as listed since an active offer exists for this listing
+            if inv_item.get("ebay_listed") != "Yes":
+                await db.edit_item(user["id"], inv_item["item_id"], "ebay_listed", "Yes")
 
             purchase_price = float(inv_item.get("purchase_price") or 0)
 
