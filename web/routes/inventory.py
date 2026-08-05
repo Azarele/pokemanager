@@ -473,7 +473,7 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
     logger.info(f"[add] === Received POST /inventory/add ===")
     logger.info(f"[add] acquisition_type={req.acquisition_type}, pc_url={req.pc_url}, purchase_price={req.purchase_price}")
 
-    if req.purchase_price < 0:
+    if req.acquisition_type == "purchase" and req.purchase_price < 0:
         return {"success": False, "error": "Purchase price must be greater than or equal to 0"}
 
     if req.acquisition_type == "purchase":

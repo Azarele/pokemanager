@@ -1737,10 +1737,10 @@ async function submitBulkAdd() {
 
       if (!tradeItems.length) { console.log(`[add] Row ${id}: No items selected for trade`); toast(`Row ${id}: Select at least one item to trade`, 'error'); return; }
 
-      const effectiveCost = tradeItems.reduce((sum, i) => sum + i.price, 0) + tradeCash;
-      console.log(`[add] Row ${id}: Valid trade, effective_cost=${effectiveCost}`);
+      const tradeItemsTotalValue = tradeItems.reduce((sum, i) => sum + i.price, 0);
+      console.log(`[add] Row ${id}: Valid trade, trade_items_total=${tradeItemsTotalValue}, trade_cash=${tradeCash}`);
       cards.push({
-        pc_url: '', purchase_price: effectiveCost, condition: cond, source: src, acquisition_type: 'trade',
+        pc_url: '', purchase_price: 0, condition: cond, source: src, acquisition_type: 'trade',
         traded_item_ids: tradeIds.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)),
         traded_item_names: tradeNames,
         trade_cash_difference: tradeCash
