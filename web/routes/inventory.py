@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
 
 import lister_ebay_api
+import scraper
 from web import db_inventory as db
 from web import user_config
 from web.auth import get_current_user
@@ -475,8 +476,8 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
     logger.info(f"[add] === Received POST /inventory/add ===")
     logger.info(f"[add] acquisition_type={req.acquisition_type}, pc_url={req.pc_url}, purchase_price={req.purchase_price}")
 
-    if req.purchase_price <= 0:
-        return {"success": False, "error": "Purchase price must be greater than 0"}
+    if req.purchase_price < 0:
+        return {"success": False, "error": "Purchase price must be greater than or equal to 0"}
 
     if req.acquisition_type == "purchase":
         if not req.pc_url.strip():
