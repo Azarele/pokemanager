@@ -119,7 +119,7 @@ async def _get_recent_orders(
         # Fetch most recent orders — eBay returns sorted by lastModifiedDate:desc by default
         # Already-sold items are filtered out in the sync logic anyway
         params = {
-            "limit": 100,
+            "limit": 200,
         }
         headers = _get_ebay_headers(access_token)
 
@@ -263,18 +263,36 @@ async def _sync_user_sales(user_id: str) -> dict:
                 inv_item = inventory_by_id.get(item_id)
                 ebay_listing_id = item.get("legacyItemId", "")
 
-                # Fallback: try matching by eBay listing_id if SKU-based lookup failed
+                # Fallback 1: try matching by eBay listing_id if SKU-based lookup failed
                 if not inv_item and ebay_listing_id:
-                    logger.info(f"[ebay_sync] SKU mismatch for {sku}, attempting fallback match by listing_id {ebay_listing_id}")
+                    logger.info(f"[ebay_sync] SKU mismatch for {sku}, attempting Fallback 1: matching by listing_id {ebay_listing_id}")
                     inv_item = await db.get_item_by_listing_id(user_id, ebay_listing_id)
                     if inv_item:
-                        logger.info(f"[ebay_sync] ✓ Matched by listing_id {ebay_listing_id} to item {inv_item.get('item_id')}")
+                        logger.info(f"[ebay_sync] ✓ Fallback 1 SUCCESS: Matched listing_id {ebay_listing_id} to item {inv_item.get('item_id')}")
                         item_id = inv_item.get("item_id")
                         # Mark item as listed since we found an active eBay listing
                         await db.edit_item(user_id, item_id, "ebay_listed", "Yes")
+                    else:
+                        # Detailed logging for fallback failure
+                        all_listing_items = [i for i in inventory_items if i.get("ebay_listing_id") == ebay_listing_id]
+                        logger.info(f"[ebay_sync] ✗ Fallback 1 FAILED: No items with listing_id {ebay_listing_id} in database. Searched {len(all_listing_items)} items but none matched.")
+                        logger.info(f"[ebay_sync] ✗ Items found with this listing_id in inventory: {[i['item_id'] for i in all_listing_items]}")
+
+                # Fallback 2: try matching by eBay order_id to avoid re-processing already synced orders
+                if not inv_item and order_id:
+                    logger.info(f"[ebay_sync] Attempting Fallback 2: checking if order {order_id} was already synced")
+                    # Check if any inventory item with this order_id exists (to avoid duplicates)
+                    already_synced = [i for i in inventory_items if i.get("ebay_order_id") == order_id and i.get("status") == "Sold"]
+                    if already_synced:
+                        logger.info(f"[ebay_sync] ✓ Fallback 2: Order {order_id} already synced ({len(already_synced)} items). Skipping.")
+                        stats["skipped"] += 1
+                        continue
+                    else:
+                        logger.info(f"[ebay_sync] ✗ Fallback 2 FAILED: Order {order_id} not found in synced items, and no SKU/listing_id match available.")
 
                 if not inv_item:
-                    logger.info(f"[ebay_sync] No inventory item found for SKU: {sku}, listing_id: {ebay_listing_id}")
+                    logger.warning(f"[ebay_sync] ✗ MATCH FAILED: No inventory item found - SKU: {sku}, listing_id: {ebay_listing_id}, order_id: {order_id}")
+                    stats["skipped"] += 1
                     continue
 
                 # Check for bundle listing (multiple items share same listing_id)
