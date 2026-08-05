@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
 
+import audit
 import lister_ebay_api
 import scraper
 from web import db_inventory as db

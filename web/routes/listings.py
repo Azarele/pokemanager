@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
+import audit
 import config
 import lister_ebay_api
 from web import db_inventory as db
