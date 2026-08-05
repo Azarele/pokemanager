@@ -419,16 +419,23 @@ class PatchItemMultiRequest(BaseModel):
 @router.patch("/{item_id}/fields")
 async def patch_item_multi(item_id: int, req: PatchItemMultiRequest, user: dict = Depends(get_current_user)):
     """Update multiple fields on an item in one request."""
+    logger.info(f"[patch] === PATCH /inventory/{item_id}/fields ===")
+    logger.info(f"[patch] user_id={user['id']}, fields={req.fields}")
     results = {}
     for field, value in req.fields.items():
         if field not in _PATCHABLE_FIELDS:
+            logger.warning(f"[patch] Field '{field}' is not patchable")
             raise HTTPException(status_code=400, detail=f"Field '{field}' is not patchable")
         try:
             cast_value = _cast_field_value(field, value)
+            logger.info(f"[patch] Updating field '{field}': {value} -> {cast_value}")
             await db.edit_item(user["id"], item_id, field, cast_value)
+            logger.info(f"[patch] Field '{field}' updated successfully")
             results[field] = {"new": cast_value}
         except ValueError as e:
+            logger.error(f"[patch] Field '{field}' error: {e}")
             raise HTTPException(status_code=400, detail=f"Field '{field}': {e}")
+    logger.info(f"[patch] Update complete: {results}")
     return {"item_id": item_id, "updated": results}
 
 

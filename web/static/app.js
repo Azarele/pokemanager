@@ -1120,17 +1120,29 @@ async function confirmEdit() {
   const condition = document.getElementById('edit-condition')?.value;
   const region    = document.getElementById('edit-region')?.value;
 
+  console.log(`[edit] Item ID: ${_editId}`);
+  console.log(`[edit] Current values: name=${item.card_name}, pcUrl=${item.pc_url}, price=${item.purchase_price}, condition=${item.condition}, region=${item.region}`);
+  console.log(`[edit] New values: name=${name}, pcUrl=${pcUrl}, price=${price}, condition=${condition}, region=${region}`);
+
   if (name && name !== item.card_name)           fields.card_name = name;
   if (pcUrl && pcUrl !== item.pc_url)            fields.pc_url = pcUrl;
   if (!isNaN(price) && price !== item.purchase_price) fields.purchase_price = String(price);
   if (condition !== item.condition)              fields.condition = condition;
   if (region !== (item.region || ''))            fields.region = region;
 
-  if (Object.keys(fields).length === 0) { closeModal(); return; }
+  console.log(`[edit] Fields to update:`, fields);
+
+  if (Object.keys(fields).length === 0) {
+    console.log(`[edit] No changes detected, closing modal`);
+    closeModal();
+    return;
+  }
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
 
   try {
-    await api.patch(`/inventory/${_editId}/fields`, { fields });
+    console.log(`[edit] Sending PATCH request to /api/inventory/${_editId}/fields`);
+    const resp = await api.patch(`/inventory/${_editId}/fields`, { fields });
+    console.log(`[edit] Patch response:`, resp);
     Object.assign(item, {
       card_name: fields.card_name ?? item.card_name,
       pc_url: fields.pc_url ?? item.pc_url,
@@ -1138,11 +1150,13 @@ async function confirmEdit() {
       condition: fields.condition ?? item.condition,
       region: fields.region ?? item.region,
     });
+    console.log(`[edit] Updated local item object`);
     closeModal();
     refreshInventoryGrid();
     flashCard(_editId, 'success');
     toast('Item updated', 'success');
   } catch (e) {
+    console.error(`[edit] Error:`, e);
     toast('Save failed: ' + extractError(e.message), 'error');
     if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
   }
