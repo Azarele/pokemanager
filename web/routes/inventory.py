@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
 
-import audit
 import lister_ebay_api
 import scraper
 from web import db_inventory as db
@@ -443,9 +442,6 @@ async def sell_item_web(item_id: int, req: SellItemRequest, user: dict = Depends
         return {"success": False, "error": "Sell price must be greater than 0"}
     try:
         result = await db.sell_item(user["id"], item_id, req.sell_price)
-        audit.log_mutation("web_sell", item_id, "sold", {
-            "sell_price": req.sell_price, "user_id": user["id"],
-        })
         return {"success": True, "item_id": item_id, "sell_price": req.sell_price, "result": result}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -554,10 +550,6 @@ async def add_item_web(req: AddItemWebRequest, user: dict = Depends(get_current_
         except Exception as e:
             logger.info(f"[add] Image cache failed (non-blocking): {e}")
 
-        audit.log_mutation("web_add", item_id, "added", {
-            "card_name": card_name, "purchase_price": req.purchase_price,
-            "live_price": live_price, "acquisition_type": req.acquisition_type, "user_id": user["id"],
-        })
         logger.info(f"[add] SUCCESS: item_id={item_id}, card_name={card_name}")
 
         return {
@@ -659,10 +651,6 @@ async def bundle_sell(req: BundleSellRequest, user: dict = Depends(get_current_u
         }).execute()
 
         logger.info(f"[bundle] SUCCESS: Created bundle {bundle_id} with {len(items)} items, profit: £{profit}")
-        audit.log_mutation("web_bundle_sell", bundle_id, "bundle_sold", {
-            "item_count": len(items), "sell_price": sell_price, "profit": profit, "user_id": user_id
-        })
-
         return {
             "success": True,
             "bundle_id": bundle_id,
@@ -685,7 +673,6 @@ async def delete_item(item_id: int, user: dict = Depends(get_current_user)):
             return {"success": False, "error": "Cannot remove a sold item"}
 
         await db.remove_item(user["id"], item_id)
-        audit.log_mutation("web_remove", item_id, "removed", {"source": "web_dashboard", "user_id": user["id"]})
 
         logger.info(f"[web] Removed item {item_id} ({item.get('card_name', '')})")
         return {"success": True, "item_id": item_id}
@@ -769,7 +756,6 @@ async def import_csv(
                 source=source,
             )
             imported += 1
-            audit.log_mutation("web_import_csv", 0, "added", {"card": card_name, "user_id": user["id"]})
         except Exception as e:
             errors += 1
             error_details.append(f"Row {i+1} ({card_name}): {str(e)}")

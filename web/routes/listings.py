@@ -7,7 +7,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-import audit
 import config
 import lister_ebay_api
 from web import db_inventory as db
@@ -476,13 +475,6 @@ async def sold_and_delist(item_id: int, body: dict, user: dict = Depends(get_cur
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Step 3: Audit log
-    audit.log_mutation("web_sold_delist", item_id, "sold_and_delisted", {
-        "sell_price": sell_price,
-        "listing_id": listing_id,
-        "user_id": user["id"],
-    })
-
     return {
         "success": True,
         "sold": results["sold"],
@@ -527,9 +519,6 @@ async def reprice_item(item_id: int, body: dict, user: dict = Depends(get_curren
 
     if success:
         await db.update_sell_price(user["id"], item_id, new_price)
-        audit.log_mutation("web_reprice", item_id, "repriced", {
-            "new_price": new_price, "strategy": strategy, "listing_id": listing_id
-        })
 
     return {"success": success, "new_price": new_price, "listing_id": listing_id}
 
@@ -688,13 +677,6 @@ async def bundle_list_on_ebay(req: BundleListRequest, user: dict = Depends(get_c
             await db.update_item_field(user_id, item["item_id"], "ebay_listed", "Yes")
             await db.update_item_field(user_id, item["item_id"], "bundle_id", bundle_id)
             await db.update_item_field(user_id, item["item_id"], "promoted_listing_pct", promo_pct)
-
-        audit.log_mutation("bundle_list", user_id, "bundle_listed", {
-            "item_ids": item_ids,
-            "listing_id": listing_id,
-            "bundle_id": bundle_id,
-            "price": price
-        })
 
         return {
             "success": True,
