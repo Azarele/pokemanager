@@ -454,6 +454,51 @@ async def sell_item_web(item_id: int, req: SellItemRequest, user: dict = Depends
         return {"success": False, "error": str(e)}
 
 
+class TradeItemRequest(BaseModel):
+    trade_value: float
+    trade_notes: str = ""
+
+
+@router.patch("/{item_id}/trade")
+async def trade_item_web(item_id: int, req: TradeItemRequest, user: dict = Depends(get_current_user)):
+    from datetime import date
+    logger.info(f"[trade] === PATCH /inventory/{item_id}/trade ===")
+    logger.info(f"[trade] user_id={user['id']}, trade_value={req.trade_value}, trade_notes={req.trade_notes}")
+
+    try:
+        item = await db.get_item(user["id"], item_id)
+        if not item:
+            return {"success": False, "error": "Item not found"}
+
+        # Calculate profit
+        purchase_price = float(item.get("purchase_price") or 0)
+        profit = round(req.trade_value - purchase_price, 2)
+
+        # Update item to Traded status
+        today = date.today().isoformat()
+        logger.info(f"[trade] Updating item: status=Traded, sell_price={req.trade_value}, profit={profit}, date_sold={today}")
+
+        await db.supabase.table("inventory_items").update({
+            "status": "Traded",
+            "sell_price": req.trade_value,
+            "profit": profit,
+            "date_sold": today,
+            "trade_notes": req.trade_notes,
+        }).eq("item_id", item_id).eq("user_id", user["id"]).execute()
+
+        logger.info(f"[trade] Item marked as traded successfully")
+        return {
+            "success": True,
+            "item_id": item_id,
+            "status": "Traded",
+            "trade_value": req.trade_value,
+            "profit": profit,
+        }
+    except Exception as e:
+        logger.error(f"[trade] Error: {e}")
+        return {"success": False, "error": str(e)}
+
+
 class AddItemWebRequest(BaseModel):
     pc_url: str = ""
     purchase_price: float

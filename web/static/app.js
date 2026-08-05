@@ -722,6 +722,7 @@ function renderInventoryCard(item) {
     ? `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">💰 Check</button>`
     : `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">💰 Check</button>
        <button onclick="refreshSinglePrice(${item.item_id})" class="btn btn-ghost btn-sm refresh-price-btn" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🔄 Refresh</button>
+       ${!isTraded ? `<button onclick="openTradeModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🔄 Trade</button>` : ''}
        <button onclick="postToInstagram(${item.item_id})" id="ig-btn-${item.item_id}" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">${item.ig_story_posted ? '✓ Posted' : '📸 IG'}</button>
        <button onclick="openEditModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">✏️ Edit</button>
        <button onclick="confirmRemove(${item.item_id})" class="btn btn-danger btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🗑️ Delete</button>
@@ -1298,6 +1299,78 @@ async function confirmSell() {
   } catch (e) {
     toast('Error: ' + extractError(e.message), 'error');
     if (btn) { btn.disabled = false; btn.textContent = '✅ Record Sale'; }
+  }
+}
+
+/* ── Trade modal ────────────────────────────────────────────────────────── */
+let _tradeId = null;
+function openTradeModal(itemId) {
+  const item = S.inventory.find(i => i.item_id === itemId);
+  if (!item) return;
+  _tradeId = itemId;
+  showModal(`
+    <h2 style="margin-bottom:6px">🔄 Mark as Traded</h2>
+    <p class="text-muted" style="margin-bottom:16px">${esc(item.card_name || '')}</p>
+    <div class="form-section">
+      <label class="form-label">Trade Value Received (£)</label>
+      <input type="number" id="trade-value-input" class="form-input"
+             value="0.00" step="0.01" min="0" />
+      <p class="text-muted" style="margin-top:6px;font-size:12px">Value of items/cash you received in the trade</p>
+    </div>
+    <div class="form-section">
+      <label class="form-label">Notes (optional)</label>
+      <input type="text" id="trade-notes-input" class="form-input"
+             placeholder="e.g. Card shop credit, Cash trade" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-accent" onclick="confirmTrade()">✅ Mark Traded</button>
+    </div>`);
+  setTimeout(() => document.getElementById('trade-value-input')?.focus(), 80);
+}
+
+async function confirmTrade() {
+  const tradeValue = parseFloat(document.getElementById('trade-value-input').value);
+  const tradeNotes = document.getElementById('trade-notes-input')?.value.trim() || '';
+  if (isNaN(tradeValue) || tradeValue < 0) { toast('Enter a valid trade value', 'error'); return; }
+
+  const btn = document.querySelector('#modal-overlay .btn-accent');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Processing…'; }
+
+  try {
+    console.log(`[trade] Marking item ${_tradeId} as traded: value=${tradeValue}, notes=${tradeNotes}`);
+    const res = await api.patch(`/inventory/${_tradeId}/trade`, {
+      trade_value: tradeValue,
+      trade_notes: tradeNotes
+    });
+    console.log(`[trade] Response:`, res);
+
+    if (res.success === false) {
+      toast(res.error || 'Trade marking failed', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Mark Traded'; }
+      return;
+    }
+
+    const item = S.inventory.find(i => i.item_id === _tradeId);
+    if (item) {
+      item.status = 'Traded';
+      item.sell_price = tradeValue;
+      item.trade_notes = tradeNotes;
+    }
+
+    closeModal();
+    const card = document.querySelector(`.inv-card[data-id="${_tradeId}"]`);
+    if (card) {
+      card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      card.style.opacity = '0'; card.style.transform = 'scale(0.88)';
+      setTimeout(() => { card.remove(); refreshInventoryGrid(); }, 320);
+    } else { refreshInventoryGrid(); }
+
+    toast(`Marked as traded for £${tradeValue.toFixed(2)} ✅`, 'success');
+  } catch (e) {
+    console.error(`[trade] Error:`, e);
+    toast('Error: ' + extractError(e.message), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Mark Traded'; }
   }
 }
 
