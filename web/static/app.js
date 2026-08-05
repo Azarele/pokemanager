@@ -657,6 +657,7 @@ function countFor(k) {
     case 'all':        return inv.length;
     case 'in_stock':   return inv.filter(i => i.status === 'Inventory').length;
     case 'sold':       return inv.filter(i => i.status === 'Sold').length;
+    case 'traded':     return inv.filter(i => i.status === 'Traded').length;
     case 'ebay':       return inv.filter(i => i.ebay_listed === 'Yes').length;
     case 'not_listed': return inv.filter(i => i.status === 'Inventory' && i.ebay_listed !== 'Yes').length;
     case 'underwater': return inv.filter(i => i.status === 'Inventory' && (i.live_price || 0) < (i.purchase_price || 0)).length;
