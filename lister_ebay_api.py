@@ -507,6 +507,25 @@ def _create_inventory_item(
         )
  
  
+def _delete_offer(offer_id: str, access_token: str) -> bool:
+    """DELETE /sell/inventory/v1/offer/{offerId} — removes an offer. Returns True on success."""
+    try:
+        resp = requests.delete(
+            f"{_INVENTORY_URL}/offer/{offer_id}",
+            headers=_json_headers(access_token),
+            timeout=30,
+        )
+        if resp.status_code in (200, 204):
+            print(f"[ebay_api] Offer {offer_id} deleted successfully.")
+            return True
+        else:
+            print(f"[ebay_api] Failed to delete offer {offer_id}: HTTP {resp.status_code} — {resp.text[:200]}")
+            return False
+    except Exception as e:
+        print(f"[ebay_api] Exception deleting offer {offer_id}: {e}")
+        return False
+
+
 def _create_offer(
     sku:          str,
     price_gbp:    float,
@@ -518,7 +537,7 @@ def _create_offer(
     """POST /sell/inventory/v1/offer — returns offer ID."""
     if category_id is None:
         category_id = config.EBAY_CATEGORY_ID
- 
+
     body = {
         "sku":                sku,
         "marketplaceId":      "EBAY_GB",
@@ -541,7 +560,9 @@ def _create_offer(
             "returnPolicyId":      config.EBAY_RETURN_POLICY_ID,
         },
     }
- 
+
+    print(f"[ebay_api] Creating offer with payload: {body}")
+
     resp = requests.post(
         f"{_INVENTORY_URL}/offer",
         headers=_json_headers(access_token),
@@ -586,29 +607,44 @@ def _create_offer(
  
 def _publish_offer(offer_id: str, access_token: str) -> str:
     """POST /sell/inventory/v1/offer/{offerId}/publish — returns listing URL.
- 
+
     eBay returns HTTP 400 with error 25058 for trading card condition warnings
     but still publishes the listing and includes a listingId in the response.
     If listingId is present, the listing is live regardless of HTTP status.
+
+    Item.Country errors indicate missing or misconfigured merchant location data.
+    If detected, deletes the offer and raises an error to trigger retry with updated payload.
     """
     resp = requests.post(
         f"{_INVENTORY_URL}/offer/{offer_id}/publish",
         headers=_json_headers(access_token),
         timeout=30,
     )
- 
+
     try:
         data = resp.json()
     except Exception:
         data = {}
- 
+
     listing_id = data.get("listingId")
     if listing_id:
         # Listing is live — log any warnings but don't fail
         for err in data.get("errors", []):
             print(f"[ebay_api] Publish note: {err.get('message', '')[:120]}")
         return f"https://www.ebay.co.uk/itm/{listing_id}"
- 
+
+    # Check for Item.Country errors (missing country data)
+    errors = data.get("errors", [])
+    for err in errors:
+        error_msg = err.get("message", "").lower() if err.get("message") else ""
+        if "item.country" in error_msg or "country" in error_msg:
+            print(f"[ebay_api] Item.Country error detected: {err.get('message', '')[:200]}")
+            print(f"[ebay_api] Deleting offer {offer_id} to allow recreation with country data...")
+            _delete_offer(offer_id, access_token)
+            raise RuntimeError(
+                f"[ebay_api] Publish failed with Item.Country error (offer deleted, retry will create new one): {err.get('message', '')[:300]}"
+            )
+
     # No listingId — genuine failure
     raise RuntimeError(
         f"[ebay_api] Publish offer failed: HTTP {resp.status_code} — {resp.text[:500]}"
@@ -647,11 +683,30 @@ async def _create_listing(
         sku, price_gbp, description, condition_id, access_token,
     )
     print(f"[ebay_api] Offer created (ID: {offer_id}).")
- 
-    # 4c — publish
-    listing_url = await asyncio.to_thread(_publish_offer, offer_id, access_token)
-    print(f"[ebay_api] Listing published → {listing_url}")
-    return listing_url
+
+    # 4c — publish (with retry on Item.Country errors)
+    try:
+        listing_url = await asyncio.to_thread(_publish_offer, offer_id, access_token)
+        print(f"[ebay_api] Listing published → {listing_url}")
+        return listing_url
+    except RuntimeError as e:
+        error_msg = str(e).lower()
+        if "item.country" in error_msg:
+            print(f"[ebay_api] Item.Country error caught in _create_listing, attempting to recreate offer...")
+            # Offer was already deleted by _publish_offer, attempt fresh offer creation
+            try:
+                offer_id = await asyncio.to_thread(
+                    _create_offer,
+                    sku, price_gbp, description, condition_id, access_token,
+                )
+                print(f"[ebay_api] Offer recreated after country fix (ID: {offer_id}).")
+                listing_url = await asyncio.to_thread(_publish_offer, offer_id, access_token)
+                print(f"[ebay_api] Listing published after retry → {listing_url}")
+                return listing_url
+            except Exception as retry_err:
+                raise RuntimeError(f"[ebay_api] Retry failed after Item.Country fix: {retry_err}")
+        else:
+            raise
  
  
 # ---------------------------------------------------------------------------
