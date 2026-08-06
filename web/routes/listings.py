@@ -241,6 +241,39 @@ async def delist_item(item_id: int, user: dict = Depends(get_current_user)):
     return {"success": True, "warning": error}
 
 
+# ── Delete stuck eBay inventory item ───────────────────────────────────────
+
+@router.delete("/ebay-inventory/{sku}")
+async def delete_ebay_inventory_item(sku: str, user: dict = Depends(get_current_user)):
+    """
+    Delete a stuck eBay inventory item (SKU) to allow fresh creation.
+
+    This is useful for clearing stuck SKUs with missing country data or other
+    inventory-level errors that prevent offers from being created.
+
+    Example: DELETE /api/listings/ebay-inventory/pokemaz-448
+    """
+    if not sku or len(sku) == 0:
+        raise HTTPException(status_code=400, detail="SKU cannot be empty")
+
+    # Validate SKU format (basic check)
+    if len(sku) > 50:
+        raise HTTPException(status_code=400, detail="SKU too long (max 50 chars)")
+
+    try:
+        async with user_config.apply(user):
+            result = await lister_ebay_api.delete_inventory_item(sku)
+
+        return {
+            "success": result["success"],
+            "sku": sku,
+            "message": result["message"],
+        }
+    except Exception as e:
+        logger.error(f"[listings] Error deleting inventory item {sku}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete inventory item: {str(e)}")
+
+
 # ── Verify active eBay listings ───────────────────────────────────────────
 
 class VerifyRequest(BaseModel):

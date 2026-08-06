@@ -507,6 +507,25 @@ def _create_inventory_item(
         )
  
  
+def _delete_inventory_item(sku: str, access_token: str) -> bool:
+    """DELETE /sell/inventory/v1/inventory_item/{sku} — removes an inventory item. Returns True on success."""
+    try:
+        resp = requests.delete(
+            f"{_INVENTORY_URL}/inventory_item/{sku}",
+            headers=_json_headers(access_token),
+            timeout=30,
+        )
+        if resp.status_code in (200, 204):
+            print(f"[ebay_api] Inventory item {sku} deleted successfully.")
+            return True
+        else:
+            print(f"[ebay_api] Failed to delete inventory item {sku}: HTTP {resp.status_code} — {resp.text[:200]}")
+            return False
+    except Exception as e:
+        print(f"[ebay_api] Exception deleting inventory item {sku}: {e}")
+        return False
+
+
 def _delete_offer(offer_id: str, access_token: str) -> bool:
     """DELETE /sell/inventory/v1/offer/{offerId} — removes an offer. Returns True on success."""
     try:
@@ -979,12 +998,40 @@ async def list_item_on_ebay(
             sku            = sku,
         )
         return ListingResult(platform="eBay", success=True, listing_url=listing_url)
- 
+
     except Exception as exc:
         print(f"[ebay_api] Listing failed: {exc}")
         return ListingResult(platform="eBay", success=False, error=str(exc))
- 
- 
+
+
+# ---------------------------------------------------------------------------
+# Delete inventory item — cleanup for stuck SKUs
+# ---------------------------------------------------------------------------
+
+async def delete_inventory_item(sku: str) -> dict:
+    """
+    Delete a stuck inventory item from eBay.
+
+    Parameters
+    ----------
+    sku : The SKU to delete (e.g., "pokemaz-448")
+
+    Returns
+    -------
+    dict with "success" (bool) and "message" (str)
+    """
+    try:
+        access_token = await _get_access_token()
+        success = await asyncio.to_thread(_delete_inventory_item, sku, access_token)
+        if success:
+            return {"success": True, "message": f"Inventory item {sku} deleted successfully."}
+        else:
+            return {"success": False, "message": f"Failed to delete inventory item {sku}."}
+    except Exception as exc:
+        print(f"[ebay_api] Delete inventory failed: {exc}")
+        return {"success": False, "message": str(exc)}
+
+
 # ---------------------------------------------------------------------------
 # End listing — Trading API EndItem
 # ---------------------------------------------------------------------------
