@@ -526,6 +526,7 @@ def _create_offer(
         "availableQuantity":  1,
         "categoryId":         category_id,
         "conditionId":        condition_id,
+        "countryCode":        "GB",
         "listingDescription": description,
         "pricingSummary": {
             "price": {
