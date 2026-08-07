@@ -2,22 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from web.auth import get_current_user
 from web.database import get_db
 from web.notifications import send_discord_notification
-from web.instagram_service import exchange_for_long_lived_token
 import config
 import requests
 import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-def _mask_account_id(account_id: str) -> str:
-    """Mask Instagram account ID, showing only first 6 and last 4 digits."""
-    if not account_id:
-        return None
-    if len(account_id) <= 10:
-        return account_id[-4:]
-    return account_id[:6] + '...' + account_id[-4:]
 
 
 @router.get("")
@@ -30,7 +20,6 @@ async def get_settings(user: dict = Depends(get_current_user)):
         "has_ebay":          bool(user.get("ebay_app_id")),
         "has_gemini":        bool(user.get("gemini_api_key")),
         "has_discord":       bool(user.get("discord_webhook_url")),
-        "has_instagram":     bool(user.get("instagram_access_token")),
         "ebay_fee_rate":     user.get("ebay_fee_rate", 0.1235),
         "postage_cost":      user.get("postage_cost", 1.50),
         "promoted_listing_pct": float(user.get("promoted_listing_pct") or 0),
@@ -41,7 +30,6 @@ async def get_settings(user: dict = Depends(get_current_user)):
         "ebay_fulfillment_policy_id": user.get("ebay_fulfillment_policy_id", ""),
         "ebay_payment_policy_id":     user.get("ebay_payment_policy_id", ""),
         "ebay_return_policy_id":      user.get("ebay_return_policy_id", ""),
-        "instagram_business_account_id_masked": _mask_account_id(user.get("instagram_business_account_id")),
         "onboarding_dismissed": user.get("onboarding_dismissed", False),
     }
 
@@ -174,141 +162,6 @@ async def test_discord_webhook(user: dict = Depends(get_current_user)):
         5763719,
     )
     return {"success": True, "message": "Test notification sent"}
-
-
-@router.get("/instagram")
-async def get_instagram_settings(user: dict = Depends(get_current_user)):
-    """Get Instagram connection status and masked account ID."""
-    return {
-        "connected": bool(user.get("instagram_access_token")),
-        "account_id": _mask_account_id(user.get("instagram_business_account_id")),
-    }
-
-
-@router.post("/instagram")
-async def save_instagram_settings(body: dict, user: dict = Depends(get_current_user)):
-    """
-    Save Instagram credentials after validating the access token.
-    Expects: { access_token, business_account_id }
-    """
-    access_token = body.get("access_token", "").strip()
-    business_account_id = body.get("business_account_id", "").strip()
-
-    if not access_token or not business_account_id:
-        return {"success": False, "error": "Both access token and business account ID are required"}
-
-    # Validate token using Instagram Graph API (new Instagram Login)
-    # Try graph.instagram.com first (IGAA token), fall back to graph.facebook.com
-    validation_success = False
-    last_error = None
-
-    # First attempt: graph.instagram.com (new Instagram API with Instagram Login)
-    try:
-        ig_validate_url = f"https://graph.instagram.com/v21.0/me?fields=id,username&access_token={access_token}"
-        logger.info(f"Attempting Instagram token validation: {ig_validate_url}")
-        response = requests.get(ig_validate_url, timeout=10)
-        data = response.json()
-        logger.info(f"Instagram Graph API response (status {response.status_code}): {data}")
-
-        if response.status_code == 200 and "error" not in data:
-            validation_success = True
-        elif "error" in data:
-            last_error = data.get("error", {}).get("message", "Unknown error")
-    except Exception as e:
-        logger.warning(f"Instagram Graph API exception: {str(e)}")
-        last_error = str(e)
-
-    # Fall back: graph.facebook.com if Instagram Graph API failed
-    if not validation_success:
-        try:
-            fb_validate_url = f"https://graph.facebook.com/v21.0/me?access_token={access_token}"
-            logger.info(f"Falling back to Facebook Graph API: {fb_validate_url}")
-            response = requests.get(fb_validate_url, timeout=10)
-            data = response.json()
-            logger.info(f"Facebook Graph API response (status {response.status_code}): {data}")
-
-            if response.status_code == 200 and "error" not in data:
-                validation_success = True
-            elif "error" in data:
-                last_error = data.get("error", {}).get("message", "Unknown error")
-                logger.error(f"Facebook Graph API validation failed: {data}")
-        except Exception as e:
-            logger.error(f"Facebook Graph API exception: {str(e)}")
-            last_error = str(e)
-
-    if not validation_success:
-        return {"success": False, "error": f"Token validation failed: {last_error or 'Unknown error'}"}
-
-    # Save to user_profiles
-    db = get_db()
-    try:
-        db.table("user_profiles").update({
-            "instagram_access_token": access_token,
-            "instagram_business_account_id": business_account_id,
-        }).eq("id", user["id"]).execute()
-        return {"success": True, "message": "Instagram account connected"}
-    except Exception as e:
-        return {"success": False, "error": f"Failed to save credentials: {str(e)}"}
-
-
-@router.delete("/instagram")
-async def disconnect_instagram(user: dict = Depends(get_current_user)):
-    """Clear Instagram credentials for the current user."""
-    db = get_db()
-    try:
-        db.table("user_profiles").update({
-            "instagram_access_token": None,
-            "instagram_business_account_id": None,
-        }).eq("id", user["id"]).execute()
-        return {"success": True, "message": "Instagram account disconnected"}
-    except Exception as e:
-        return {"success": False, "error": f"Failed to disconnect: {str(e)}"}
-
-
-@router.post("/instagram/refresh-token")
-async def refresh_instagram_token(user: dict = Depends(get_current_user)):
-    """
-    Refresh Instagram access token to extend validity from 1 hour to 60 days.
-    Uses the Instagram Graph API token exchange endpoint.
-    """
-    db = get_db()
-
-    # Fetch current token
-    try:
-        result = db.table("user_profiles").select("instagram_access_token").eq("id", user["id"]).execute()
-        if not result.data:
-            return {"success": False, "error": "User not found"}
-
-        current_token = result.data[0].get("instagram_access_token")
-        if not current_token:
-            return {"success": False, "error": "No Instagram token to refresh"}
-    except Exception as e:
-        logger.error(f"Failed to fetch current token for user {user['id']}: {e}")
-        return {"success": False, "error": "Failed to fetch current token"}
-
-    # Exchange for long-lived token
-    try:
-        token_data = exchange_for_long_lived_token(current_token)
-        long_lived_token = token_data.get("access_token")
-        expires_in = token_data.get("expires_in")
-
-        # Save new token
-        db.table("user_profiles").update({
-            "instagram_access_token": long_lived_token,
-        }).eq("id", user["id"]).execute()
-
-        logger.info(f"Successfully refreshed Instagram token for user {user['id']}")
-        return {
-            "success": True,
-            "message": "Token refreshed successfully",
-            "expires_in": "60 days",
-        }
-    except ValueError as e:
-        logger.error(f"Token exchange failed for user {user['id']}: {e}")
-        return {"success": False, "error": str(e)}
-    except Exception as e:
-        logger.error(f"Unexpected error refreshing token for user {user['id']}: {e}")
-        return {"success": False, "error": "Failed to refresh token"}
 
 
 # ── eBay OAuth Token Management ───────────────────────────────────────────

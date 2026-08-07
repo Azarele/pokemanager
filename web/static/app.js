@@ -710,7 +710,6 @@ function renderInventoryCard(item) {
     isListed  ? `<span class="badge badge-ebay">eBay</span>`   : '',
     isTradeIn  ? `<span class="badge badge-warning" title="${esc(item.traded_item_names || 'Trade-in')}">🔄 Trade</span>` : '',
     isBundle  ? `<span class="badge badge-info" title="Bundle ${item.bundle_id}">📦 Bundle</span>` : '',
-    item.ig_story_posted ? `<span class="badge badge-accent" title="Posted on Instagram">📸 IG</span>` : '',
     isUW      ? `<span class="badge badge-danger">⚠️</span>`   : '',
     isLE && !isUW ? `<span class="badge badge-warn">⚡</span>` : '',
     isSold    ? `<span class="badge badge-sold">Sold</span>`   : '',
@@ -724,7 +723,6 @@ function renderInventoryCard(item) {
     : `<button onclick="openPriceCheck(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">💰 Check</button>
        <button onclick="refreshSinglePrice(${item.item_id})" class="btn btn-ghost btn-sm refresh-price-btn" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🔄 Refresh</button>
        ${!isTraded ? `<button onclick="openTradeModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🔄 Trade</button>` : ''}
-       <button onclick="postToInstagram(${item.item_id})" id="ig-btn-${item.item_id}" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">${item.ig_story_posted ? '✓ Posted' : '📸 IG'}</button>
        <button onclick="openEditModal(${item.item_id})" class="btn btn-ghost btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">✏️ Edit</button>
        <button onclick="confirmRemove(${item.item_id})" class="btn btn-danger btn-sm" style="flex:1;min-width:60px;max-width:none;padding:8px 4px;font-size:12px;white-space:nowrap">🗑️ Delete</button>
        ${isListed
@@ -1437,170 +1435,6 @@ async function syncExistingListing(itemId) {
   } catch (e) {
     toast('Error: ' + extractError(e.message), 'error');
   }
-}
-
-/* ── Instagram posting ───────────────────────────────────────────────────── */
-function openInstagramUploadModal(itemId) {
-  const item = S.inventory.find(i => i.item_id === itemId);
-  if (!item) return;
-
-  const price = item.sale_price || item.quick_price || item.live_price || 0;
-  const cardName = esc(item.card_name || '');
-  const isMobile = window.innerWidth <= 768;
-  const uploadText = isMobile
-    ? '📱 Tap to select image'
-    : '📁 Click or drag image here';
-
-  showModal(`
-    <h2 style="margin-bottom:6px">📸 Post ${cardName} to Instagram</h2>
-    <div style="display:flex;flex-direction:column;gap:16px;margin-top:16px">
-      <!-- Image upload area -->
-      <div class="form-section">
-        <label class="form-label">Card Image (optional)</label>
-        <div id="ig-upload-area" style="border:2px dashed var(--border);border-radius:8px;padding:${isMobile ? '32px 20px' : '20px'};text-align:center;background:var(--bg-secondary);cursor:pointer;transition:all 0.2s;min-height:${isMobile ? '100px' : '80px'};display:flex;align-items:center;justify-content:center"
-             ondrop="handleInstagramImageDrop(event, ${itemId})" ondragover="event.preventDefault(); event.currentTarget.style.borderColor='var(--accent)'" ondragleave="event.currentTarget.style.borderColor='var(--border)'">
-          <div style="color:var(--text-muted);font-size:${isMobile ? '16px' : '14px'}">
-            <p style="margin:0;font-weight:600">${uploadText}</p>
-            <p style="margin:4px 0 0 0;font-size:12px">JPG or PNG only</p>
-          </div>
-        </div>
-        <input type="file" id="ig-file-input-${itemId}" style="display:none" accept="image/jpeg,image/png" capture="environment" onchange="handleInstagramFileSelect(event, ${itemId})">
-        <div id="ig-preview-${itemId}" style="margin-top:12px;display:none">
-          <img id="ig-preview-img-${itemId}" style="max-width:100%;max-height:300px;border-radius:6px;border:1px solid var(--border)">
-          <p id="ig-preview-name-${itemId}" style="margin:8px 0 0 0;color:var(--text-muted);font-size:12px"></p>
-        </div>
-      </div>
-
-      <!-- Price field -->
-      <div class="form-section">
-        <label class="form-label">Price (£)</label>
-        <input type="number" id="ig-price-${itemId}" class="form-input" value="${price}" step="0.01" min="0" style="${isMobile ? 'font-size:16px;padding:12px;height:44px' : ''}">
-      </div>
-
-      <!-- Buttons -->
-      <div class="modal-actions" style="${isMobile ? 'flex-direction:column;gap:8px' : ''}">
-        <button class="btn btn-accent" onclick="submitInstagramPost(${itemId})" style="${isMobile ? 'width:100%;padding:12px;min-height:44px;font-size:16px' : ''}">Post to Instagram</button>
-        <button class="btn btn-ghost" onclick="closeModal()" style="${isMobile ? 'width:100%;padding:12px;min-height:44px;font-size:16px' : ''}">Cancel</button>
-      </div>
-    </div>
-  `);
-
-  // Set up click handler for upload area
-  const uploadArea = document.getElementById('ig-upload-area');
-  if (uploadArea) {
-    uploadArea.onclick = (e) => {
-      e.preventDefault();
-      document.getElementById(`ig-file-input-${itemId}`).click();
-    };
-  }
-}
-
-function handleInstagramFileSelect(event, itemId) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  if (!['image/jpeg', 'image/png'].includes(file.type)) {
-    toast('Only JPG and PNG images are supported', 'warning');
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const preview = document.getElementById(`ig-preview-${itemId}`);
-    const img = document.getElementById(`ig-preview-img-${itemId}`);
-    const name = document.getElementById(`ig-preview-name-${itemId}`);
-    img.src = e.target.result;
-    name.textContent = `Selected: ${file.name}`;
-    preview.style.display = 'block';
-    window._igUploadedFile = file;
-  };
-  reader.readAsDataURL(file);
-}
-
-function handleInstagramImageDrop(event, itemId) {
-  event.preventDefault();
-  event.stopPropagation();
-  const file = event.dataTransfer.files[0];
-  if (file) {
-    const input = document.getElementById(`ig-file-input-${itemId}`);
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    input.files = dt.files;
-    handleInstagramFileSelect({target: {files: [file]}}, itemId);
-  }
-}
-
-async function submitInstagramPost(itemId) {
-  const item = S.inventory.find(i => i.item_id === itemId);
-  if (!item) return;
-
-  const price = parseFloat(document.getElementById(`ig-price-${itemId}`)?.value) || 0;
-  if (!price || price <= 0) {
-    toast('Price must be greater than 0', 'warning');
-    return;
-  }
-
-  const btn = event?.target;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
-
-  try {
-    const formData = new FormData();
-    formData.append('item_id', itemId);
-    formData.append('price_override', price);
-    if (window._igUploadedFile) {
-      formData.append('image', window._igUploadedFile);
-    }
-
-    const res = await fetch('/api/instagram/post-story', {
-      method: 'POST',
-      body: formData
-    }).then(r => r.json()).catch(e => ({ success: false, error: e.message }));
-
-    if (res.success) {
-      item.ig_story_posted = true;
-      item.ig_payment_link = res.payment_link;
-      item.ig_media_id = res.ig_media_id;
-      toast('✅ Posted to Instagram!', 'success');
-      window._igUploadedFile = null;
-
-      closeModal();
-      // Show payment link modal
-      showModal(`
-        <h2 style="margin-bottom:6px">📸 Posted to Instagram</h2>
-        <p class="text-muted" style="margin-bottom:16px">${esc(item.card_name || '')}</p>
-        <div class="form-section">
-          <label class="form-label">Payment Link</label>
-          <div style="display:flex;gap:8px">
-            <input type="text" id="ig-link-${itemId}" class="form-input"
-                   value="${res.payment_link}" readonly style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis" />
-            <button class="btn btn-accent btn-sm" onclick="copyToClipboard('ig-link-${itemId}')">📋 Copy</button>
-          </div>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Share this link in DMs or post as a comment on your story</p>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-accent" onclick="closeModal()">Done</button>
-        </div>`);
-      refreshInventoryGrid();
-    } else {
-      toast(`❌ ${res.error || 'Failed to post'}`, 'error');
-      if (btn) { btn.disabled = false; btn.textContent = 'Post to Instagram'; }
-    }
-  } catch (e) {
-    toast('Error: ' + extractError(e.message), 'error');
-    if (btn) { btn.disabled = false; btn.textContent = 'Post to Instagram'; }
-  }
-}
-
-async function postToInstagram(itemId) {
-  openInstagramUploadModal(itemId);
-}
-
-function copyToClipboard(elemId) {
-  const elem = document.getElementById(elemId);
-  if (!elem) return;
-  elem.select();
-  document.execCommand('copy');
-  toast('✅ Copied to clipboard', 'success');
 }
 
 /* ── Add item modal ──────────────────────────────────────────────────────── */
@@ -4730,36 +4564,6 @@ async function renderSettings() {
         </div>
       </div>
 
-      <!-- Instagram -->
-      <div class="settings-card">
-        <h3 class="settings-section-title">Instagram
-          <span class="badge ${settings?.has_instagram ? 'badge-ebay' : 'badge-danger'}" style="margin-left:8px">
-            ${settings?.has_instagram ? '✓ Connected' : 'Not set'}
-          </span>
-        </h3>
-        <p class="text-muted" style="font-size:13px;margin-bottom:14px">
-          Connect your Instagram Business Account to auto-post stories with Stripe payment links.
-          <a href="https://developers.facebook.com" target="_blank" style="color:var(--accent)">Get credentials ↗</a>
-        </p>
-        <div class="form-section">
-          <label class="form-label">Access Token</label>
-          <input id="s-ig-access-token" class="form-input" type="password" placeholder="${settings?.has_instagram ? '••••••• (set)' : 'Paste your Instagram access token'}">
-          <p style="color:var(--text-muted);font-size:12px;margin-top:4px">Get this from developers.facebook.com → your app → Use Cases → Generate token</p>
-        </div>
-        <div class="form-section">
-          <label class="form-label">Business Account ID</label>
-          <input id="s-ig-account-id" class="form-input" type="text" placeholder="${settings?.has_instagram ? settings?.instagram_business_account_id_masked || '(set)' : 'Your Instagram Business Account ID'}">
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-accent btn-sm" onclick="saveInstagramSettings()">Connect Instagram</button>
-          ${settings?.has_instagram ? `
-            <button class="btn btn-ghost btn-sm" onclick="refreshInstagramToken()">🔄 Refresh Token</button>
-            <button class="btn btn-ghost btn-sm" onclick="disconnectInstagram()">Disconnect</button>
-          ` : ''}
-        </div>
-        ${settings?.has_instagram ? `<p style="color:var(--text-muted);font-size:11px;margin-top:8px">💡 Refresh your token every 60 days to keep posting active</p>` : ''}
-      </div>
-
     </div>
   `;
 }
@@ -4968,76 +4772,6 @@ async function testDiscordWebhook() {
     }
   } catch (e) {
     toast('Error: ' + extractError(e.message), 'error');
-  }
-}
-
-async function saveInstagramSettings() {
-  const accessToken = document.getElementById('s-ig-access-token')?.value.trim();
-  const accountId = document.getElementById('s-ig-account-id')?.value.trim();
-
-  if (!accessToken || !accountId) {
-    toast('Both access token and business account ID are required', 'warning');
-    return;
-  }
-
-  const btn = event?.target;
-  if (btn) btn.disabled = true;
-
-  try {
-    const resp = await api.post('/settings/instagram', {
-      access_token: accessToken,
-      business_account_id: accountId,
-    });
-    if (resp.success) {
-      toast('✅ Instagram account connected', 'success');
-      renderSettings();
-    } else {
-      toast('Failed: ' + resp.error, 'error');
-    }
-  } catch (e) {
-    toast('Error: ' + extractError(e.message), 'error');
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-async function disconnectInstagram() {
-  const ok = await confirmDialog('Disconnect Instagram', 'Remove Instagram account connection?');
-  if (!ok) return;
-
-  const btn = event?.target;
-  if (btn) btn.disabled = true;
-
-  try {
-    const resp = await api.delete('/settings/instagram');
-    if (resp.success) {
-      toast('✅ Instagram account disconnected', 'success');
-      renderSettings();
-    } else {
-      toast('Failed: ' + resp.error, 'error');
-    }
-  } catch (e) {
-    toast('Error: ' + extractError(e.message), 'error');
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-async function refreshInstagramToken() {
-  const btn = event?.target;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
-
-  try {
-    const resp = await api.post('/settings/instagram/refresh-token', {});
-    if (resp.success) {
-      toast('✅ Instagram token refreshed — valid for 60 days', 'success');
-    } else {
-      toast('Failed: ' + resp.error, 'error');
-    }
-  } catch (e) {
-    toast('Error: ' + extractError(e.message), 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Refresh Token'; }
   }
 }
 

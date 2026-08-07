@@ -17,7 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from web.routes import inventory, listings, analytics, pricing, watchlist, sales, calculator, price_history, auth_routes, settings, billing, legal, admin, scan, ebay_sync, staff, instagram, exports, notifications
+from web.routes import inventory, listings, analytics, pricing, watchlist, sales, calculator, price_history, auth_routes, settings, billing, legal, admin, scan, ebay_sync, staff, exports, notifications
 from web.middleware.auth import AuthMiddleware
 from web.middleware.rate_limit import RateLimitMiddleware
 from web.ws_manager import manager
@@ -119,7 +119,6 @@ app.include_router(billing.router,       prefix="/api/billing")
 app.include_router(admin.router,         prefix="/api/admin")
 app.include_router(scan.router,          prefix="/api/scan")
 app.include_router(ebay_sync.router,     prefix="/api/ebay")
-app.include_router(instagram.router,     prefix="/api/instagram")
 app.include_router(staff.router,         prefix="/api/staff")
 app.include_router(exports.router,       prefix="/api/export")
 app.include_router(notifications.router, prefix="/api/notifications")
