@@ -5809,26 +5809,25 @@ async function renderGuide() {
     <style>
       .guide-wrapper { max-width: 100%; }
       .guide-hero {
-        background: linear-gradient(135deg, rgba(108,99,255,0.15) 0%, rgba(139,92,246,0.08) 100%);
-        border-bottom: 1px solid var(--border);
-        padding: 60px 24px;
+        background: linear-gradient(135deg, rgba(108,99,255,0.08) 0%, rgba(139,92,246,0.04) 100%);
+        border-bottom: 1px solid transparent;
+        border-image: linear-gradient(90deg, rgba(108,99,255,0.3) 0%, rgba(108,99,255,0.05) 100%) 1;
+        padding: 1.5rem 2rem;
         text-align: center;
-        margin-bottom: 40px;
+        margin-bottom: 32px;
         animation: fadeIn 0.6s ease-out;
       }
       .guide-hero h1 {
-        font-size: 3.2rem;
-        font-weight: 800;
-        margin-bottom: 12px;
-        background: linear-gradient(135deg, var(--accent) 0%, #a78bfa 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: var(--text);
       }
       .guide-hero-subtitle {
-        font-size: 1.2rem;
+        font-size: 0.85rem;
         color: var(--text-muted);
-        margin-bottom: 24px;
+        margin-bottom: 0;
+        opacity: 0.8;
       }
       .guide-search {
         max-width: 400px;
@@ -6066,8 +6065,8 @@ async function renderGuide() {
       @media (max-width: 768px) {
         .guide-container { grid-template-columns: 1fr; gap: 20px; }
         .guide-sidebar { position: static; }
-        .guide-hero h1 { font-size: 2rem; }
-        .guide-hero-subtitle { font-size: 1rem; }
+        .guide-hero h1 { font-size: 1.5rem; }
+        .guide-hero-subtitle { font-size: 0.8rem; }
         .guide-nav-list { flex-direction: row; gap: 6px; overflow-x: auto; padding-bottom: 8px; }
         .guide-nav-btn { white-space: nowrap; flex-shrink: 0; }
       }
@@ -6076,7 +6075,7 @@ async function renderGuide() {
     <div class="guide-wrapper">
       <!-- Hero Section -->
       <div class="guide-hero">
-        <h1>📖 PokeManager Guide</h1>
+        <h1>PokeManager Guide</h1>
         <p class="guide-hero-subtitle">Master the art of Pokémon card trading & reselling</p>
         <div class="guide-search">
           <input type="text" id="guide-search" placeholder="Search guide..." style="display:none">
