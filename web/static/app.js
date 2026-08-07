@@ -614,7 +614,8 @@ const FILTERS = [
   { key: 'sold',       label: 'Sold' },
   { key: 'traded',     label: '🔄 Traded' },
   { key: 'ebay',       label: 'eBay Listed' },
-  { key: 'not_listed', label: 'Not Listed' },
+  { key: 'not_listed', label: '📋 Not Listed' },
+  { key: 'no_pc_url',  label: '⚠️ No PC URL' },
   { key: 'underwater', label: '⚠️ Underwater' },
   { key: 'low_eff',    label: '⚡ Low Eff.' },
 ];
@@ -627,6 +628,7 @@ function applyFiltersAndSort() {
     case 'traded':     items = items.filter(i => i.status === 'Traded'); break;
     case 'ebay':       items = items.filter(i => i.ebay_listed === 'Yes'); break;
     case 'not_listed': items = items.filter(i => i.status === 'Inventory' && i.ebay_listed !== 'Yes'); break;
+    case 'no_pc_url':  items = items.filter(i => !i.pc_url || i.pc_url.trim() === ''); break;
     case 'underwater': items = items.filter(i => i.status === 'Inventory' && (i.live_price || 0) < (i.purchase_price || 0)); break;
     case 'low_eff':    items = items.filter(i => i.status === 'Inventory' && i.purchase_price > 0
                                && ((i.potential_profit ?? 0) / i.purchase_price) < 0.1); break;
@@ -660,6 +662,7 @@ function countFor(k) {
     case 'traded':     return inv.filter(i => i.status === 'Traded').length;
     case 'ebay':       return inv.filter(i => i.ebay_listed === 'Yes').length;
     case 'not_listed': return inv.filter(i => i.status === 'Inventory' && i.ebay_listed !== 'Yes').length;
+    case 'no_pc_url':  return inv.filter(i => !i.pc_url || i.pc_url.trim() === '').length;
     case 'underwater': return inv.filter(i => i.status === 'Inventory' && (i.live_price || 0) < (i.purchase_price || 0)).length;
     case 'low_eff':    return inv.filter(i => i.status === 'Inventory' && i.purchase_price > 0
                               && ((i.potential_profit ?? 0) / i.purchase_price) < 0.1).length;
@@ -974,6 +977,15 @@ async function renderInventory() {
     btn.addEventListener('click', () => { S.filter = btn.dataset.filter; refreshInventoryGrid(); });
   });
 
+  // Apply filter from URL parameter if present
+  const urlParams = new URLSearchParams(window.location.search);
+  const filterParam = urlParams.get('filter');
+  if (filterParam && FILTERS.some(f => f.key === filterParam)) {
+    S.filter = filterParam;
+    // Clean URL to not persist the parameter
+    window.history.replaceState({}, '', '/');
+  }
+
   try {
     const data = await api.get('/inventory');
     S.inventory = data.items;
@@ -1069,15 +1081,14 @@ async function checkDataHealth() {
   banner.id = 'data-health-banner';
   banner.className = 'data-health-banner';
 
-  let message = `⚠️ ${health.total} item(s) are missing PriceCharting URLs`;
+  let message = `⚠️ ${health.total} item(s) missing PriceCharting URLs`;
   if (health.missing_urls) {
-    message = `⚠️ ${health.missing_urls} item(s) are missing PriceCharting URLs`;
+    message = `⚠️ ${health.missing_urls} item(s) missing PriceCharting URLs`;
   }
 
   banner.innerHTML = `
-    ${message} —
-    <a href="#" onclick="navigate('/analytics');return false">view & fix on Analytics</a>
-    <button onclick="sessionStorage.setItem('health_banner_dismissed','1');this.closest('.data-health-banner').remove()">✕</button>`;
+    <a href="#" onclick="navigate('/?filter=no-pc-url');return false" style="cursor:pointer;flex:1">${message} — click to view</a>
+    <button onclick="sessionStorage.setItem('health_banner_dismissed','1');this.closest('.data-health-banner').remove()" style="flex-shrink:0">✕</button>`;
   document.querySelector('#app .page-header')?.after(banner);
 }
 
