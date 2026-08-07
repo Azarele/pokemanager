@@ -1074,17 +1074,18 @@ async function dismissOnboarding() {
 async function checkDataHealth() {
   if (sessionStorage.getItem('health_banner_dismissed')) return;
   const health = await api.get('/analytics/data-health').catch(() => null);
-  if (!health || health.total === 0) return;
+  if (!health) return;
+
+  // Only show banner if there are items with missing PC URLs
+  const noPcUrlCount = (health.no_pc_url || []).length;
+  if (noPcUrlCount === 0) return;
 
   document.getElementById('data-health-banner')?.remove();
   const banner = document.createElement('div');
   banner.id = 'data-health-banner';
   banner.className = 'data-health-banner';
 
-  let message = `⚠️ ${health.total} item(s) missing PriceCharting URLs`;
-  if (health.missing_urls) {
-    message = `⚠️ ${health.missing_urls} item(s) missing PriceCharting URLs`;
-  }
+  const message = `⚠️ ${noPcUrlCount} item(s) missing PriceCharting URLs`;
 
   banner.innerHTML = `
     <a href="#" onclick="navigate('/?filter=no-pc-url');return false" style="cursor:pointer;flex:1">${message} — click to view</a>
