@@ -6447,8 +6447,50 @@ document.querySelectorAll('.nav-link').forEach(a => {
 });
 window.addEventListener('popstate', routeCurrentPath);
 
+/* ── OAuth Hash Token Handler ────────────────────────────────────────────── */
+async function processOAuthHashToken() {
+  const hash = window.location.hash.substring(1);
+  if (!hash) return;
+
+  const params = new URLSearchParams(hash);
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+  const error = params.get('error_description') || params.get('error');
+
+  if (error) {
+    console.warn('OAuth error:', error);
+    window.location.href = '/login?error=' + encodeURIComponent(error);
+    return true;
+  }
+
+  if (accessToken) {
+    try {
+      const resp = await fetch('/api/auth/google-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: accessToken, refresh_token: refreshToken }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        window.location.href = '/';
+      } else {
+        window.location.href = '/login?error=' + encodeURIComponent(data.error || 'auth_failed');
+      }
+    } catch (e) {
+      console.error('OAuth session exchange error:', e);
+      window.location.href = '/login?error=network_error';
+    }
+    return true;
+  }
+
+  return false;
+}
+
 /* ── Boot ────────────────────────────────────────────────────────────────── */
 (async () => {
+  // Process OAuth hash token if present (fallback handler)
+  if (await processOAuthHashToken()) return;
+
   requestNotificationPermission();
   startGlobalEventStream();
   updateStatus();
