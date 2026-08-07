@@ -5803,337 +5803,669 @@ function handleCameraCapture(file) {
 /* ── Guide Page ──────────────────────────────────────────────────────────── */
 async function renderGuide() {
   const app = document.getElementById('app');
-  app.innerHTML = `
-    <div class="page-header">
-      <h1 class="page-title">📖 Guide</h1>
-      <p class="text-muted">Learn how to use PokeManager to track and sell your Pokémon TCG collection</p>
-    </div>
 
-    <div style="display:grid;grid-template-columns:250px 1fr;gap:24px;margin-bottom:40px">
-      <!-- Sidebar navigation -->
-      <div style="position:sticky;top:100px;height:fit-content">
-        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px">
-          <button class="guide-nav-btn active" onclick="scrollToGuideSection('getting-started')" style="text-align:left;padding:8px 12px;border:none;background:var(--border);border-radius:4px;cursor:pointer;color:var(--text)">🚀 Getting Started</button>
-          <button class="guide-nav-btn" onclick="scrollToGuideSection('ebay-setup')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">🏷️ eBay Setup</button>
-          <button class="guide-nav-btn" onclick="scrollToGuideSection('listing')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">📤 Listing on eBay</button>
-          <button class="guide-nav-btn" onclick="scrollToGuideSection('sales')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">💰 Sales & Profit</button>
-          <button class="guide-nav-btn" onclick="scrollToGuideSection('analytics')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">📊 Analytics</button>
-          <button class="guide-nav-btn" onclick="scrollToGuideSection('discord')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">🔔 Discord</button>
-          <button class="guide-nav-btn" onclick="scrollToGuideSection('plans')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">💎 Plans</button>
-          <button class="guide-nav-btn" onclick="scrollToGuideSection('faq')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">❓ FAQ</button>
-          <button class="guide-nav-btn" onclick="scrollToGuideSection('troubleshooting')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">🔧 Troubleshooting</button>
+  // Create guide content with beautiful design
+  const guideHTML = `
+    <style>
+      .guide-wrapper { max-width: 100%; }
+      .guide-hero {
+        background: linear-gradient(135deg, rgba(108,99,255,0.15) 0%, rgba(139,92,246,0.08) 100%);
+        border-bottom: 1px solid var(--border);
+        padding: 60px 24px;
+        text-align: center;
+        margin-bottom: 40px;
+        animation: fadeIn 0.6s ease-out;
+      }
+      .guide-hero h1 {
+        font-size: 3.2rem;
+        font-weight: 800;
+        margin-bottom: 12px;
+        background: linear-gradient(135deg, var(--accent) 0%, #a78bfa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .guide-hero-subtitle {
+        font-size: 1.2rem;
+        color: var(--text-muted);
+        margin-bottom: 24px;
+      }
+      .guide-search {
+        max-width: 400px;
+        margin: 0 auto;
+        display: flex;
+        gap: 8px;
+      }
+      .guide-search input {
+        flex: 1;
+        padding: 12px 16px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 14px;
+      }
+      .guide-search input::placeholder { color: var(--text-muted); }
+      .guide-search input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(108,99,255,0.1);
+      }
+
+      .guide-container {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 32px;
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 0 24px 60px;
+      }
+
+      .guide-sidebar {
+        position: sticky;
+        top: 80px;
+        height: fit-content;
+      }
+
+      .guide-nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .guide-nav-item {
+        position: relative;
+      }
+
+      .guide-nav-btn {
+        width: 100%;
+        padding: 12px 16px;
+        background: transparent;
+        border: none;
+        border-left: 3px solid transparent;
+        border-radius: 6px;
+        color: var(--text-muted);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: left;
+      }
+
+      .guide-nav-btn:hover {
+        background: rgba(108,99,255,0.08);
+        color: var(--text);
+      }
+
+      .guide-nav-btn.active {
+        background: rgba(108,99,255,0.12);
+        border-left-color: var(--accent);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .guide-content {
+        display: flex;
+        flex-direction: column;
+        gap: 48px;
+      }
+
+      .guide-section {
+        animation: fadeInUp 0.4s ease-out;
+        scroll-margin-top: 100px;
+      }
+
+      .guide-section h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .guide-section h3 {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-top: 28px;
+        margin-bottom: 12px;
+      }
+
+      .guide-card {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        transition: all 0.3s ease;
+      }
+
+      .guide-card:hover {
+        border-color: var(--accent);
+        box-shadow: 0 4px 16px rgba(108,99,255,0.1);
+      }
+
+      .guide-step-card {
+        background: linear-gradient(135deg, rgba(108,99,255,0.05) 0%, transparent 100%);
+        border: 1px solid rgba(108,99,255,0.2);
+        border-left: 3px solid var(--accent);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+
+      .guide-step-number {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        background: var(--accent);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 14px;
+      }
+
+      .guide-step-content { flex: 1; }
+      .guide-step-content strong { color: var(--text); }
+
+      .guide-callout {
+        background: rgba(76,175,125,0.08);
+        border-left: 3px solid var(--success);
+        padding: 16px;
+        border-radius: 6px;
+        margin: 16px 0;
+        font-size: 14px;
+      }
+
+      .guide-callout.warning {
+        background: rgba(255,193,7,0.08);
+        border-left-color: #ffc107;
+      }
+
+      .guide-callout.pro {
+        background: rgba(108,99,255,0.08);
+        border-left-color: var(--accent);
+      }
+
+      .guide-accordion {
+        margin-bottom: 12px;
+      }
+
+      .guide-accordion-btn {
+        width: 100%;
+        padding: 16px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 15px;
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .guide-accordion-btn:hover {
+        background: var(--surface3);
+        border-color: var(--accent);
+      }
+
+      .guide-accordion-btn.open {
+        background: rgba(108,99,255,0.1);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .guide-accordion-icon {
+        transition: transform 0.2s ease;
+        font-size: 18px;
+      }
+
+      .guide-accordion-btn.open .guide-accordion-icon {
+        transform: rotate(180deg);
+      }
+
+      .guide-accordion-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+        padding: 0 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+      }
+
+      .guide-accordion-btn.open + .guide-accordion-content {
+        max-height: 500px;
+        padding: 16px;
+      }
+
+      .guide-feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        margin: 20px 0;
+      }
+
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+      @media (max-width: 768px) {
+        .guide-container { grid-template-columns: 1fr; gap: 20px; }
+        .guide-sidebar { position: static; }
+        .guide-hero h1 { font-size: 2rem; }
+        .guide-hero-subtitle { font-size: 1rem; }
+        .guide-nav-list { flex-direction: row; gap: 6px; overflow-x: auto; padding-bottom: 8px; }
+        .guide-nav-btn { white-space: nowrap; flex-shrink: 0; }
+      }
+    </style>
+
+    <div class="guide-wrapper">
+      <!-- Hero Section -->
+      <div class="guide-hero">
+        <h1>📖 PokeManager Guide</h1>
+        <p class="guide-hero-subtitle">Master the art of Pokémon card trading & reselling</p>
+        <div class="guide-search">
+          <input type="text" id="guide-search" placeholder="Search guide..." style="display:none">
         </div>
       </div>
 
-      <!-- Main content -->
-      <div class="guide-content">
-        <!-- Getting Started -->
-        <div class="guide-section" data-section="getting-started">
-          <h2>🚀 Getting Started</h2>
-
-          <h3>Adding Inventory Items</h3>
-          <p>Click <strong>+ Add Item</strong> in the Inventory tab to add cards you own:</p>
-          <ul style="margin:12px 0 16px 20px">
-            <li><strong>Card Name</strong> — e.g., "Charizard Holo Base Set"</li>
-            <li><strong>PriceCharting URL</strong> — Copy the URL from <a href="https://www.pricecharting.com" target="_blank" style="color:var(--accent)">pricecharting.com</a>. We'll auto-fetch the current market price</li>
-            <li><strong>Purchase Price</strong> — How much you paid for the card</li>
-            <li><strong>Market Price</strong> — Optional; we fetch this automatically from PriceCharting</li>
-            <li><strong>Condition</strong> — Ungraded (Near Mint, Lightly Played, etc.) or graded (PSA 10, BGS 9.5, etc.)</li>
-            <li><strong>Region</strong> — English, Japanese, or Korean</li>
+      <div class="guide-container">
+        <!-- Sidebar Navigation -->
+        <nav class="guide-sidebar">
+          <ul class="guide-nav-list">
+            <li class="guide-nav-item"><button class="guide-nav-btn active" onclick="scrollToGuideSection('getting-started')">🚀 Getting Started</button></li>
+            <li class="guide-nav-item"><button class="guide-nav-btn" onclick="scrollToGuideSection('inventory')">📦 Inventory</button></li>
+            <li class="guide-nav-item"><button class="guide-nav-btn" onclick="scrollToGuideSection('ebay-listing')">🏪 eBay Listing</button></li>
+            <li class="guide-nav-item"><button class="guide-nav-btn" onclick="scrollToGuideSection('sales')">💰 Sales & Sync</button></li>
+            <li class="guide-nav-item"><button class="guide-nav-btn" onclick="scrollToGuideSection('tradeins')">🔄 Trade-ins</button></li>
+            <li class="guide-nav-item"><button class="guide-nav-btn" onclick="scrollToGuideSection('analytics')">📊 Analytics</button></li>
+            <li class="guide-nav-item"><button class="guide-nav-btn" onclick="scrollToGuideSection('settings')">⚙️ Settings</button></li>
+            <li class="guide-nav-item"><button class="guide-nav-btn" onclick="scrollToGuideSection('plans')">💳 Plans</button></li>
+            <li class="guide-nav-item"><button class="guide-nav-btn" onclick="scrollToGuideSection('faq')">❓ FAQ</button></li>
+            <li class="guide-nav-item"><button class="guide-nav-btn" onclick="scrollToGuideSection('troubleshooting')">🔧 Troubleshooting</button></li>
           </ul>
+        </nav>
 
-          <h3>Scan & Add (Mobile)</h3>
-          <p>On mobile, tap the <strong>📷 camera icon</strong> at the bottom right to scan a card with your phone's camera. We'll identify the card and pre-fill the form for you.</p>
+        <!-- Main Content -->
+        <div class="guide-content">
+          <!-- Getting Started -->
+          <section class="guide-section" data-section="getting-started">
+            <h2>🚀 Getting Started</h2>
 
-          <h3>Understanding Prices</h3>
-          <p><strong>Market Price (Live Price)</strong> — The current average price on PriceCharting. We refresh this daily for all your items.</p>
-          <p><strong>Quick Sell Price</strong> — 85% of market price. This is our recommended price if you want to sell quickly. Lower prices = faster sales.</p>
-          <p><strong>Potential Profit</strong> — Quick Sell Price − eBay Fee Rate − Purchase Price. Your expected profit per card.</p>
-        </div>
+            <h3>Create Your Account</h3>
+            <div class="guide-step-card"><div class="guide-step-number">1</div><div class="guide-step-content"><strong>Sign up</strong> with email and password or Google (2 mins)</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">2</div><div class="guide-step-content">You'll land in <strong>Inventory</strong> with 50 card slots (free tier)</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">3</div><div class="guide-step-content">To list on eBay and sync sales, <strong>upgrade to Gym Leader</strong> (£7.99/mo, 7 days free)</div></div>
 
-        <!-- eBay Setup -->
-        <div class="guide-section" data-section="ebay-setup">
-          <h2>🏷️ eBay Setup</h2>
-          <p>To list cards and auto-detect sales, you need to connect your eBay account. This requires a one-time setup:</p>
+            <h3>Add Your First Card</h3>
+            <div class="guide-card">
+              <strong>📦 Method 1: Manual Add</strong>
+              <p>Click <strong>+ Add Item</strong> in Inventory:</p>
+              <ul style="margin: 10px 0; padding-left: 20px;">
+                <li><strong>Card Name:</strong> e.g., "Charizard Holo Base Set"</li>
+                <li><strong>PriceCharting URL:</strong> Paste from pricecharting.com (we'll auto-fetch market price)</li>
+                <li><strong>Purchase Price:</strong> How much you paid</li>
+                <li><strong>Condition:</strong> Near Mint, Lightly Played, PSA 9, etc.</li>
+                <li><strong>Region:</strong> English, Japanese, or Korean</li>
+              </ul>
+            </div>
 
-          <h3>Step 1: Get Developer Keys</h3>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Go to <a href="https://developer.ebay.com" target="_blank" style="color:var(--accent)">developer.ebay.com</a></li>
-            <li>Sign in with your eBay account</li>
-            <li>Go to <strong>Keys & Tokens</strong></li>
-            <li>Copy your <strong>App ID</strong> and <strong>Cert ID</strong></li>
-          </ol>
+            <div class="guide-card">
+              <strong>📷 Method 2: Scan & Add (Mobile, Gym Leader+)</strong>
+              <p>Tap the camera icon at the bottom right. We'll identify the card with AI and pre-fill the form.</p>
+            </div>
 
-          <h3>Step 2: Generate Refresh Token</h3>
-          <p>Run this command from your computer (where PokeManager is installed):</p>
-          <pre style="background:var(--bg-secondary);padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">python web/generate_ebay_token.py</pre>
-          <p>Follow the instructions and copy the <strong>Refresh Token</strong></p>
+            <div class="guide-callout pro">
+              💡 <strong>Pro Tip:</strong> Market prices update daily automatically. You don't need to manually refresh them.
+            </div>
+          </section>
 
-          <h3>Step 3: Add Keys to PokeManager</h3>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Go to <strong>Settings → eBay API</strong></li>
-            <li>Paste your App ID, Cert ID, and Refresh Token</li>
-            <li>Click <strong>Save eBay Keys</strong></li>
-          </ol>
+          <!-- Inventory Management -->
+          <section class="guide-section" data-section="inventory">
+            <h2>📦 Managing Inventory</h2>
 
-          <h3>Step 4: Create Business Policies</h3>
-          <p>Go to <a href="https://www.ebay.co.uk/sh/selling/policies" target="_blank" style="color:var(--accent)">eBay Business Policies</a> and create 3 policies:</p>
-          <ul style="margin:12px 0 16px 20px">
-            <li><strong>Postage Policy</strong> — Use "Simple Delivery", buyer pays shipping</li>
-            <li><strong>Payment Policy</strong> — Managed Payments (standard)</li>
-            <li><strong>Return Policy</strong> — 30 days with full refund</li>
-          </ul>
+            <h3>Inventory Actions</h3>
+            <div class="guide-step-card"><div class="guide-step-number">1</div><div class="guide-step-content">Click <strong>💰 Check</strong> to see live price and profit potential</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">2</div><div class="guide-step-content">Click <strong>🔄 Refresh</strong> to manually update price (usually daily)</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">3</div><div class="guide-step-content">Click <strong>🔄 Trade</strong> to mark as traded for X value</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">4</div><div class="guide-step-content">Click <strong>✏️ Edit</strong> to update card details</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">5</div><div class="guide-step-content">Click <strong>💰 Sell</strong> to mark as sold with profit</div></div>
 
-          <h3>Step 5: Fetch & Save Policies</h3>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Go to <strong>Settings → eBay Business Policies</strong></li>
-            <li>Click <strong>🔄 Fetch Policies</strong></li>
-            <li>Click on each policy to auto-fill the IDs</li>
-            <li>Click <strong>Save Policies</strong></li>
-          </ol>
-        </div>
+            <h3>Filters & Sorting</h3>
+            <p>Use filters to find exactly what you need:</p>
+            <div class="guide-feature-grid">
+              <div style="padding:12px;background:var(--surface2);border-radius:6px;"><strong>In Stock</strong><br><small>Unsold inventory</small></div>
+              <div style="padding:12px;background:var(--surface2);border-radius:6px;"><strong>Sold</strong><br><small>Completed sales</small></div>
+              <div style="padding:12px;background:var(--surface2);border-radius:6px;"><strong>🔄 Traded</strong><br><small>Trade-in items</small></div>
+              <div style="padding:12px;background:var(--surface2);border-radius:6px;"><strong>eBay Listed</strong><br><small>Currently on eBay</small></div>
+              <div style="padding:12px;background:var(--surface2);border-radius:6px;"><strong>📋 Not Listed</strong><br><small>Ready to list</small></div>
+              <div style="padding:12px;background:var(--surface2);border-radius:6px;"><strong>⚠️ No PC URL</strong><br><small>Missing pricing data</small></div>
+            </div>
+          </section>
 
-        <!-- Listing on eBay -->
-        <div class="guide-section" data-section="listing">
-          <h2>📤 Listing on eBay</h2>
+          <!-- eBay Listing -->
+          <section class="guide-section" data-section="ebay-listing">
+            <h2>🏪 eBay Listing</h2>
 
-          <h3>List a Single Card</h3>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Go to <strong>Inventory</strong></li>
-            <li>Find your card and click <strong>List</strong></li>
-            <li>Choose your pricing strategy:</li>
-          </ol>
-          <ul style="margin:12px 0 16px 20px">
-            <li><strong>Quick Sell</strong> — 85% of market price, sells faster</li>
-            <li><strong>Market</strong> — 115% of market price (good for mid-range cards)</li>
-            <li><strong>Custom</strong> — Set your own price</li>
-          </ul>
-          <ol start="4" style="margin:12px 0 16px 20px">
-            <li>Add photos and description</li>
-            <li>Optional: Enable <strong>Promoted Listing</strong> (% commission to eBay for visibility)</li>
-            <li>Click <strong>List on eBay</strong></li>
-          </ol>
+            <h3>Setup (One-Time)</h3>
+            <div class="guide-step-card"><div class="guide-step-number">1</div><div class="guide-step-content">Go to <strong>developer.ebay.com</strong>, get <strong>App ID</strong> and <strong>Cert ID</strong></div></div>
+            <div class="guide-step-card"><div class="guide-step-number">2</div><div class="guide-step-content">Run <code>python web/generate_ebay_token.py</code>, copy the <strong>Refresh Token</strong></div></div>
+            <div class="guide-step-card"><div class="guide-step-number">3</div><div class="guide-step-content">In <strong>Settings → eBay API</strong>, paste all 3 keys</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">4</div><div class="guide-step-content">Create 3 business policies on eBay (Postage, Payment, Returns)</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">5</div><div class="guide-step-content">In <strong>Settings → eBay Business Policies</strong>, click <strong>Fetch Policies</strong> and save</div></div>
 
-          <h3>Auto-Reprice Existing Listings</h3>
-          <p>To automatically adjust prices when market price changes, enable <strong>Settings → Pricing → Auto-sync prices to eBay listings</strong></p>
-          <p>Or manually reprice all listings: <strong>Listings → Reprice All</strong></p>
-        </div>
+            <h3>List a Card</h3>
+            <div class="guide-card">
+              1. Go to <strong>Inventory</strong>, find your card
+              <br>2. Click <strong>📋 List</strong>
+              <br>3. Choose pricing: <strong>Quick Sell</strong> (85% market, faster), <strong>Market</strong> (115% market), or <strong>Custom</strong>
+              <br>4. Add photos and description (AI-generated available)
+              <br>5. Optional: Enable Promoted Listing for boost
+              <br>6. Click <strong>List on eBay</strong>
+            </div>
 
-        <!-- Sales & Profit -->
-        <div class="guide-section" data-section="sales">
-          <h2>💰 Sales & Profit Tracking</h2>
+            <div class="guide-callout warning">
+              ⚡ <strong>Common Issue:</strong> Listing fails? Check that business policies are fetched in Settings.
+            </div>
+          </section>
 
-          <h3>How Sales Are Detected</h3>
-          <p>We check your eBay account every 30 minutes for new completed sales and automatically add them to your Sales log. You can also manually sync anytime:</p>
-          <p><strong>Settings → Sync Sales Now</strong></p>
+          <!-- Sales & Sync -->
+          <section class="guide-section" data-section="sales">
+            <h2>💰 Sales & Sync</h2>
 
-          <h3>How Profit Is Calculated</h3>
-          <pre style="background:var(--bg-secondary);padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">Profit = Sell Price − eBay Fee Rate − Purchase Price</pre>
+            <h3>How It Works</h3>
+            <p>PokeManager checks your eBay account every <strong>30 minutes</strong> for completed sales. When found, it automatically adds them to your <strong>Sales</strong> page with profit calculated.</p>
 
-          <h3>Accurate Fee Tracking</h3>
-          <p>eBay fees depend on your sales history and marketplace. For the most accurate profit calculation:</p>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Download your monthly eBay statement from <strong>eBay → Account → Reports</strong></li>
-            <li>Go to <strong>Settings → Pricing</strong> and adjust the <strong>eBay Fee Rate (%)</strong> to match your actual fees</li>
-          </ol>
-        </div>
+            <div class="guide-step-card"><div class="guide-step-number">1</div><div class="guide-step-content"><strong>Auto-sync:</strong> Runs every 30 minutes in the background</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">2</div><div class="guide-step-content"><strong>Manual sync:</strong> Settings → <strong>Sync Sales Now</strong> for immediate update</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">3</div><div class="guide-step-content"><strong>Profit shows:</strong> Sell Price − eBay Fee Rate − Purchase Price</div></div>
 
-        <!-- Analytics -->
-        <div class="guide-section" data-section="analytics">
-          <h2>📊 Analytics</h2>
+            <h3>Accurate Fee Tracking</h3>
+            <p>eBay fees vary by account history, category, and region. For accuracy:</p>
+            <div class="guide-card">
+              1. Download your <strong>eBay monthly statement</strong> (eBay → Account → Reports)
+              <br>2. Check your actual fee %
+              <br>3. Go to <strong>Settings → Pricing</strong> and update <strong>eBay Fee Rate</strong>
+            </div>
+          </section>
 
-          <h3>KPI Cards</h3>
-          <p>The top of Analytics shows your key metrics:</p>
-          <ul style="margin:12px 0 16px 20px">
-            <li><strong>Total Value</strong> — Sum of purchase prices for all unsold inventory</li>
-            <li><strong>Market Value</strong> — Current market price of your collection</li>
-            <li><strong>Potential Profit</strong> — Total profit if you sold all cards at Quick Sell price</li>
-            <li><strong>Total Sold</strong> — Total profit from completed sales</li>
-          </ul>
+          <!-- Trade-Ins -->
+          <section class="guide-section" data-section="tradeins">
+            <h2>🔄 Trade-Ins</h2>
 
-          <h3>Price Predictions</h3>
-          <p>Based on 30-day price history, we predict which cards are trending up or down. High ROI cards are great candidates to list.</p>
+            <h3>Record a Trade</h3>
+            <div class="guide-step-card"><div class="guide-step-number">1</div><div class="guide-step-content">Find the card in <strong>Inventory</strong></div></div>
+            <div class="guide-step-card"><div class="guide-step-number">2</div><div class="guide-step-content">Click <strong>🔄 Trade</strong></div></div>
+            <div class="guide-step-card"><div class="guide-step-number">3</div><div class="guide-step-content">Enter the <strong>trade value</strong> (what you received it for)</div></div>
+            <div class="guide-step-card"><div class="guide-step-number">4</div><div class="guide-step-number">5</div><div class="guide-step-content">Card moves to <strong>Traded</strong> filter, profit is calculated</div></div>
 
-          <h3>Restock Suggestions</h3>
-          <p>We show cards that sell well and have low prices, so you can restock and resell them at profit.</p>
+            <div class="guide-callout">
+              📊 Trade profit = Trade Value − Purchase Price. Tracked separately from sales for analysis.
+            </div>
+          </section>
 
-          <h3>Exports</h3>
-          <p>Available on Gym Leader and Champion plans:</p>
-          <ul style="margin:12px 0 16px 20px">
-            <li><strong>HMRC</strong> — For UK tax reporting</li>
-            <li><strong>Xero</strong> — Cloud accounting software</li>
-            <li><strong>QuickBooks</strong> — Desktop/online accounting</li>
-          </ul>
-        </div>
+          <!-- Analytics -->
+          <section class="guide-section" data-section="analytics">
+            <h2>📊 Analytics</h2>
 
-        <!-- Discord -->
-        <div class="guide-section" data-section="discord">
-          <h2>🔔 Discord Notifications</h2>
-          <p>Get instant alerts for sales, offers, and price changes in Discord.</p>
+            <h3>Key Metrics</h3>
+            <div class="guide-feature-grid">
+              <div style="padding:16px;background:var(--surface2);border-radius:8px;">
+                <strong>Total Value</strong>
+                <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">Sum of all unsold inventory purchase prices</p>
+              </div>
+              <div style="padding:16px;background:var(--surface2);border-radius:8px;">
+                <strong>Market Value</strong>
+                <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">Current PriceCharting prices of all cards</p>
+              </div>
+              <div style="padding:16px;background:var(--surface2);border-radius:8px;">
+                <strong>Potential Profit</strong>
+                <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">If sold at Quick Sell price</p>
+              </div>
+              <div style="padding:16px;background:var(--surface2);border-radius:8px;">
+                <strong>Total Sold</strong>
+                <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">Profit from completed sales</p>
+              </div>
+            </div>
 
-          <h3>Setting Up Discord Webhook</h3>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Open your Discord server</li>
-            <li>Go to <strong>Server Settings → Integrations → Webhooks</strong></li>
-            <li>Click <strong>New Webhook</strong></li>
-            <li>Name it "PokeManager"</li>
-            <li>Click <strong>Copy Webhook URL</strong></li>
-            <li>Go to <strong>Settings → Integrations</strong> in PokeManager</li>
-            <li>Paste the URL in <strong>Discord Webhook URL</strong></li>
-            <li>Click <strong>Save</strong> and then <strong>Test</strong></li>
-          </ol>
+            <h3>Predictions & Insights</h3>
+            <ul style="margin:12px 0;padding-left:20px;">
+              <li><strong>Trending Cards:</strong> Cards with rising prices (great to list)</li>
+              <li><strong>ROI Analysis:</strong> Profit % on each sale</li>
+              <li><strong>Restock Suggestions:</strong> Cards that sell fast at good margin</li>
+              <li><strong>CSV Export:</strong> (Gym Leader+) HMRC, Xero, QuickBooks formats</li>
+            </ul>
+          </section>
 
-          <h3>What You'll Get</h3>
-          <ul style="margin:12px 0 16px 20px">
-            <li><strong>Sale alerts</strong> — Price, profit, card name</li>
-            <li><strong>Best offer notifications</strong> — With ROI analysis</li>
-            <li><strong>Price spikes</strong> — Cards trending up</li>
-            <li><strong>Watklist hits</strong> — Cards you're monitoring dropped in price</li>
-          </ul>
-        </div>
+          <!-- Settings -->
+          <section class="guide-section" data-section="settings">
+            <h2>⚙️ Settings</h2>
 
-        <!-- Plans -->
-        <div class="guide-section" data-section="plans">
-          <h2>💎 Pricing Tiers</h2>
+            <h3>Pricing Defaults</h3>
+            <div class="guide-card">
+              <strong>eBay Fee Rate (%):</strong> Default 12.35%, adjust to your actual rate from eBay statement
+              <br><strong>Postage Cost:</strong> Default £1.50 (used in profit calc)
+              <br><strong>Auto-sync Prices:</strong> Toggle to auto-reprice active listings when market price changes
+            </div>
 
-          <h3>🎒 Trainer (Free)</h3>
-          <ul style="margin:12px 0 16px 20px">
-            <li>Up to 50 cards in inventory</li>
-            <li>Price tracking & market analysis</li>
-            <li>Buying calculator</li>
-            <li>Analytics dashboard</li>
-          </ul>
+            <h3>API Setup</h3>
+            <div class="guide-card">
+              <strong>eBay API:</strong> App ID, Cert ID, Refresh Token (get from developer.ebay.com)
+              <br><strong>eBay Business Policies:</strong> Fetch from your eBay account (Postage, Payment, Returns)
+              <br><strong>Gemini API Key:</strong> (Gym Leader+) For AI card descriptions and scanning
+            </div>
 
-          <h3>🏅 Gym Leader (£7.99/month)</h3>
-          <ul style="margin:12px 0 16px 20px">
-            <li>Everything in Trainer</li>
-            <li>Unlimited inventory</li>
-            <li>eBay listing & auto-sync</li>
-            <li>AI descriptions (bring your own Gemini API key)</li>
-            <li>Scan & Add (your Gemini key)</li>
-            <li>Price history & sparklines</li>
-            <li>HMRC / Xero / QuickBooks export</li>
-          </ul>
+            <h3>Integrations</h3>
+            <ul style="margin:12px 0;padding-left:20px;">
+              <li><strong>Discord Webhook:</strong> Get notified on sales, offers, price spikes</li>
+              <li><strong>CSV Import:</strong> Import from Excel spreadsheet</li>
+            </ul>
+          </section>
 
-          <h3>🏆 Champion (£14.99/month)</h3>
-          <ul style="margin:12px 0 16px 20px">
-            <li>Everything in Gym Leader</li>
-            <li>AI descriptions — we provide the API key (no setup)</li>
-            <li>Scan & Add — no API key needed</li>
-            <li>Priority support</li>
-            <li>Early access to new features</li>
-          </ul>
-        </div>
+          <!-- Plans -->
+          <section class="guide-section" data-section="plans">
+            <h2>💳 Plans & Billing</h2>
 
-        <!-- FAQ -->
-        <div class="guide-section" data-section="faq">
-          <h2>❓ FAQ</h2>
+            <div class="guide-card" style="margin-bottom:20px;">
+              <strong>🎒 Trainer (Free)</strong>
+              <ul style="margin:8px 0;padding-left:20px;">
+                <li>50 card limit</li>
+                <li>Price tracking & analytics</li>
+                <li>Buying calculator</li>
+              </ul>
+            </div>
 
-          <h3>Why is my listing failing?</h3>
-          <p>❌ Make sure you've created business policies on eBay and fetched them in Settings → eBay Business Policies. Without these, eBay will reject your listing.</p>
+            <div class="guide-card" style="margin-bottom:20px;border-color:var(--accent);background:rgba(108,99,255,0.05);">
+              <strong>🏅 Gym Leader (£7.99/mo)</strong>
+              <ul style="margin:8px 0;padding-left:20px;">
+                <li>Unlimited inventory</li>
+                <li>eBay listing & auto-sync</li>
+                <li>AI descriptions (bring Gemini key)</li>
+                <li>Mobile scanning</li>
+                <li>Tax exports (HMRC, Xero, QuickBooks)</li>
+              </ul>
+            </div>
 
-          <h3>Why isn't my sale showing in Sales?</h3>
-          <p>💡 Sales are synced every 30 minutes. You can also manually sync: Settings → Sync Sales Now</p>
+            <div class="guide-card" style="margin-bottom:20px;">
+              <strong>🏆 Champion (£14.99/mo)</strong>
+              <ul style="margin:8px 0;padding-left:20px;">
+                <li>Everything in Gym Leader</li>
+                <li>AI descriptions (we provide key)</li>
+                <li>Mobile scanning (no API key)</li>
+                <li>Priority support</li>
+                <li>Early access to features</li>
+              </ul>
+            </div>
 
-          <h3>How do I scan cards?</h3>
-          <p>📷 Tap the camera icon at the bottom right on mobile (not available on desktop). We'll identify the card using AI.</p>
+            <div class="guide-callout warning">
+              ⭐ <strong>7-day free trial:</strong> Start Gym Leader or Champion free. Cancel anytime before day 7 (no charge).
+            </div>
+          </section>
 
-          <h3>What is Quick Sell price?</h3>
-          <p>💰 It's 85% of the current market price on PriceCharting. Good for selling fast without racing to the bottom.</p>
+          <!-- FAQ -->
+          <section class="guide-section" data-section="faq">
+            <h2>❓ FAQ</h2>
 
-          <h3>How accurate are price predictions?</h3>
-          <p>📈 Based on 30-day history from PriceCharting. Accurate for most cards, but graded cards and new sets can be unpredictable.</p>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                Why isn't my sale syncing? <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                Sales sync every 30 minutes automatically. For immediate update, click <strong>Settings → Sync Sales Now</strong>. Note: eBay takes 1-2 hours to mark orders as complete after payment.
+              </div>
+            </div>
 
-          <h3>Can I bulk import from Excel?</h3>
-          <p>📤 Yes! Go to Settings → Import from Excel. Your inventory.xlsx from the Discord bot will be imported.</p>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                Why is my listing failing? <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                Most common: missing business policies. Make sure you've created 3 policies on eBay (Postage, Payment, Returns) and fetched them in <strong>Settings → eBay Business Policies</strong>.
+              </div>
+            </div>
 
-          <h3>What happens to my data if I cancel?</h3>
-          <p>🔒 Your inventory, sales, and settings are kept for 30 days. After that, they're deleted. Cancel anytime — no penalty.</p>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                How accurate is AI scanning? <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                Very accurate for modern cards and PSA slabs. Older/vintage cards can be tricky. Good lighting helps. If wrong, you can edit the card details after.
+              </div>
+            </div>
 
-          <h3>Is there a desktop app?</h3>
-          <p>💻 Not yet, but PokeManager works great in your browser. On mobile, tap "Add to Home Screen" for a native-like experience.</p>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                What happens if I cancel? <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                Your inventory and sales data stay for 30 days. After that, permanently deleted. You can re-upgrade anytime and re-add cards.
+              </div>
+            </div>
 
-          <h3>Do you support other card games?</h3>
-          <p>🎴 Currently Pokémon only. We're optimized for the TCG market with PriceCharting integration.</p>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                Can I use PokeManager for other TCGs? <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                Currently Pokémon only. We're optimized for the TCG market with PriceCharting integration. Future support for other games is possible.
+              </div>
+            </div>
 
-          <h3>Can I export my data?</h3>
-          <p>📤 Yes! Gym Leader+ plans offer HMRC, Xero, and QuickBooks exports. Manual CSV export available on all plans.</p>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                How do I export for tax? <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                <strong>Gym Leader+:</strong> <strong>Analytics → Export</strong> offers HMRC (UK tax), Xero, or QuickBooks formats. All plans can CSV export sales manually.
+              </div>
+            </div>
 
-          <h3>How do I report a bug?</h3>
-          <p>🐛 Found an issue? Let us know via the Notifications page. We read every report and prioritize fixes.</p>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                How do prices get updated? <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                Prices sync from PriceCharting daily. You can manually refresh anytime. Market prices are shown as "Live Price". Quick Sell is 85% of that.
+              </div>
+            </div>
 
-          <h3>Is my data backed up?</h3>
-          <p>☁️ Yes. Your data is stored securely in Supabase (AWS-backed) with daily automated backups.</p>
-        </div>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                Is my data backed up? <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                Yes. Data is encrypted in Supabase (AWS) with daily automated backups. Your inventory and sales are safe.
+              </div>
+            </div>
+          </section>
 
-        <!-- Troubleshooting -->
-        <div class="guide-section" data-section="troubleshooting">
-          <h2>🔧 Troubleshooting</h2>
+          <!-- Troubleshooting -->
+          <section class="guide-section" data-section="troubleshooting">
+            <h2>🔧 Troubleshooting</h2>
 
-          <h3>Inventory cards won't load</h3>
-          <p><strong>Solution:</strong> Refresh the page (Ctrl+R or Cmd+R). If it persists, clear your browser cache and cookies, then reload. Contact support if the issue continues.</p>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                Cards won't load <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                <strong>Fix:</strong> Hard refresh (Ctrl+Shift+R on Windows, Cmd+Shift+R on Mac). If persists, clear cache/cookies and reload.
+              </div>
+            </div>
 
-          <h3>eBay listing keeps failing</h3>
-          <p><strong>Check:</strong></p>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Have you created 3 business policies on eBay? (Postage, Payment, Return)</li>
-            <li>Did you fetch them in Settings → eBay Business Policies?</li>
-            <li>Is your eBay account in good standing? (no suspensions or holds)</li>
-            <li>Try refreshing policies: Settings → eBay Business Policies → Fetch Policies</li>
-          </ol>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                eBay API keys won't save <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                <strong>Check:</strong> Are keys valid? No extra spaces? Try a different browser. If still fails, contact support.
+              </div>
+            </div>
 
-          <h3>Sale detection is slow</h3>
-          <p><strong>Timing:</strong> Sales are synced every 30 minutes automatically. For immediate sync, click "🔄 Sync Sales Now" in Settings. Note: eBay takes 1-2 hours to mark orders as complete.</p>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                Prices not updating <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                <strong>Normal:</strong> Background sync runs every 30 mins. Click <strong>Refresh All Prices</strong> in Inventory for immediate update. May take 2-3 minutes for all cards.
+              </div>
+            </div>
 
-          <h3>Price scanning doesn't work on mobile</h3>
-          <p><strong>Fix:</strong></p>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Make sure you're using a modern browser (Chrome, Safari, Firefox)</li>
-            <li>Allow camera permissions when prompted</li>
-            <li>Ensure good lighting when taking photos</li>
-            <li>For Gym Leader users: Check that your Gemini API key is set in Settings</li>
-          </ol>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                Mobile scanning not working <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                <strong>Requirements:</strong> Gym Leader+ plan, modern browser (Chrome/Safari/Firefox), camera permission granted, good lighting. Try different angle or lighting.
+              </div>
+            </div>
 
-          <h3>My API keys won't save</h3>
-          <p><strong>Fix:</strong></p>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Make sure you've entered valid keys from developer.ebay.com</li>
-            <li>Check that there are no extra spaces or line breaks</li>
-            <li>Refresh the page and try again</li>
-            <li>If the error persists, try a different browser</li>
-          </ol>
-
-          <h3>Profit calculations seem off</h3>
-          <p><strong>Check:</strong> Your eBay Fee Rate (Settings → Pricing) should match your actual fees. Rates vary by account history, category, and listing type. Check your monthly eBay statement for accurate rates.</p>
-
-          <h3>Images aren't loading in inventory</h3>
-          <p><strong>Fix:</strong> The PriceCharting images sometimes fail to load. Try these:</p>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)</li>
-            <li>Disable browser extensions that block images</li>
-            <li>Check your internet connection</li>
-          </ol>
-
-          <h3>Watchlist alerts aren't working</h3>
-          <p><strong>Fix:</strong></p>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Make sure you've set price drop thresholds (Watchlist → Settings)</li>
-            <li>Enable Discord notifications (Settings → Integrations → Discord)</li>
-            <li>Alerts check every 1 hour — be patient</li>
-          </ol>
-
-          <h3>I can't upgrade to a paid plan</h3>
-          <p><strong>Fix:</strong></p>
-          <ol style="margin:12px 0 16px 20px">
-            <li>Try a different browser or device</li>
-            <li>Check that your payment method is valid</li>
-            <li>Disable ad blockers (they can interfere with Stripe)</li>
-            <li>Contact support if you keep seeing errors</li>
-          </ol>
+            <div class="guide-accordion">
+              <button class="guide-accordion-btn" onclick="toggleAccordion(this)">
+                Page loading slowly <span class="guide-accordion-icon">▼</span>
+              </button>
+              <div class="guide-accordion-content">
+                <strong>Normal:</strong> First load fetches 50+ items and market prices (may take 5-10 seconds). Subsequent loads are cached. Check your internet speed.
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
+
+    <script>
+      function toggleAccordion(btn) {
+        btn.classList.toggle('open');
+      }
+
+      function scrollToGuideSection(sectionId) {
+        const section = document.querySelector(\`[data-section="\${sectionId}"]\`);
+        if (section) {
+          section.scrollIntoView({ behavior: 'smooth' });
+          document.querySelectorAll('.guide-nav-btn').forEach(b => b.classList.remove('active'));
+          event.target.classList.add('active');
+        }
+      }
+
+      window.toggleAccordion = toggleAccordion;
+      window.scrollToGuideSection = scrollToGuideSection;
+    </script>
   `;
+
+  app.innerHTML = guideHTML;
 }
 
 function scrollToGuideSection(sectionId) {
