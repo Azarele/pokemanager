@@ -180,16 +180,16 @@
   <div id="modal-delete" class="modal-overlay hidden">
     <div class="modal modal-sm">
       <div class="modal-header">
-        <h2>Remove Item</h2>
+        <h2>Delete Item</h2>
         <button class="modal-close" onclick="closeModal('modal-delete')">✕</button>
       </div>
       <div class="modal-body">
-        <p id="delete-card-name" class="modal-subtitle"></p>
-        <p class="text-muted">This will permanently remove the item from inventory. Sold items cannot be removed.</p>
+        <p style="font-size:16px;font-weight:600;margin-bottom:8px">Delete <span id="delete-card-name" style="color:var(--accent)"></span>?</p>
+        <p class="text-muted" style="color:var(--danger);font-size:13px">⚠️ This cannot be undone. The item will be permanently removed from your inventory.</p>
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="closeModal('modal-delete')">Cancel</button>
-        <button class="btn btn-danger" onclick="confirmDelete()">Remove</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">🗑️ Delete Item</button>
       </div>
     </div>
   </div>

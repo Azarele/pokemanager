@@ -1048,7 +1048,12 @@ function renderOnboarding() {
   `;
 }
 
-function dismissOnboarding() {
+async function dismissOnboarding() {
+  try {
+    await api.patch('/settings', { onboarding_dismissed: true });
+  } catch (e) {
+    console.error('Failed to save onboarding dismissal:', e);
+  }
   sessionStorage.setItem('onboarding_dismissed', '1');
   renderInventory();
 }
@@ -1063,9 +1068,15 @@ async function checkDataHealth() {
   const banner = document.createElement('div');
   banner.id = 'data-health-banner';
   banner.className = 'data-health-banner';
+
+  let message = `⚠️ ${health.total} item(s) are missing PriceCharting URLs`;
+  if (health.missing_urls) {
+    message = `⚠️ ${health.missing_urls} item(s) are missing PriceCharting URLs`;
+  }
+
   banner.innerHTML = `
-    ⚠️ ${health.total} item(s) have price data issues —
-    <a href="#" onclick="navigate('/analytics');return false">view details on Analytics</a>
+    ${message} —
+    <a href="#" onclick="navigate('/analytics');return false">view & fix on Analytics</a>
     <button onclick="sessionStorage.setItem('health_banner_dismissed','1');this.closest('.data-health-banner').remove()">✕</button>`;
   document.querySelector('#app .page-header')?.after(banner);
 }
@@ -4386,27 +4397,34 @@ async function renderSettings() {
       <div class="settings-card" data-section="ebay">
         <h3 class="settings-section-title">eBay API
           <span class="badge ${settings?.has_ebay ? 'badge-ebay' : 'badge-danger'}" style="margin-left:8px">
-            ${settings?.has_ebay ? '✓ Connected' : 'Not set'}
+            ${settings?.has_ebay ? '✅ Connected' : '❌ Not set'}
           </span>
         </h3>
         <p class="text-muted" style="font-size:13px;margin-bottom:14px">
           Required for auto-listing and sale detection.
           <a href="https://developer.ebay.com" target="_blank" style="color:var(--accent)">Get keys ↗</a>
         </p>
+        ${settings?.has_ebay ? `
+          <div style="background:rgba(76,175,125,0.08);border-left:3px solid var(--success);padding:12px;margin-bottom:16px;border-radius:4px;font-size:13px">
+            <p style="margin:0;color:var(--success);font-weight:600">✅ Your eBay keys are active</p>
+            <p style="margin:4px 0 0 0;color:var(--text-muted);font-size:12px">Your API keys are encrypted and secure. To update them, enter new values below and click Save.</p>
+          </div>
+        ` : ''}
         <div class="form-section">
           <label class="form-label">App ID</label>
-          <input id="s-ebay-app-id" class="form-input" type="password" placeholder="${settings?.has_ebay ? '••••••• (set)' : 'Enter App ID'}">
+          <input id="s-ebay-app-id" class="form-input" type="password" placeholder="${settings?.has_ebay ? 'Leave blank to keep current' : 'Enter your eBay App ID'}">
         </div>
         <div class="form-section">
           <label class="form-label">Cert ID</label>
-          <input id="s-ebay-cert-id" class="form-input" type="password" placeholder="${settings?.has_ebay ? '••••••• (set)' : 'Enter Cert ID'}">
+          <input id="s-ebay-cert-id" class="form-input" type="password" placeholder="${settings?.has_ebay ? 'Leave blank to keep current' : 'Enter your eBay Cert ID'}">
         </div>
         <div class="form-section">
           <label class="form-label">Refresh Token</label>
-          <input id="s-ebay-token" class="form-input" type="password" placeholder="${settings?.has_ebay ? '••••••• (set)' : 'Run generate_ebay_token.py'}">
+          <input id="s-ebay-token" class="form-input" type="password" placeholder="${settings?.has_ebay ? 'Leave blank to keep current' : 'Paste your refresh token'}">
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px">Generate one with: python web/generate_ebay_token.py</p>
         </div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-accent btn-sm" onclick="saveEbaySettings()">Save eBay Keys</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-accent btn-sm" onclick="saveEbaySettings()">💾 Save eBay Keys</button>
           ${settings?.has_ebay ? `<button class="btn btn-ghost btn-sm" onclick="syncEbaySales()">🔄 Sync Sales Now</button>` : ''}
         </div>
       </div>
@@ -4982,23 +5000,79 @@ async function renderUpgrade() {
   }
 }
 
-async function startCheckout(plan) {
-  const btn = event.target;
-  btn.disabled = true;
-  btn.textContent = '⏳ Loading…';
+function showCheckoutConfirmation(plan) {
+  const planNames = { gym_leader: 'Gym Leader', champion: 'Champion' };
+  const planPrices = { gym_leader: '£7.99', champion: '£14.99' };
+  const planName = planNames[plan];
+  const price = planPrices[plan];
+
+  const features = {
+    gym_leader: [
+      'Unlimited items',
+      'eBay listing & auto-reprice',
+      'AI descriptions',
+      'Scan & Add / Scan & Sell',
+      'HMRC / Xero / QuickBooks export',
+    ],
+    champion: [
+      'Everything in Gym Leader',
+      'AI descriptions (included)',
+      'Scan & Add / Sell (included)',
+      'Priority support',
+      'Early access to features',
+    ]
+  };
+
+  showModal(`
+    <h2 style="margin-bottom:8px">🎉 Upgrade to ${planName}</h2>
+    <p class="text-muted" style="margin-bottom:16px">7 days free, then ${price}/month. Cancel anytime.</p>
+
+    <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">YOU'LL GET:</p>
+      <ul style="margin:0;padding-left:20px;color:var(--text);font-size:13px">
+        ${features[plan].map(f => `<li style="margin-bottom:6px">✅ ${f}</li>`).join('')}
+      </ul>
+    </div>
+
+    <div style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--text-muted)">
+      After your 7-day free trial, you'll be charged ${price} each month. You can cancel anytime from your <a href="#" onclick="navigate('/settings');closeModal();return false;" style="color:var(--accent)">Billing Settings</a>.
+    </div>
+
+    <div class="modal-actions" style="gap:8px">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-accent" onclick="proceedToCheckout('${plan}')" style="flex:1">Proceed to Payment →</button>
+    </div>
+  `);
+}
+
+async function proceedToCheckout(plan) {
+  const btn = event?.target;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Loading…';
+  }
   try {
     const resp = await api.post('/billing/create-checkout', { plan });
     if (resp.checkout_url) {
       window.location.href = resp.checkout_url;
     } else {
       toast('Could not start checkout — try again', 'error');
-      btn.disabled = false;
-      btn.textContent = 'Start 7-day free trial →';
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Proceed to Payment →';
+      }
     }
   } catch (e) {
     toast('Error: ' + extractError(e.message), 'error');
-    btn.disabled = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Proceed to Payment →';
+    }
   }
+}
+
+async function startCheckout(plan) {
+  showCheckoutConfirmation(plan);
 }
 
 async function manageBilling() {
@@ -5439,50 +5513,31 @@ function handleScanImage(event, mode) {
 
 async function identifyCard() {
   if (!_scannedCardData) {
-    console.log('[scan] ERROR: No scanned card data');
+    toast('❌ No scanned card data', 'error');
     return;
   }
   const btn = document.getElementById('identify-btn');
   btn.disabled = true;
   btn.textContent = '⏳ Analyzing…';
 
-  console.log('[scan] Starting card identification...');
-  console.log('[scan] Scan mode:', _scanMode);
-
   try {
     const base64 = _scannedCardData.image.split(',')[1];
-    console.log('[scan] Sending to /scan/identify...');
     const resp = await api.post('/scan/identify', {
       image: base64,
       mime_type: _scannedCardData.file.type || 'image/jpeg'
     });
 
-    console.log('[scan] Got response:', JSON.stringify(resp, null, 2));
-
     if (resp.error) {
-      console.log('[scan] ERROR returned:', resp.error);
       toast(resp.error === 'not a pokemon card' ? '❌ Not a Pokémon card' : `❌ ${resp.error}`, 'error');
       btn.disabled = false;
       btn.textContent = '🤖 Identify Card';
       return;
     }
 
-    console.log('[scan] Response contains card data:');
-    console.log('  - card_name:', resp.card_name);
-    console.log('  - card_number:', resp.card_number);
-    console.log('  - set_name:', resp.set_name);
-    console.log('  - confidence:', resp.confidence);
-    console.log('  - pc_url:', resp.pc_url);
-    console.log('  - market_price:', resp.market_price);
-
     _scannedCardData = { ..._scannedCardData, ...resp };
-    console.log('[scan] Updated _scannedCardData:', JSON.stringify(_scannedCardData, null, 2));
-
-    console.log('[scan] Calling showCardConfirmation()...');
     showCardConfirmation();
-    console.log('[scan] Identification complete');
   } catch (e) {
-    console.error('[scan] Exception caught:', e);
+    console.error('Card identification error:', e);
     toast('Identification failed: ' + extractError(e.message), 'error');
     btn.disabled = false;
     btn.textContent = '🤖 Identify Card';
@@ -5490,34 +5545,16 @@ async function identifyCard() {
 }
 
 function showCardConfirmation() {
-  console.log('[scan] === showCardConfirmation() called ===');
-  console.log('[scan] _scanMode:', _scanMode);
-  console.log('[scan] _scannedCardData:', JSON.stringify(_scannedCardData, null, 2));
-
   const card = _scannedCardData;
   if (!card) {
-    console.error('[scan] ERROR: _scannedCardData is empty!');
     toast('❌ Card data not found', 'error');
     return;
   }
 
-  // Store result globally so onclick handlers can access it
   window._scanResult = card;
-  console.log('[scan] Stored result in window._scanResult');
-
-  // Check if modal overlay exists
-  const existingOverlay = document.getElementById('modal-overlay');
-  console.log('[scan] modal-overlay exists before showModal:', existingOverlay !== null);
-  if (existingOverlay) {
-    console.log('[scan] modal-overlay is visible:', !existingOverlay.classList.contains('hidden'));
-  }
 
   const title = _scanMode === 'add' ? '📦 Confirm Card' : '💰 Confirm Card';
   const marketPrice = card.market_price ? `£${card.market_price.toFixed(2)}` : 'Not found';
-
-  console.log('[scan] Showing modal with title:', title);
-  console.log('[scan] Market price:', marketPrice);
-  console.log('[scan] About to call showModal()...');
 
   showModal(`
     <h2 style="margin-bottom:16px">${title}</h2>
@@ -5541,74 +5578,42 @@ function showCardConfirmation() {
       <button class="btn btn-accent" onclick="${_scanMode === 'add' ? 'proceedScanAdd(window._scanResult)' : 'proceedScanSell()'}">${_scanMode === 'add' ? 'Confirm & Add' : 'Confirm & Sell'}</button>
     </div>
   `);
-
-  console.log('[scan] showModal() returned, modal should be visible now');
-  const modalAfter = document.getElementById('modal-overlay');
-  console.log('[scan] modal-overlay exists after showModal:', modalAfter !== null);
-  if (modalAfter) {
-    console.log('[scan] modal-overlay hidden class:', modalAfter.classList.contains('hidden'));
-    console.log('[scan] modal-overlay display:', modalAfter.style.display);
-  }
 }
 
 window.proceedScanAdd = function(result) {
-  console.log('[scan] === proceedScanAdd() called ===');
-  console.log('[scan] result:', JSON.stringify(result, null, 2));
-
   if (!result) {
-    console.error('[scan] No result passed to proceedScanAdd');
     toast('❌ Error: No scan result', 'error');
     return;
   }
 
-  console.log('[scan] Opening add modal directly (no close first)...');
-
-  // Reset to single clean row
   _addRowCount = 1;
-
-  // Prevent modal auto-close for 500ms while transitioning
   window._preventModalClose = true;
   setTimeout(() => { window._preventModalClose = false; }, 500);
 
-  // Open add modal immediately - this replaces scan modal content
   openAddItemModal();
-  console.log('[scan] openAddItemModal() called');
 
-  // Pre-fill after modal renders
   setTimeout(function() {
-    console.log('[scan] Pre-filling form (300ms after add modal)...');
     const urlInput = document.getElementById('pc-url-1');
     const priceInput = document.getElementById('price-1');
     const sourceInput = document.getElementById('source-1');
 
-    console.log('[scan] pc-url-1 element:', urlInput ? 'found' : 'NOT FOUND');
-    console.log('[scan] price-1 element:', priceInput ? 'found' : 'NOT FOUND');
-
-    // Pre-fill PC URL
     if (urlInput && result.pc_url) {
       urlInput.value = result.pc_url;
-      console.log('[scan] Set PC URL to:', result.pc_url);
     }
 
-    // Clear price (leave empty for user to enter)
     if (priceInput) {
       priceInput.value = '';
       if (result.market_price) {
         priceInput.placeholder = '£' + result.market_price.toFixed(2) + ' (market)';
       }
       priceInput.focus();
-      console.log('[scan] Cleared price field, focused for input');
     }
 
-    // Reset source to default
     if (sourceInput) {
       sourceInput.value = '';
-      console.log('[scan] Reset source field to default');
     }
 
-    const toastMsg = '📦 ' + (result.card_name || 'Card') + ' — enter your purchase price';
-    console.log('[scan] Showing toast:', toastMsg);
-    toast(toastMsg, 'info', 5000);
+    toast('📦 ' + (result.card_name || 'Card') + ' — enter your purchase price', 'info', 5000);
   }, 300);
 };
 
@@ -5805,6 +5810,7 @@ async function renderGuide() {
           <button class="guide-nav-btn" onclick="scrollToGuideSection('discord')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">🔔 Discord</button>
           <button class="guide-nav-btn" onclick="scrollToGuideSection('plans')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">💎 Plans</button>
           <button class="guide-nav-btn" onclick="scrollToGuideSection('faq')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">❓ FAQ</button>
+          <button class="guide-nav-btn" onclick="scrollToGuideSection('troubleshooting')" style="text-align:left;padding:8px 12px;border:none;background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">🔧 Troubleshooting</button>
         </div>
       </div>
 
@@ -5831,7 +5837,7 @@ async function renderGuide() {
           <h3>Understanding Prices</h3>
           <p><strong>Market Price (Live Price)</strong> — The current average price on PriceCharting. We refresh this daily for all your items.</p>
           <p><strong>Quick Sell Price</strong> — 85% of market price. This is our recommended price if you want to sell quickly. Lower prices = faster sales.</p>
-          <p><strong>Potential Profit</strong> — Quick Sell Price − eBay Fees − Purchase Price. Your expected profit per card.</p>
+          <p><strong>Potential Profit</strong> — Quick Sell Price − eBay Fee Rate − Purchase Price. Your expected profit per card.</p>
         </div>
 
         <!-- eBay Setup -->
@@ -5911,7 +5917,7 @@ async function renderGuide() {
           <p><strong>Settings → Sync Sales Now</strong></p>
 
           <h3>How Profit Is Calculated</h3>
-          <pre style="background:var(--bg-secondary);padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">Profit = Sell Price − eBay Fees − Purchase Price</pre>
+          <pre style="background:var(--bg-secondary);padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">Profit = Sell Price − eBay Fee Rate − Purchase Price</pre>
 
           <h3>Accurate Fee Tracking</h3>
           <p>eBay fees depend on your sales history and marketplace. For the most accurate profit calculation:</p>
@@ -6035,6 +6041,84 @@ async function renderGuide() {
 
           <h3>Is there a desktop app?</h3>
           <p>💻 Not yet, but PokeManager works great in your browser. On mobile, tap "Add to Home Screen" for a native-like experience.</p>
+
+          <h3>Do you support other card games?</h3>
+          <p>🎴 Currently Pokémon only. We're optimized for the TCG market with PriceCharting integration.</p>
+
+          <h3>Can I export my data?</h3>
+          <p>📤 Yes! Gym Leader+ plans offer HMRC, Xero, and QuickBooks exports. Manual CSV export available on all plans.</p>
+
+          <h3>How do I report a bug?</h3>
+          <p>🐛 Found an issue? Let us know via the Notifications page. We read every report and prioritize fixes.</p>
+
+          <h3>Is my data backed up?</h3>
+          <p>☁️ Yes. Your data is stored securely in Supabase (AWS-backed) with daily automated backups.</p>
+        </div>
+
+        <!-- Troubleshooting -->
+        <div class="guide-section" data-section="troubleshooting">
+          <h2>🔧 Troubleshooting</h2>
+
+          <h3>Inventory cards won't load</h3>
+          <p><strong>Solution:</strong> Refresh the page (Ctrl+R or Cmd+R). If it persists, clear your browser cache and cookies, then reload. Contact support if the issue continues.</p>
+
+          <h3>eBay listing keeps failing</h3>
+          <p><strong>Check:</strong></p>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Have you created 3 business policies on eBay? (Postage, Payment, Return)</li>
+            <li>Did you fetch them in Settings → eBay Business Policies?</li>
+            <li>Is your eBay account in good standing? (no suspensions or holds)</li>
+            <li>Try refreshing policies: Settings → eBay Business Policies → Fetch Policies</li>
+          </ol>
+
+          <h3>Sale detection is slow</h3>
+          <p><strong>Timing:</strong> Sales are synced every 30 minutes automatically. For immediate sync, click "🔄 Sync Sales Now" in Settings. Note: eBay takes 1-2 hours to mark orders as complete.</p>
+
+          <h3>Price scanning doesn't work on mobile</h3>
+          <p><strong>Fix:</strong></p>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Make sure you're using a modern browser (Chrome, Safari, Firefox)</li>
+            <li>Allow camera permissions when prompted</li>
+            <li>Ensure good lighting when taking photos</li>
+            <li>For Gym Leader users: Check that your Gemini API key is set in Settings</li>
+          </ol>
+
+          <h3>My API keys won't save</h3>
+          <p><strong>Fix:</strong></p>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Make sure you've entered valid keys from developer.ebay.com</li>
+            <li>Check that there are no extra spaces or line breaks</li>
+            <li>Refresh the page and try again</li>
+            <li>If the error persists, try a different browser</li>
+          </ol>
+
+          <h3>Profit calculations seem off</h3>
+          <p><strong>Check:</strong> Your eBay Fee Rate (Settings → Pricing) should match your actual fees. Rates vary by account history, category, and listing type. Check your monthly eBay statement for accurate rates.</p>
+
+          <h3>Images aren't loading in inventory</h3>
+          <p><strong>Fix:</strong> The PriceCharting images sometimes fail to load. Try these:</p>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)</li>
+            <li>Disable browser extensions that block images</li>
+            <li>Check your internet connection</li>
+          </ol>
+
+          <h3>Watchlist alerts aren't working</h3>
+          <p><strong>Fix:</strong></p>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Make sure you've set price drop thresholds (Watchlist → Settings)</li>
+            <li>Enable Discord notifications (Settings → Integrations → Discord)</li>
+            <li>Alerts check every 1 hour — be patient</li>
+          </ol>
+
+          <h3>I can't upgrade to a paid plan</h3>
+          <p><strong>Fix:</strong></p>
+          <ol style="margin:12px 0 16px 20px">
+            <li>Try a different browser or device</li>
+            <li>Check that your payment method is valid</li>
+            <li>Disable ad blockers (they can interfere with Stripe)</li>
+            <li>Contact support if you keep seeing errors</li>
+          </ol>
         </div>
       </div>
     </div>

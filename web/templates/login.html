@@ -543,10 +543,10 @@
             <label>Password</label>
             <input type="password" id="reg-password" placeholder="Min 8 characters" required minlength="8" autocomplete="new-password">
           </div>
-          <div class="form-checkbox" id="waiver-group" style="display:none">
-            <input type="checkbox" id="reg-waiver" required>
+          <div class="form-checkbox" id="tos-group">
+            <input type="checkbox" id="reg-tos" required>
             <label style="margin: 0;">
-              I agree to PokeManager's <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>. If I subscribe to a paid plan, I understand the service begins immediately and I waive my 14-day cooling-off right.
+              I agree to PokeManager's <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>
             </label>
           </div>
           <button type="submit" class="btn-primary" id="reg-btn">Create Account</button>
@@ -573,7 +573,6 @@
 
       document.getElementById('login-form').classList.toggle('active', tab === 'login');
       document.getElementById('register-form').classList.toggle('active', tab === 'register');
-      document.getElementById('waiver-group').style.display = tab === 'register' ? 'flex' : 'none';
       hideMessages();
     }
 
@@ -629,8 +628,8 @@
 
     async function handleRegister(e) {
       e.preventDefault();
-      const waiver = document.getElementById('reg-waiver')?.checked;
-      if (!waiver) {
+      const tos = document.getElementById('reg-tos')?.checked;
+      if (!tos) {
         showError('Please accept the Terms of Service to continue');
         return;
       }
@@ -646,7 +645,7 @@
             email: document.getElementById('reg-email').value,
             password: document.getElementById('reg-password').value,
             display_name: document.getElementById('reg-name').value,
-            waived_cooling_off: true,
+            waived_cooling_off: false,
           }),
         });
         const data = await resp.json();
