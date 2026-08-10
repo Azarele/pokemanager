@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from bs4 import BeautifulSoup
 
 import lister_ebay_api
+import scraper
 from web import db_inventory as db
 from web.auth import get_current_user
 from web import user_config
