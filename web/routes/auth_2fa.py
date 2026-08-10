@@ -21,11 +21,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-class Setup2FARequest(BaseModel):
-    """Request to set up 2FA."""
-    password: str  # Require password confirmation
-
-
 class Verify2FARequest(BaseModel):
     """Request to verify 2FA code during login."""
     code: str  # 6-digit TOTP code
@@ -38,8 +33,8 @@ class Verify2FAConfirmRequest(BaseModel):
 
 
 @router.post("/2fa/setup")
-async def setup_2fa(req: Setup2FARequest, user: dict = Depends(get_current_user)):
-    """Generate a new TOTP secret for 2FA setup."""
+async def setup_2fa(user: dict = Depends(get_current_user)):
+    """Generate a new TOTP secret for 2FA setup. User must be authenticated."""
     db = get_db()
 
     # Generate new secret (will be stored after user confirms)
