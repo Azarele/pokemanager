@@ -124,12 +124,80 @@ async def login(request: Request, body: LoginRequest):
 
     _ensure_profile(db, user.id, body.email)
 
+    # Check if user has 2FA enabled
+    profile = db.table("user_profiles").select("two_fa_enabled").eq("id", user.id).single().execute()
+    if profile.data and profile.data.get("two_fa_enabled"):
+        # 2FA enabled — issue temporary token and ask for code
+        from web.auth import create_2fa_temp_token
+        temp_token = create_2fa_temp_token(user.id)
+        return JSONResponse({
+            "requires_2fa": True,
+            "temp_token": temp_token,
+            "user": {"id": user.id, "email": body.email},
+        })
+
+    # 2FA not enabled — issue full JWT session
     access_token  = create_access_token(user.id, body.email)
     refresh_token = create_refresh_token(user.id)
 
     resp = JSONResponse({"success": True, "user": {"id": user.id, "email": body.email}})
     _set_auth_cookies(resp, access_token, refresh_token)
     return resp
+
+
+@router.post("/login/verify-2fa")
+@limiter.limit("5/minute")
+async def verify_2fa(request: Request, body: dict):
+    """Verify TOTP code and issue full JWT session cookie."""
+    temp_token = body.get("temp_token")
+    code = body.get("code")
+
+    if not temp_token or not code:
+        raise HTTPException(400, "Missing temp_token or code")
+
+    # Validate temp token
+    try:
+        from web.auth import decode_token
+        payload = decode_token(temp_token)
+        if payload.get("type") != "2fa_temp":
+            raise HTTPException(401, "Invalid token type")
+        user_id = payload.get("sub")
+    except Exception as e:
+        logger.error(f"2FA temp token validation failed: {e}")
+        raise HTTPException(401, "Invalid or expired temp token")
+
+    # Validate TOTP code
+    try:
+        import pyotp
+        db = get_db()
+        profile = db.table("user_profiles").select("two_fa_secret, email").eq("id", user_id).single().execute()
+        if not profile.data:
+            raise HTTPException(401, "User not found")
+
+        secret = profile.data.get("two_fa_secret")
+        email = profile.data.get("email")
+        if not secret:
+            raise HTTPException(400, "2FA not configured for this user")
+
+        totp = pyotp.TOTP(secret)
+        if not totp.verify(code):
+            logger.warning(f"Invalid 2FA code for user {user_id}")
+            raise HTTPException(401, "Invalid 2FA code")
+
+        # Issue full JWT session
+        from web.auth import create_access_token, create_refresh_token
+        access_token = create_access_token(user_id, email)
+        refresh_token = create_refresh_token(user_id)
+
+        resp = JSONResponse({"success": True, "user": {"id": user_id, "email": email}})
+        _set_auth_cookies(resp, access_token, refresh_token)
+        return resp
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"2FA verification error: {e}")
+        raise HTTPException(500, "2FA verification failed")
 
 
 @router.post("/logout")

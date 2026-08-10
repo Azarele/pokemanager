@@ -48,6 +48,16 @@ def create_refresh_token(user_id: str) -> str:
     )
 
 
+def create_2fa_temp_token(user_id: str) -> str:
+    """Create a short-lived temporary token for 2FA verification (5 minutes)."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=5)
+    return jwt.encode(
+        {"sub": user_id, "exp": expire, "type": "2fa_temp"},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
 # ── Token validation ──────────────────────────────────────────────────────────
 
 def decode_token(token: str) -> dict:
