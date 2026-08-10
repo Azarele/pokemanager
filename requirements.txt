@@ -29,3 +29,6 @@ stripe>=10.0.0
 
 # Image generation (Instagram stories)
 pillow>=10.0.0
+
+# Security — rate limiting
+slowapi>=0.1.9

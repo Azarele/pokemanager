@@ -6,10 +6,27 @@ from pydantic import BaseModel, EmailStr
 
 from web.auth import create_access_token, create_refresh_token, decode_token
 from web.database import get_db
+from web.middleware.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """
+    Validate password meets minimum security requirements.
+    Returns: (is_valid, error_message)
+    """
+    if len(password) < 12:
+        return False, "Password must be at least 12 characters long"
+    if not any(c.isupper() for c in password):
+        return False, "Password must contain at least one uppercase letter"
+    if not any(c.islower() for c in password):
+        return False, "Password must contain at least one lowercase letter"
+    if not any(c.isdigit() for c in password):
+        return False, "Password must contain at least one number"
+    return True, ""
 
 
 class RegisterRequest(BaseModel):
@@ -52,9 +69,11 @@ def _ensure_profile(db, user_id: str, email: str, display_name: str = "") -> Non
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/register")
-async def register(body: RegisterRequest):
-    if len(body.password) < 8:
-        raise HTTPException(400, "Password must be at least 8 characters")
+@limiter.limit("3/minute")
+async def register(request: Request, body: RegisterRequest):
+    is_valid, error_msg = validate_password_strength(body.password)
+    if not is_valid:
+        raise HTTPException(400, error_msg)
 
     db = get_db()
     try:
@@ -87,7 +106,8 @@ async def register(body: RegisterRequest):
 
 
 @router.post("/login")
-async def login(body: LoginRequest):
+@limiter.limit("5/minute")
+async def login(request: Request, body: LoginRequest):
     db = get_db()
     try:
         auth_response = db.auth.sign_in_with_password({
@@ -121,6 +141,7 @@ async def logout():
 
 
 @router.post("/refresh")
+@limiter.limit("20/minute")
 async def refresh(request: Request):
     token = request.cookies.get("refresh_token")
     if not token:

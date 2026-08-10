@@ -210,13 +210,23 @@ async def exchange_ebay_token(body: dict, user: dict = Depends(get_current_user)
     if not redirect_url:
         raise HTTPException(status_code=400, detail="redirect_url is required")
 
-    # Extract auth code from redirect URL
+    # Validate redirect URL origin — must be our application or localhost
     try:
         parsed = urlparse(redirect_url)
+        site_url = os.getenv("SITE_URL", "http://localhost:8000")
+        parsed_site = urlparse(site_url)
+
+        # Only allow redirects to our own domain or localhost for dev
+        allowed_hosts = [parsed_site.hostname, "localhost"]
+        if parsed.hostname not in allowed_hosts:
+            raise ValueError(f"Invalid redirect origin: {parsed.hostname} not in {allowed_hosts}")
+
         qs = parse_qs(parsed.query)
         code = qs.get("code", [None])[0]
         if not code:
             raise ValueError("No code in URL")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid redirect URL: {e}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid redirect URL: {e}")
 

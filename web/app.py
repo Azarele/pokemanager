@@ -14,14 +14,17 @@ from pathlib import Path
 from fastapi import FastAPI, Request, WebSocket, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from web.routes import inventory, listings, analytics, pricing, watchlist, sales, calculator, price_history, auth_routes, settings, billing, legal, admin, scan, ebay_sync, staff, exports, notifications
 from web.middleware.auth import AuthMiddleware
 from web.middleware.rate_limit import RateLimitMiddleware
+from web.middleware.rate_limiter import limiter
 from web.ws_manager import manager
 from web.background_sync import start_background_sync, stop_background_sync
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -86,16 +89,32 @@ async def public_stats():
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
+        # Prevent MIME type sniffing
         response.headers["X-Content-Type-Options"] = "nosniff"
+        # Prevent clickjacking
         response.headers["X-Frame-Options"] = "DENY"
+        # Prevent XSS attacks
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        # Enforce HTTPS (1 year = 31536000 seconds)
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # Control referrer information
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # Basic CSP — allow same-origin for scripts/styles, block unsafe inline
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'"
         return response
 
 
 # Include public routes BEFORE middleware
 app.include_router(public_router)
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, lambda request, exc: JSONResponse(
+    status_code=429,
+    content={"detail": "Rate limit exceeded. Please try again later."}
+))
+
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

@@ -1278,7 +1278,13 @@
           </div>
           <div style="margin-bottom:16px">
             <label style="display:block;font-size:13px;color:var(--lp-text);margin-bottom:6px;font-weight:500">Password</label>
-            <input type="password" id="reg-password" placeholder="Min 8 characters" required minlength="8" style="width:100%;padding:10px 12px;background:var(--lp-bg);border:1px solid var(--lp-border);border-radius:8px;color:var(--lp-text);font-size:13px;outline:none" autocomplete="new-password">
+            <input type="password" id="reg-password" placeholder="Min 12 characters, uppercase, lowercase, number" required minlength="12" style="width:100%;padding:10px 12px;background:var(--lp-bg);border:1px solid var(--lp-border);border-radius:8px;color:var(--lp-text);font-size:13px;outline:none" autocomplete="new-password" oninput="updatePasswordStrength()">
+            <div id="password-strength" style="margin-top:8px;display:none">
+              <div style="display:flex;gap:4px;margin-bottom:4px">
+                <div id="strength-bar" style="height:3px;flex:1;background:rgba(255,255,255,0.1);border-radius:2px"></div>
+              </div>
+              <div style="font-size:11px;color:var(--lp-muted)" id="strength-text"></div>
+            </div>
           </div>
           <div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--lp-muted);margin-bottom:16px;line-height:1.5" id="waiver-group" style="display:none">
             <input type="checkbox" id="reg-waiver" required style="margin-top:2px;flex-shrink:0">
@@ -1528,10 +1534,54 @@
       }
     }
 
+    function validatePasswordStrength(password) {
+      const checks = {
+        length: password.length >= 12,
+        uppercase: /[A-Z]/.test(password),
+        lowercase: /[a-z]/.test(password),
+        number: /[0-9]/.test(password),
+      };
+      const passed = Object.values(checks).filter(Boolean).length;
+      return { checks, passed, total: 4 };
+    }
+
+    function updatePasswordStrength() {
+      const pwd = document.getElementById('reg-password').value;
+      if (!pwd) {
+        document.getElementById('password-strength').style.display = 'none';
+        return;
+      }
+      const validation = validatePasswordStrength(pwd);
+      const strength = Math.round((validation.passed / validation.total) * 100);
+      const bar = document.getElementById('strength-bar');
+      const text = document.getElementById('strength-text');
+
+      const colors = ['#ef4444', '#f97316', '#eab308', '#10b981'];
+      const labels = ['Weak', 'Fair', 'Good', 'Strong'];
+      const idx = Math.min(Math.floor(strength / 25), 3);
+
+      bar.style.background = colors[idx];
+      bar.style.width = strength + '%';
+      text.textContent = labels[idx] + ` — ${validation.passed}/4 requirements met`;
+      document.getElementById('password-strength').style.display = 'block';
+    }
+
     async function handleRegister(e) {
       e.preventDefault();
       if (!document.getElementById('reg-waiver').checked) {
         document.getElementById('auth-error').textContent = 'Please accept terms';
+        document.getElementById('auth-error').style.display = 'block';
+        return;
+      }
+      const password = document.getElementById('reg-password').value;
+      const validation = validatePasswordStrength(password);
+      if (validation.passed < 4) {
+        const missing = [];
+        if (!validation.checks.length) missing.push('12+ characters');
+        if (!validation.checks.uppercase) missing.push('uppercase letter');
+        if (!validation.checks.lowercase) missing.push('lowercase letter');
+        if (!validation.checks.number) missing.push('number');
+        document.getElementById('auth-error').textContent = 'Password needs: ' + missing.join(', ');
         document.getElementById('auth-error').style.display = 'block';
         return;
       }
