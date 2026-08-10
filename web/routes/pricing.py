@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 import lister_ebay_api
+import scraper
 from web import db_inventory as db
 from web import user_config
 from web.auth import get_current_user
@@ -25,11 +26,16 @@ async def lookup_card(data: LookupRequest, user: dict = Depends(get_current_user
     url = data.pc_url
     name = data.card_name
 
+    logger.info(f'[lookup] Request: pc_url={url}, card_name={name}')
+
     if not url and not name:
+        logger.warning('[lookup] No pc_url or card_name provided')
         return {"error": "Provide pc_url or card_name"}
 
     try:
+        logger.info(f'[lookup] Calling scraper with: {url or name}')
         card_name, price = await scraper.scrape_card(url or name)
+        logger.info(f'[lookup] ✅ Scrape success: card_name={card_name}, price={price}')
         return {
             "card_name": card_name,
             "pc_url": url,
@@ -37,7 +43,8 @@ async def lookup_card(data: LookupRequest, user: dict = Depends(get_current_user
             "image_url": ""
         }
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f'[lookup] ❌ Scrape failed: {type(e).__name__}: {str(e)}', exc_info=True)
+        return {"error": str(e), "card_name": None}
 
 
 @router.get("/competitors/{item_id}")

@@ -1899,9 +1899,25 @@ window.addCardToBundle = async function() {
 
   try {
     const isPcUrl = input.includes('pricecharting.com');
-    const data = await api.post('/pricing/lookup', {
+    const payload = {
       pc_url: isPcUrl ? input : '',
       card_name: isPcUrl ? '' : input
+    };
+
+    console.log('[bundle] 📤 Sending lookup request:', {
+      input: input,
+      isPcUrl: isPcUrl,
+      payload: payload
+    });
+
+    const data = await api.post('/pricing/lookup', payload);
+
+    console.log('[bundle] 📥 Received lookup response:', {
+      card_name: data.card_name,
+      pc_url: data.pc_url,
+      market_price: data.market_price,
+      image_url: data.image_url,
+      fullResponse: data
     });
 
     if (data.card_name) {
@@ -1915,10 +1931,16 @@ window.addCardToBundle = async function() {
       toast(`✅ Added: ${data.card_name}`, 'success');
       renderBundleModal();
     } else {
+      console.warn('[bundle] ⚠️ No card_name in response, showing error');
       toast('❌ Card not found', 'error');
     }
   } catch(e) {
     console.error('[bundle] lookup error:', e);
+    console.error('[bundle] Error details:', {
+      message: e.message,
+      response: e.response,
+      stack: e.stack
+    });
     toast('❌ Error looking up card', 'error');
   }
 };
