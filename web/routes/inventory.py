@@ -683,7 +683,6 @@ async def bundle_sell(req: BundleSellRequest, user: dict = Depends(get_current_u
                 "date_sold": date_sold,
                 "ebay_order_id": ebay_order_id,
                 "bundle_id": bundle_id,
-                "postage_cost": 0,
                 "fees_verified": False
             }).eq("item_id", item["item_id"]).eq("user_id", user_id).execute()
 
