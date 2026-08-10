@@ -28,17 +28,19 @@ def encrypt(value: str | None) -> str | None:
 
 
 def decrypt(encrypted_value: str | None) -> str | None:
-    """Decrypt a sensitive value. Returns None if value is None or decryption fails."""
+    """
+    Decrypt a sensitive value. Gracefully handles both encrypted and plain text values.
+    Returns encrypted_value as-is if decryption fails (assumes plain text from pre-encryption).
+    """
     if not encrypted_value or not cipher:
         return encrypted_value
     try:
         return cipher.decrypt(encrypted_value.encode()).decode()
-    except InvalidToken:
-        logger.warning("Invalid encryption token — returning empty string")
-        return None
-    except Exception as e:
-        logger.error(f"Decryption failed: {e}")
-        return None
+    except (InvalidToken, Exception):
+        # Value is plain text (pre-encryption migration) or cipher is disabled
+        # Return as-is — it will get encrypted next time user saves settings
+        logger.debug(f"Treating value as plain text (pre-encryption or cipher disabled)")
+        return encrypted_value
 
 
 def mask_credential(value: str | None, show_chars: int = 4) -> str | None:
