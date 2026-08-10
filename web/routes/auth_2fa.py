@@ -66,7 +66,8 @@ async def setup_2fa(user: dict = Depends(get_current_user)):
 
 
 @router.post("/2fa/enable")
-async def enable_2fa(req: Verify2FAConfirmRequest, user: dict = Depends(get_current_user)):
+@limiter.limit("10/minute")  # Prevent brute-force on 2FA setup confirmation
+async def enable_2fa(request: Request, req: Verify2FAConfirmRequest, user: dict = Depends(get_current_user)):
     """Confirm 2FA setup and enable it."""
     db = get_db()
 
@@ -95,7 +96,8 @@ async def enable_2fa(req: Verify2FAConfirmRequest, user: dict = Depends(get_curr
 
 
 @router.post("/2fa/disable")
-async def disable_2fa(req: Verify2FARequest, user: dict = Depends(get_current_user)):
+@limiter.limit("10/minute")  # Prevent brute-force attempts to disable 2FA
+async def disable_2fa(request: Request, req: Verify2FARequest, user: dict = Depends(get_current_user)):
     """Disable 2FA after verifying current code."""
     db = get_db()
 

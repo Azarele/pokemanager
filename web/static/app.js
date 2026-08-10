@@ -4728,7 +4728,14 @@ async function enable2FA() {
     };
     document.addEventListener('keydown', _2faEscapeHandler);
 
-    document.getElementById('2fa-code')?.focus();
+    // Add input validation for 2FA code — only digits, max 6
+    const codeInput = document.getElementById('2fa-code');
+    if (codeInput) {
+      codeInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+      });
+      codeInput.focus();
+    }
   } catch (e) {
     console.error('[2fa] Setup error:', e);
     toast('Failed to start 2FA setup: ' + extractError(e.message), 'error');
@@ -4769,13 +4776,18 @@ async function confirm2FA(secret, btn) {
 
 async function disable2FA() {
   const code = prompt('Enter your 6-digit 2FA code to confirm disabling:');
-  if (!code || code.length !== 6) {
-    if (code !== null) toast('Invalid code', 'error');
+  if (!code) {
+    return;
+  }
+  // Sanitize: only digits, max 6 chars
+  const sanitized = code.replace(/\D/g, '').slice(0, 6);
+  if (sanitized.length !== 6) {
+    toast('Enter a valid 6-digit code', 'error');
     return;
   }
 
   try {
-    const response = await api.post('/auth/2fa/disable', { code });
+    const response = await api.post('/auth/2fa/disable', { code: sanitized });
     console.log('[2fa] Disable response:', response);
 
     if (response.success) {
