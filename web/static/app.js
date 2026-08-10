@@ -4616,8 +4616,134 @@ async function renderSettings() {
         </div>
       </div>
 
+      <!-- Security -->
+      <div class="settings-card">
+        <h3 class="settings-section-title">🔒 Security</h3>
+        <div class="form-section">
+          <label class="form-label">Two-Factor Authentication (2FA)</label>
+          ${settings?.two_fa_enabled ? `
+            <div style="background:rgba(76,175,125,0.08);border:1px solid rgba(76,175,125,0.2);border-radius:8px;padding:12px;margin-bottom:12px">
+              <div style="display:flex;align-items:center;gap:8px;color:var(--success)">
+                <span>✅</span>
+                <span>Two-Factor Authentication — Enabled</span>
+              </div>
+            </div>
+            <p class="text-muted" style="font-size:12px;margin-bottom:12px">Your account is protected with a 6-digit code from your authenticator app.</p>
+            <button class="btn btn-ghost btn-sm" onclick="disable2FA()">Disable 2FA</button>
+          ` : `
+            <div style="background:rgba(200,200,200,0.1);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+              <div style="display:flex;align-items:center;gap:8px;color:var(--text-muted)">
+                <span>⚠️</span>
+                <span>Not enabled — Add an extra layer of security</span>
+              </div>
+            </div>
+            <button class="btn btn-accent btn-sm" onclick="enable2FA()">Enable 2FA</button>
+          `}
+        </div>
+      </div>
+
     </div>
   `;
+}
+
+async function enable2FA() {
+  console.log('[2fa] Starting 2FA setup...');
+  try {
+    const response = await api.post('/auth/2fa/setup', {});
+    console.log('[2fa] Setup response:', response);
+
+    if (!response.secret || !response.qr_code) {
+      toast('Failed to generate 2FA setup', 'error');
+      return;
+    }
+
+    // Show QR code modal
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
+    modal.innerHTML = `
+      <div style="background:var(--surface);border-radius:12px;padding:24px;max-width:400px;width:90%">
+        <h2 style="margin:0 0 16px 0">Scan to Enable 2FA</h2>
+        <p style="color:var(--text-muted);font-size:13px;margin:0 0 16px 0">
+          Scan this QR code with Google Authenticator, Authy, or any compatible authenticator app.
+        </p>
+        <div style="background:white;padding:16px;border-radius:8px;margin-bottom:16px">
+          <img src="${response.qr_code}" style="width:100%;height:auto">
+        </div>
+        <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px 0">
+          <strong>Can't scan?</strong> Enter this code manually:<br>
+          <code style="background:var(--bg);padding:4px 8px;border-radius:4px;font-family:monospace;font-size:11px">${response.secret}</code>
+        </p>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:6px">Enter 6-digit code to confirm:</label>
+          <input id="2fa-code" class="form-input" type="text" placeholder="000000" maxlength="6" style="font-size:16px;letter-spacing:2px">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-accent" style="flex:1" onclick="confirm2FA('${response.secret}', this)">Activate 2FA</button>
+          <button class="btn btn-ghost" style="flex:1" onclick="this.closest('div').parentElement.remove()">Cancel</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('2fa-code')?.focus();
+  } catch (e) {
+    console.error('[2fa] Setup error:', e);
+    toast('Failed to start 2FA setup: ' + extractError(e.message), 'error');
+  }
+}
+
+async function confirm2FA(secret, btn) {
+  const code = document.getElementById('2fa-code')?.value.trim();
+  if (!code || code.length !== 6) {
+    toast('Enter a valid 6-digit code', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Activating...';
+
+  try {
+    // Pass secret in request body (client-side generated during setup)
+    const response = await api.post('/auth/2fa/enable', { code, _setup_secret: secret });
+    console.log('[2fa] Enable response:', response);
+
+    if (response.success) {
+      toast('✅ 2FA enabled successfully', 'success');
+      document.querySelector('[style*="position:fixed"]')?.remove();
+      renderSettings();
+    } else {
+      toast('Invalid code. Try again.', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Activate 2FA';
+    }
+  } catch (e) {
+    console.error('[2fa] Enable error:', e);
+    toast('Failed to enable 2FA: ' + extractError(e.message), 'error');
+    btn.disabled = false;
+    btn.textContent = 'Activate 2FA';
+  }
+}
+
+async function disable2FA() {
+  const code = prompt('Enter your 6-digit 2FA code to confirm disabling:');
+  if (!code || code.length !== 6) {
+    if (code !== null) toast('Invalid code', 'error');
+    return;
+  }
+
+  try {
+    const response = await api.post('/auth/2fa/disable', { code });
+    console.log('[2fa] Disable response:', response);
+
+    if (response.success) {
+      toast('2FA disabled', 'success');
+      renderSettings();
+    } else {
+      toast('Invalid 2FA code', 'error');
+    }
+  } catch (e) {
+    console.error('[2fa] Disable error:', e);
+    toast('Failed to disable 2FA: ' + extractError(e.message), 'error');
+  }
 }
 
 async function saveAccountSettings() {

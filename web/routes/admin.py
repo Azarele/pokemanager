@@ -8,7 +8,7 @@ import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from web.auth import get_current_user
 from web.database import get_db
-from web.background_sync import sync_ebay_live_prices
+from web.background_sync import sync_ebay_live_prices, get_token_refresh_status
 
 logger = logging.getLogger(__name__)
 
@@ -236,3 +236,20 @@ async def trigger_ebay_price_sync(admin: dict = Depends(require_admin)):
             "success": False,
             "error": str(e)
         }
+
+
+@router.get("/token-refresh-status")
+async def get_ebay_token_refresh_status(admin: dict = Depends(require_admin)):
+    """
+    Get the status of the last eBay token refresh cycle.
+    Returns when the last refresh ran and how many succeeded/failed.
+    Admin only.
+    """
+    status = get_token_refresh_status()
+    return {
+        "last_run": status.get("last_run"),
+        "total_users": status.get("total_users", 0),
+        "success_count": status.get("success_count", 0),
+        "failed_count": status.get("failed_count", 0),
+        "status": "idle" if not status.get("last_run") else "completed"
+    }

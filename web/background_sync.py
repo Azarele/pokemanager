@@ -17,6 +17,18 @@ logger = logging.getLogger(__name__)
 _sync_task: Optional[asyncio.Task] = None
 _token_refresh_task: Optional[asyncio.Task] = None
 
+# Token refresh status tracking (in-memory)
+_token_refresh_status = {
+    "last_run": None,
+    "success_count": 0,
+    "failed_count": 0,
+    "total_users": 0
+}
+
+def get_token_refresh_status():
+    """Get the current token refresh status."""
+    return _token_refresh_status.copy()
+
 
 async def sync_ebay_live_prices():
     """
@@ -183,8 +195,10 @@ async def refresh_ebay_tokens():
     Updates ebay_access_token and ebay_token_expires_at in database.
     Runs every 12 hours to keep tokens fresh.
     """
+    global _token_refresh_status
+
     try:
-        logger.info("[bg-token] Starting eBay token refresh")
+        logger.info("[token-refresh] Starting eBay token refresh")
         db_client = get_db()
 
         # Fetch all users with eBay refresh tokens
@@ -193,14 +207,20 @@ async def refresh_ebay_tokens():
         ).not_.is_("ebay_refresh_token", "null").execute()
 
         users_with_tokens = result.data or []
+        total_users = len(users_with_tokens)
+
         if not users_with_tokens:
-            logger.info("[bg-token] No users with eBay tokens to refresh")
+            logger.info("[token-refresh] No users with eBay tokens to refresh")
+            _token_refresh_status["last_run"] = datetime.now(timezone.utc).isoformat()
+            _token_refresh_status["total_users"] = 0
+            _token_refresh_status["success_count"] = 0
+            _token_refresh_status["failed_count"] = 0
             return
 
-        logger.info(f"[bg-token] Refreshing tokens for {len(users_with_tokens)} users")
+        logger.info(f"[token-refresh] Starting eBay token refresh for {total_users} users")
 
         success_count = 0
-        error_count = 0
+        failed_count = 0
 
         for user in users_with_tokens:
             user_id = user.get("id")
@@ -220,8 +240,8 @@ async def refresh_ebay_tokens():
                     )
 
                 if not new_token:
-                    logger.warning(f"[bg-token] Failed to refresh token for user {user_id}")
-                    error_count += 1
+                    logger.warning(f"[token-refresh] User {user_id}: token refresh failed")
+                    failed_count += 1
                     continue
 
                 # Calculate expiration time (eBay tokens usually expire in 24 hours)
@@ -234,19 +254,25 @@ async def refresh_ebay_tokens():
                 }).eq("id", user_id).execute()
 
                 success_count += 1
-                logger.info(f"[bg-token] Refreshed token for user {user_id}")
+                logger.info(f"[token-refresh] User {user_id}: token refreshed successfully")
 
             except Exception as e:
-                logger.error(f"[bg-token] Error refreshing token for user {user_id}: {e}")
-                error_count += 1
+                logger.error(f"[token-refresh] User {user_id}: failed: {type(e).__name__}: {str(e)}")
+                failed_count += 1
+
+        # Update status tracking
+        _token_refresh_status["last_run"] = datetime.now(timezone.utc).isoformat()
+        _token_refresh_status["success_count"] = success_count
+        _token_refresh_status["failed_count"] = failed_count
+        _token_refresh_status["total_users"] = total_users
 
         logger.info(
-            f"[bg-token] Token refresh complete: "
-            f"success={success_count}, errors={error_count}"
+            f"[token-refresh] Refresh complete: {success_count} succeeded, {failed_count} failed"
         )
 
     except Exception as e:
-        logger.error(f"[bg-token] Fatal error in token refresh: {e}", exc_info=True)
+        logger.error(f"[token-refresh] Fatal error: {type(e).__name__}: {str(e)}", exc_info=True)
+        _token_refresh_status["last_run"] = datetime.now(timezone.utc).isoformat()
 
 
 async def token_refresh_loop():
