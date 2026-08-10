@@ -71,11 +71,12 @@ async def get_month_sales(user: dict = Depends(get_current_user)):
     month_sales = [i for i in all_items if str(i.get("date_sold", "") or "").startswith(prefix)]
     revenue = sum(float(i.get("sell_price") or 0) for i in month_sales)
     cost    = sum(float(i.get("purchase_price") or 0) for i in month_sales)
+    profit  = sum(float(i.get("profit") or 0) for i in month_sales)
     return {
         "month":   prefix,
         "count":   len(month_sales),
         "revenue": round(revenue, 2),
-        "profit":  round(revenue - cost, 2),
+        "profit":  round(profit, 2),
         "sales":   month_sales,
     }
 
