@@ -4646,6 +4646,28 @@ async function renderSettings() {
   `;
 }
 
+// Store the escape handler so we can remove it later
+let _2faEscapeHandler = null;
+
+function close2FAModal() {
+  console.log('[2fa] Closing 2FA modal');
+
+  // Remove the modal from DOM
+  const modal = document.getElementById('2fa-modal-backdrop');
+  if (modal) {
+    modal.remove();
+  }
+
+  // Remove escape key listener
+  if (_2faEscapeHandler) {
+    document.removeEventListener('keydown', _2faEscapeHandler);
+    _2faEscapeHandler = null;
+  }
+
+  // Restore body scrolling
+  document.body.style.overflow = '';
+}
+
 async function enable2FA() {
   console.log('[2fa] Starting 2FA setup...');
   try {
@@ -4657,11 +4679,23 @@ async function enable2FA() {
       return;
     }
 
-    // Show QR code modal
-    const modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
-    modal.innerHTML = `
-      <div style="background:var(--surface);border-radius:12px;padding:24px;max-width:400px;width:90%">
+    // Disable body scrolling
+    document.body.style.overflow = 'hidden';
+
+    // Show QR code modal with backdrop
+    const backdrop = document.createElement('div');
+    backdrop.id = '2fa-modal-backdrop';
+    backdrop.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer';
+
+    // Close modal when clicking on backdrop
+    backdrop.onclick = function(e) {
+      if (e.target === backdrop) {
+        close2FAModal();
+      }
+    };
+
+    backdrop.innerHTML = `
+      <div style="background:var(--surface);border-radius:12px;padding:24px;max-width:400px;width:90%;cursor:default" onclick="event.stopPropagation()">
         <h2 style="margin:0 0 16px 0">Scan to Enable 2FA</h2>
         <p style="color:var(--text-muted);font-size:13px;margin:0 0 16px 0">
           Scan this QR code with Google Authenticator, Authy, or any compatible authenticator app.
@@ -4679,11 +4713,21 @@ async function enable2FA() {
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-accent" style="flex:1" onclick="confirm2FA('${response.secret}', this)">Activate 2FA</button>
-          <button class="btn btn-ghost" style="flex:1" onclick="this.closest('div').parentElement.remove()">Cancel</button>
+          <button class="btn btn-ghost" style="flex:1" onclick="close2FAModal()">Cancel</button>
         </div>
       </div>
     `;
-    document.body.appendChild(modal);
+
+    document.body.appendChild(backdrop);
+
+    // Add Escape key handler
+    _2faEscapeHandler = function(e) {
+      if (e.key === 'Escape') {
+        close2FAModal();
+      }
+    };
+    document.addEventListener('keydown', _2faEscapeHandler);
+
     document.getElementById('2fa-code')?.focus();
   } catch (e) {
     console.error('[2fa] Setup error:', e);
@@ -4708,7 +4752,7 @@ async function confirm2FA(secret, btn) {
 
     if (response.success) {
       toast('✅ 2FA enabled successfully', 'success');
-      document.querySelector('[style*="position:fixed"]')?.remove();
+      close2FAModal();
       renderSettings();
     } else {
       toast('Invalid code. Try again.', 'error');
