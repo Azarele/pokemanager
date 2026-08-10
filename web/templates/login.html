@@ -368,13 +368,78 @@
       color: var(--success);
     }
 
-    #login-form, #register-form {
+    #login-form, #register-form, #2fa-form {
       display: none;
     }
 
-    #login-form.active, #register-form.active {
+    #login-form.active, #register-form.active, #2fa-form.active {
       display: block;
       animation: slideInUp 0.3s ease-out;
+    }
+
+    .form-center-text {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .form-center-text h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .form-center-text p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .code-input-group {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin: 24px 0;
+    }
+
+    .code-digit {
+      width: 48px;
+      height: 48px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      border: 1.5px solid #e2e6ed;
+      border-radius: 10px;
+      background: #f9fafb;
+      color: var(--text);
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    .code-digit:focus {
+      background: white;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.1);
+    }
+
+    .code-digit.error {
+      border-color: var(--danger);
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    .back-link {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+
+    .back-link a {
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .back-link a:hover {
+      text-decoration: underline;
     }
 
     .form-note {
@@ -553,6 +618,26 @@
           <p class="form-note">Free account — no credit card needed</p>
         </form>
 
+        <!-- 2FA Form -->
+        <form id="2fa-form" onsubmit="handle2FA(event)">
+          <div class="form-center-text">
+            <h2>🔒 Two-Factor Authentication</h2>
+            <p>Enter the 6-digit code from your authenticator app</p>
+          </div>
+          <div class="code-input-group" id="code-input-group">
+            <input type="text" class="code-digit" maxlength="1" inputmode="numeric" placeholder="•" autocomplete="off">
+            <input type="text" class="code-digit" maxlength="1" inputmode="numeric" placeholder="•" autocomplete="off">
+            <input type="text" class="code-digit" maxlength="1" inputmode="numeric" placeholder="•" autocomplete="off">
+            <input type="text" class="code-digit" maxlength="1" inputmode="numeric" placeholder="•" autocomplete="off">
+            <input type="text" class="code-digit" maxlength="1" inputmode="numeric" placeholder="•" autocomplete="off">
+            <input type="text" class="code-digit" maxlength="1" inputmode="numeric" placeholder="•" autocomplete="off">
+          </div>
+          <button type="submit" class="btn-primary" id="2fa-btn">Verify</button>
+          <div class="back-link">
+            <a onclick="back2Login()">← Back to login</a>
+          </div>
+        </form>
+
         <p style="text-align:center;font-size:11px;color:rgba(0,0,0,0.5);margin-top:20px;line-height:1.6">
           By signing up you agree to our
           <a href="/terms" style="color:rgba(0,0,0,0.7);text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Terms</a> &
@@ -612,8 +697,16 @@
         });
         const data = await resp.json();
         if (resp.ok) {
-          showSuccess('Signed in! Redirecting…');
-          setTimeout(() => window.location.href = '/', 800);
+          // Check if 2FA is required
+          if (data.requires_2fa) {
+            // Store temp token and show 2FA screen
+            window._2faToken = data.temp_token;
+            show2FAForm();
+          } else {
+            // No 2FA, redirect to dashboard
+            showSuccess('Signed in! Redirecting…');
+            setTimeout(() => window.location.href = '/', 800);
+          }
         } else {
           showError(data.detail || 'Login failed');
           btn.disabled = false;
@@ -683,6 +776,98 @@
         showError('Google sign-in failed — try email instead');
         btn.disabled = false;
         btn.textContent = 'Continue with Google';
+      }
+    }
+
+    function show2FAForm() {
+      document.getElementById('login-form').classList.remove('active');
+      document.getElementById('register-form').classList.remove('active');
+      document.getElementById('2fa-form').classList.add('active');
+      hideMessages();
+      // Focus first digit input
+      document.querySelector('.code-digit').focus();
+      // Setup digit input handlers
+      setup2FAInput();
+    }
+
+    function back2Login() {
+      document.getElementById('2fa-form').classList.remove('active');
+      document.getElementById('login-form').classList.add('active');
+      // Clear 2FA inputs
+      document.querySelectorAll('.code-digit').forEach(el => {
+        el.value = '';
+        el.classList.remove('error');
+      });
+      hideMessages();
+    }
+
+    function setup2FAInput() {
+      const inputs = document.querySelectorAll('.code-digit');
+      inputs.forEach((input, index) => {
+        input.addEventListener('input', (e) => {
+          // Only allow digits
+          e.target.value = e.target.value.replace(/[^0-9]/g, '');
+          // Move to next input if digit entered
+          if (e.target.value && index < inputs.length - 1) {
+            inputs[index + 1].focus();
+          }
+        });
+        input.addEventListener('keydown', (e) => {
+          // Handle backspace to move to previous input
+          if (e.key === 'Backspace' && !e.target.value && index > 0) {
+            inputs[index - 1].focus();
+          }
+          // Handle escape key
+          if (e.key === 'Escape') {
+            back2Login();
+          }
+        });
+      });
+    }
+
+    async function handle2FA(e) {
+      e.preventDefault();
+      const btn = document.getElementById('2fa-btn');
+      const inputs = document.querySelectorAll('.code-digit');
+      const code = Array.from(inputs).map(el => el.value).join('');
+
+      if (code.length !== 6) {
+        inputs.forEach(el => el.classList.add('error'));
+        showError('Please enter a complete 6-digit code');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Verifying…';
+      hideMessages();
+
+      try {
+        const resp = await fetch('/api/auth/login/verify-2fa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            temp_token: window._2faToken,
+            code: code,
+          }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          showSuccess('Verified! Redirecting…');
+          setTimeout(() => window.location.href = '/', 800);
+        } else {
+          showError('Invalid code, try again');
+          inputs.forEach(el => {
+            el.value = '';
+            el.classList.add('error');
+          });
+          inputs[0].focus();
+          btn.disabled = false;
+          btn.textContent = 'Verify';
+        }
+      } catch {
+        showError('Network error — please try again');
+        btn.disabled = false;
+        btn.textContent = 'Verify';
       }
     }
 
