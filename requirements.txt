@@ -30,5 +30,8 @@ stripe>=10.0.0
 # Image generation (Instagram stories)
 pillow>=10.0.0
 
-# Security — rate limiting
+# Security — rate limiting, encryption, 2FA
 slowapi>=0.1.9
+cryptography>=41.0.0
+pyotp>=2.9.0
+qrcode>=7.4.0

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from web.auth import get_current_user
 from web.database import get_db
 from web.notifications import send_discord_notification
+from web.encryption import encrypt, decrypt, mask_credential
 import config
 import requests
 import logging
@@ -12,14 +13,22 @@ router = APIRouter()
 
 @router.get("")
 async def get_settings(user: dict = Depends(get_current_user)):
-    """Return current settings — mask sensitive values."""
+    """Return current settings — mask/hide sensitive values."""
+    # Decrypt credentials if encrypted
+    ebay_app_id = decrypt(user.get("ebay_app_id")) or ""
+    ebay_cert_id = decrypt(user.get("ebay_cert_id")) or ""
+    gemini_api_key = decrypt(user.get("gemini_api_key")) or ""
+
     return {
         "display_name":      user.get("display_name", ""),
         "email":             user.get("email", ""),
         "plan":              user.get("plan", "free"),
-        "has_ebay":          bool(user.get("ebay_app_id")),
-        "has_gemini":        bool(user.get("gemini_api_key")),
+        "has_ebay":          bool(ebay_app_id),
+        "has_gemini":        bool(gemini_api_key),
         "has_discord":       bool(user.get("discord_webhook_url")),
+        "ebay_app_id_masked": mask_credential(ebay_app_id),  # Show only last 4 chars
+        "ebay_cert_id_masked": mask_credential(ebay_cert_id),  # Show only last 4 chars
+        "gemini_api_key_masked": mask_credential(gemini_api_key),  # Show only last 4 chars
         "ebay_fee_rate":     user.get("ebay_fee_rate", 0.1235),
         "postage_cost":      user.get("postage_cost", 1.50),
         "promoted_listing_pct": float(user.get("promoted_listing_pct") or 0),
@@ -31,12 +40,13 @@ async def get_settings(user: dict = Depends(get_current_user)):
         "ebay_payment_policy_id":     user.get("ebay_payment_policy_id", ""),
         "ebay_return_policy_id":      user.get("ebay_return_policy_id", ""),
         "onboarding_dismissed": user.get("onboarding_dismissed", False),
+        "two_fa_enabled":    user.get("two_fa_enabled", False),
     }
 
 
 @router.patch("")
 async def update_settings(body: dict, user: dict = Depends(get_current_user)):
-    """Update user settings and API keys."""
+    """Update user settings and API keys. Encrypts sensitive credentials."""
     db = get_db()
     allowed = {
         "display_name", "ebay_fee_rate", "postage_cost", "promoted_listing_pct",
@@ -51,6 +61,12 @@ async def update_settings(body: dict, user: dict = Depends(get_current_user)):
     updates = {k: v for k, v in body.items() if k in allowed and v is not None}
     if not updates:
         return {"success": False, "error": "Nothing to update"}
+
+    # Encrypt sensitive credentials before storing
+    encrypted_fields = {"ebay_app_id", "ebay_dev_id", "ebay_cert_id", "ebay_refresh_token", "gemini_api_key"}
+    for field in encrypted_fields:
+        if field in updates and updates[field]:
+            updates[field] = encrypt(updates[field])
 
     db.table("user_profiles").update(updates).eq("id", user["id"]).execute()
     return {"success": True, "updated": list(updates.keys())}
@@ -230,8 +246,9 @@ async def exchange_ebay_token(body: dict, user: dict = Depends(get_current_user)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid redirect URL: {e}")
 
-    app_id = user.get("ebay_app_id", "").strip()
-    cert_id = user.get("ebay_cert_id", "").strip()
+    # Decrypt credentials
+    app_id = (decrypt(user.get("ebay_app_id")) or "").strip()
+    cert_id = (decrypt(user.get("ebay_cert_id")) or "").strip()
 
     if not app_id:
         raise HTTPException(
@@ -269,10 +286,10 @@ async def exchange_ebay_token(body: dict, user: dict = Depends(get_current_user)
         if not refresh_token:
             raise ValueError("No refresh token in eBay response")
 
-        # Save refresh token to user profile
+        # Save refresh token to user profile (encrypted)
         db = get_db()
         db.table("user_profiles").update({
-            "ebay_refresh_token": refresh_token
+            "ebay_refresh_token": encrypt(refresh_token)
         }).eq("id", user["id"]).execute()
 
         logger.info(f"[ebay-oauth] User {user['id']} connected eBay account")

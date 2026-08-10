@@ -17,7 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from web.routes import inventory, listings, analytics, pricing, watchlist, sales, calculator, price_history, auth_routes, settings, billing, legal, admin, scan, ebay_sync, staff, exports, notifications
+from web.routes import inventory, listings, analytics, pricing, watchlist, sales, calculator, price_history, auth_routes, auth_2fa, settings, billing, legal, admin, scan, ebay_sync, staff, exports, notifications
 from web.middleware.auth import AuthMiddleware
 from web.middleware.rate_limit import RateLimitMiddleware
 from web.middleware.rate_limiter import limiter
@@ -99,8 +99,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         # Control referrer information
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        # Basic CSP — allow same-origin for scripts/styles, block unsafe inline
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'"
+        # CSP — allows external resources for images, fonts, Stripe, Google
+        csp = (
+            "default-src 'self'; "
+            "img-src 'self' data: https:; "
+            "script-src 'self' 'unsafe-inline' https://js.stripe.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com data:; "
+            "connect-src 'self' https://*.supabase.co https://api.stripe.com https://js.stripe.com; "
+            "frame-src https://js.stripe.com; "
+            "frame-ancestors 'none'"
+        )
+        response.headers["Content-Security-Policy"] = csp
         return response
 
 
@@ -115,16 +125,23 @@ app.add_exception_handler(RateLimitExceeded, lambda request, exc: JSONResponse(
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SlowAPIMiddleware)
+# CORS configuration — restrict to our domains
+allowed_origins = [
+    "https://pokemanager.app",
+    "http://localhost:8000",
+    "http://localhost:3000",  # Development frontend
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 app.add_middleware(AuthMiddleware)
 
 app.include_router(auth_routes.router,   prefix="/api/auth")
+app.include_router(auth_2fa.router,      prefix="/api/auth")
 app.include_router(inventory.router,     prefix="/api/inventory")
 app.include_router(listings.router,      prefix="/api/listings")
 app.include_router(analytics.router,     prefix="/api/analytics")
